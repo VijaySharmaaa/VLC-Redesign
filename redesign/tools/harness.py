@@ -8,6 +8,7 @@ read or written. Player state is set through VLC's rc interface; keys go
 through pywinauto (UIA), which also shows which controls have accessible names.
 """
 import argparse
+import msvcrt
 import os
 import socket
 import subprocess
@@ -27,18 +28,39 @@ MEDIA = os.path.join(HERE, '..', '.local', 'media')
 RC_PORT = 4212
 
 
+def _desktop_lock(timeout=1800):
+    """Hold one machine-wide lock while a session drives the desktop: parallel
+    sessions would steal each other's focus and keys. The OS drops it if we die."""
+    f = open(os.path.join(tempfile.gettempdir(), 'vlc-harness.lock'), 'a+')
+    deadline = time.time() + timeout
+    while True:
+        try:
+            msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
+            return f
+        except OSError:
+            if time.time() > deadline:
+                raise RuntimeError('another harness session held the desktop for %d s' % timeout)
+            time.sleep(1)
+
+
 class Vlc:
     def __init__(self, exe, extra=()):
+        self.lock = _desktop_lock()
         self.profile = tempfile.mkdtemp(prefix='vlc-harness-')
         env = dict(os.environ, APPDATA=self.profile)
         self.proc = subprocess.Popen(
             [exe, '--no-qt-privacy-ask', '--no-qt-updates-notif',
              '--extraintf=rc', '--rc-quiet', '--rc-host=127.0.0.1:%d' % RC_PORT,
              *extra], env=env)
-        self.sock = self._connect()
-        self.app = Application(backend='uia').connect(process=self.proc.pid, timeout=20)
-        self.main = self.app.top_window()
-        self.main.wait('visible ready', timeout=20)
+        try:
+            self.sock = self._connect()
+            self.app = Application(backend='uia').connect(process=self.proc.pid, timeout=20)
+            self.main = self.app.top_window()
+            self.main.wait('visible ready', timeout=20)
+        except Exception:                 # e.g. a broken plugin: don't leave VLC or the lock behind
+            self.proc.kill()
+            self.lock.close()
+            raise
 
     def _connect(self):
         deadline = time.time() + 20
@@ -134,6 +156,8 @@ class Vlc:
             self.proc.wait(timeout=10)
         except Exception:
             self.proc.kill()
+        finally:
+            self.lock.close()             # closing the handle releases the desktop lock
 
 
 def media(name):
