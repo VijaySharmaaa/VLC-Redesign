@@ -27,6 +27,7 @@
 
 #include "EPGView.hpp"
 #include "EPGItem.hpp"
+#include "util/theme.hpp"
 
 #include <QDateTime>
 #include <QRectF>
@@ -67,7 +68,7 @@ void EPGGraphicsScene::drawBackground( QPainter *painter, const QRectF &rect)
     }
 
     /* channels lines */
-    painter->setPen( QPen( QColor( 224, 224, 224 ) ) );
+    painter->setPen( QPen( Theme::instance()->ink( RedesignTokens::InkAlpha::Divider ) ) );
     for( int y = rect.top() + TRACKS_HEIGHT ; y < rect.bottom() ; y += TRACKS_HEIGHT )
        painter->drawLine( QLineF( rect.left(), y, rect.right(), y ) );
 
@@ -75,7 +76,7 @@ void EPGGraphicsScene::drawBackground( QPainter *painter, const QRectF &rect)
     if( epgView->epgTime().isValid() )
     {
         int x = epgView->startTime().secsTo( epgView->epgTime() );
-        painter->setPen( QPen( QColor( 255, 192, 192 ) ) );
+        painter->setPen( QPen( Theme::instance()->color( Theme::Accent ) ) );
         painter->drawLine( QLineF( x, rect.top(), x, rect.bottom() ) );
     }
 }

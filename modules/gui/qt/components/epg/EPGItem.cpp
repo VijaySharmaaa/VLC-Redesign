@@ -35,6 +35,7 @@
 #include "EPGView.hpp"
 
 #include "qt.hpp"
+#include "util/theme.hpp"
 
 EPGItem::EPGItem( const vlc_epg_event_t *data, EPGView *view, EPGProgram *prog )
     : QGraphicsItem()
@@ -56,7 +57,8 @@ QRectF EPGItem::boundingRect() const
 void EPGItem::paint( QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget*)
 {
     QPen pen;
-    QColor gradientColor;
+    QColor gradientColor, textColor;
+    const Theme *theme = Theme::instance();
 
     // Draw in view's coordinates
     painter->setWorldMatrixEnabled( false );
@@ -71,15 +73,21 @@ void EPGItem::paint( QPainter *painter, const QStyleOptionGraphicsItem *option, 
     QLinearGradient gradient( mapped.topLeft(), mapped.bottomLeft() );
 
     if ( program->getCurrent() == this )
-        gradientColor.setRgb( 244, 125, 0 , 255 );
+    {
+        gradientColor = theme->color( Theme::Accent );
+        textColor = theme->color( Theme::OnAccent );
+    }
     else
-        gradientColor.setRgb( 201, 217, 242 );
+    {
+        gradientColor = theme->color( Theme::Raised );
+        textColor = theme->color( Theme::Text );
+    }
 
     gradient.setColorAt( 0.0, gradientColor.lighter( 120 ) );
     gradient.setColorAt( 1.0, gradientColor );
 
     pen.setColor( option->state & QStyle::State_MouseOver || hasFocus()
-                  ? QColor( 0, 0, 0 ) : QColor( 192, 192, 192 ) );
+                  ? theme->color( Theme::Text ) : theme->ink( RedesignTokens::InkAlpha::Outline ) );
 
     pen.setStyle( option->state & QStyle::State_MouseOver && !hasFocus()
                   ? Qt::DashLine : Qt::SolidLine );
@@ -100,7 +108,7 @@ void EPGItem::paint( QPainter *painter, const QStyleOptionGraphicsItem *option, 
     // Adjust the drawing rect
     mapped.adjust( 6, 6, -6, -6 );
 
-    painter->setPen( Qt::black );
+    painter->setPen( textColor );
     /* Draw the title. */
     painter->drawText( mapped, Qt::AlignTop | Qt::AlignLeft, fm.elidedText( m_name, Qt::ElideRight, mapped.width() ) );
 
@@ -109,7 +117,8 @@ void EPGItem::paint( QPainter *painter, const QStyleOptionGraphicsItem *option, 
         QRectF iconsRect = QRectF( mapped.bottomRight(), mapped.bottomRight() );
         iconsRect.adjust( -20, -20, 0, 0 );
         painter->save();
-        painter->setBrush( Qt::white );
+        painter->setBrush( theme->color( Theme::Surface ) );
+        painter->setPen( theme->color( Theme::Text ) );
         f.setPixelSize( 8 );
         painter->setFont( f );
         painter->drawRect( iconsRect );

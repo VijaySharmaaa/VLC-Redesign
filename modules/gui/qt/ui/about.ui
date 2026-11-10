@@ -13,43 +13,6 @@
   <property name="windowTitle">
    <string>Dialog</string>
   </property>
-  <property name="styleSheet">
-   <string notr="true"> QScrollBar:vertical {
-     border: 1px solid #999999;
-     background: white;
-     width: 12px;
-     margin: 5px 0 5px 2;
- }
- QScrollBar::handle:vertical {
-     background: #777777;
-     min-height: 12px;
- }
- QScrollBar::add-line:vertical {
-     border: none;
-     background: none;
-     height: 0px;
-     subcontrol-position: bottom;
-     subcontrol-origin: margin;
- }
-
- QScrollBar::sub-line:vertical {
-     border: none;
-     background: none;
-     height: 0px;
-     subcontrol-position: top;
-     subcontrol-origin: margin;
- }
- QScrollBar::up-arrow:vertical, QScrollBar::down-arrow:vertical {
-     border: none;
-     width: 0px;
-     height: 0px;
-     background: none;
- }
-
- QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
-     background: none;
- }</string>
-  </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <property name="spacing">
     <number>0</number>
@@ -102,9 +65,6 @@
                  <verstretch>0</verstretch>
                 </sizepolicy>
                </property>
-               <property name="styleSheet">
-                <string notr="true">margin-bottom: 8px;margin-top: 4px;</string>
-               </property>
                <property name="text">
                 <string>Update</string>
                </property>
@@ -136,9 +96,6 @@
               <horstretch>0</horstretch>
               <verstretch>0</verstretch>
              </sizepolicy>
-            </property>
-            <property name="styleSheet">
-             <string notr="true">padding-right: 20px;</string>
             </property>
             <property name="alignment">
              <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
@@ -258,10 +215,6 @@
         <property name="cursor">
          <cursorShape>PointingHandCursor</cursorShape>
         </property>
-        <property name="styleSheet">
-         <string notr="true">font: 75 12pt &quot;Sans Serif&quot;;
-margin-bottom: 6px;</string>
-        </property>
         <property name="text">
          <string/>
         </property>
@@ -293,9 +246,6 @@ margin-bottom: 6px;</string>
         <property name="cursor">
          <cursorShape>PointingHandCursor</cursorShape>
         </property>
-        <property name="styleSheet">
-         <string notr="true">padding: 10px</string>
-        </property>
         <property name="alignment">
          <set>Qt::AlignCenter</set>
         </property>
@@ -306,9 +256,6 @@ margin-bottom: 6px;</string>
         <property name="cursor">
          <cursorShape>PointingHandCursor</cursorShape>
         </property>
-        <property name="styleSheet">
-         <string notr="true">padding: 10px</string>
-        </property>
         <property name="alignment">
          <set>Qt::AlignCenter</set>
         </property>
@@ -318,9 +265,6 @@ margin-bottom: 6px;</string>
        <widget class="QLabel" name="creditsButton">
         <property name="cursor">
          <cursorShape>PointingHandCursor</cursorShape>
-        </property>
-        <property name="styleSheet">
-         <string notr="true">padding: 10px;</string>
         </property>
         <property name="alignment">
          <set>Qt::AlignCenter</set>

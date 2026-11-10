@@ -22,6 +22,7 @@
  *****************************************************************************/
 
 #include "EPGRuler.hpp"
+#include "util/theme.hpp"
 
 class QPaintEvent;
 #include <QPainter>
@@ -122,7 +123,7 @@ void EPGRuler::paintEvent( QPaintEvent *event )
     here.rx() = localStartTime.secsTo( QDateTime::currentDateTime() ) * m_scale;
     if ( here.x() <= width() && here.x() >= 0 )
     {
-        p.setPen( QPen( QColor( 255, 0 , 0, 128 ) ) );
+        p.setPen( QPen( Theme::instance()->color( Theme::Accent ) ) );
         p.drawLine( here, QPoint( here.x(), here.y() + header.height() ) );
     }
 }

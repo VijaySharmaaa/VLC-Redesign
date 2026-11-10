@@ -36,8 +36,8 @@
       </item>
       <item row="2" column="0">
        <widget class="QLabel" name="examples">
-        <property name="styleSheet">
-         <string notr="true">color: #838383; </string>
+        <property name="role" stdset="0">
+         <string notr="true">hint</string>
         </property>
         <property name="text">
          <string notr="true">http://www.example.com/stream.avi

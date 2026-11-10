@@ -20,6 +20,7 @@
 
 #include "qt.hpp"
 #include "info_widgets.hpp"
+#include "util/theme.hpp"
 
 #include <QLabel>
 #include <QGraphicsView>
@@ -38,28 +39,36 @@ layout->addWidget( label, row, 0, 1, 1, 0 );
 
 VLCStatsView::VLCStatsView( QWidget *parent ) : QGraphicsView( parent )
 {
-    QColor history(0, 0, 0, 255),
-        total(237, 109, 0, 160),
-        content(109, 237, 0, 160);
-
     scale( 1.0, -1.0 ); /* invert our Y axis */
     setOptimizationFlags( QGraphicsView::DontAdjustForAntialiasing );
     setAlignment( Qt::AlignLeft );
     setVerticalScrollBarPolicy( Qt::ScrollBarAlwaysOff );
     setHorizontalScrollBarPolicy( Qt::ScrollBarAlwaysOff );
     viewScene = new QGraphicsScene( this );
-    historyShape = viewScene->addPolygon( QPolygonF(), QPen(Qt::NoPen),
-                                             QBrush(history) );
+    historyShape = viewScene->addPolygon( QPolygonF(), QPen(Qt::NoPen) );
     totalbitrateShape = viewScene->addPolygon( QPolygonF(), QPen(Qt::NoPen),
-                                           QBrush(total) );
+                            QBrush( Theme::instance()->color( Theme::AccentBorder50 ) ) );
     setScene( viewScene );
     reset();
 
     QPen linepen( Qt::DotLine );
     linepen.setCosmetic( true );
-    linepen.setBrush( QBrush( QColor( 33, 33, 33 ) ) );
     for ( int i=0; i<3; i++ )
         rulers[i] = viewScene->addLine( QLineF(), linepen );
+
+    /* the history and the rulers take the colours of the theme */
+    auto applyTheme = [this]() {
+        Theme *theme = Theme::instance();
+        historyShape->setBrush( theme->color( Theme::Mute ) );
+        for ( int i=0; i<3; i++ )
+        {
+            QPen pen = rulers[i]->pen();
+            pen.setColor( theme->ink( RedesignTokens::InkAlpha::Outline ) );
+            rulers[i]->setPen( pen );
+        }
+    };
+    applyTheme();
+    connect( Theme::instance(), &Theme::changed, this, applyTheme );
 }
 #undef ADD_LABEL
 

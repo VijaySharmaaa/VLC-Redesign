@@ -783,9 +783,6 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
                 ui.qt->setChecked( true );
             }
 
-            if ( var_InheritBool( p_intf, "qt-dark-palette" ) )
-                ui.qtdark->setChecked( true ); /*dark palette*/
-
             free( psz_intf );
 
             optionWidgets["skinRB"] = ui.skins;
@@ -816,7 +813,8 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
 #endif
             ui.styleStackedWidget->setCurrentIndex( radioGroup->checkedId() );
 
-			CONFIG_BOOL( "qt-dark-palette", qtdark );
+            /* applied by Theme::reload() when the preferences are saved */
+            CONFIG_GENERIC( "qt-redesign-theme", IntegerList, ui.themeLabel, themeCombo );
 
             connect( ui.minimalviewBox, &QCheckBox::toggled,
                      ui.mainPreview, &InterfacePreviewWidget::setNormalPreview );

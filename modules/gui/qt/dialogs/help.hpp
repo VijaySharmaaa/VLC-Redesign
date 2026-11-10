@@ -66,6 +66,7 @@ protected:
 
 private:
     bool b_advanced;
+    void applyTheme();
 
 private slots:
     void showLicense();
