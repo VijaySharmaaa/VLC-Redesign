@@ -221,7 +221,8 @@ void SpectrumWidget::tick()
     if( still || hidden() )
     {
         timer->setInterval( NowPlaying::SpectrumMotion );
-        if( still && std::any_of( shown, shown + BANDS, []( float h ) { return h != 0.f; } ) )
+        /* stopping while covered: flat, or the bars stay up when it returns */
+        if( ( still || !playing ) && std::any_of( shown, shown + BANDS, []( float h ) { return h != 0.f; } ) )
         {
             memset( shown, 0, sizeof( shown ) );
             update();
