@@ -54,6 +54,7 @@ class QSize;
 class QScreen;
 class QTimer;
 class StandardPLPanel;
+class Toast;
 class DropOverlay;
 struct vout_window_t;
 
@@ -99,6 +100,7 @@ public:
     bool isInterfaceFullScreen() { return b_interfaceFullScreen; }
     bool isInterfaceAlwaysOnTop() { return b_interfaceOnTop; }
     StandardPLPanel* getPlaylistView();
+    void showToast( const QString & );
 
 protected:
     void dropEventPlay( QDropEvent* event, bool b_play ) { dropEventPlay(event, b_play, true); }
@@ -151,6 +153,7 @@ protected:
 
     /* Widgets */
     QStackedWidget      *stackCentralW;
+    Toast               *toast;
     DropOverlay         *dropOverlay;
 
     VideoWidget         *videoWidget;

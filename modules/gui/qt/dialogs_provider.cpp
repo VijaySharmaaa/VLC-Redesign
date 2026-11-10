@@ -62,6 +62,7 @@
 #include <QApplication>
 #include <QSignalMapper>
 #include <QFileDialog>
+#include <QFileInfo>
 #include <QUrl>
 
 #define I_OP_DIR_WINTITLE I_DIR_OR_FOLDER( N_("Open Directory"), \
@@ -830,6 +831,9 @@ void DialogsProvider::loadSubtitlesFile()
         if( input_AddSlave( p_input, SLAVE_TYPE_SPU, qtu( qsUrl ), true, true, false ) )
             msg_Warn( p_intf, "unable to load subtitles from '%s'",
                       qtu( qsUrl ) );
+        else if( p_intf->p_sys->p_mi )
+            p_intf->p_sys->p_mi->showToast( qtr( "Loaded subtitle: %1" )
+                    .arg( QFileInfo( QUrl( qsUrl ).path() ).fileName() ) );
     }
 }
 

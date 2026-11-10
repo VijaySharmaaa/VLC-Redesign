@@ -39,6 +39,7 @@
 #include "util/theme.hpp"
 
 #include "components/interface_widgets.hpp"     // bgWidget, videoWidget
+#include "components/toast.hpp"
 #include "components/drop_overlay.hpp"
 #include "components/controller.hpp"            // controllers
 #include "components/playlist/playlist.hpp"     // plWidget
@@ -55,6 +56,7 @@
 #include <QSize>
 #include <QDate>
 #include <QMimeData>
+#include <QFileInfo>
 
 #include <QWindow>
 #include <QMenu>
@@ -232,6 +234,7 @@ MainInterface::MainInterface( intf_thread_t *_p_intf ) : QVLCMW( _p_intf )
     connect( THEDP, &DialogsProvider::toolBarConfUpdated, this, &MainInterface::toolBarConfUpdated );
     installEventFilter( this );
 
+    toast = new Toast( p_intf, this, stackCentralW );
     dropOverlay = new DropOverlay( this );
 
     connect( this, &MainInterface::askToQuit, THEDP, &DialogsProvider::quit );
@@ -1568,6 +1571,11 @@ void MainInterface::dropEvent(QDropEvent *event)
     dropEventPlay( event, true );
 }
 
+void MainInterface::showToast( const QString &message )
+{
+    toast->showMessage( message );
+}
+
 /**
  * dropEventPlay
  *
@@ -1592,6 +1600,8 @@ void MainInterface::dropEventPlay( QDropEvent *event, bool b_play, bool b_playli
         if( !input_AddSlave( THEMIM->getInput(), SLAVE_TYPE_SPU,
                  qtu( mimeData->urls()[0].toString() ), true, true, true ) )
         {
+            showToast( qtr( "Loaded subtitle: %1" )
+                       .arg( QFileInfo( mimeData->urls()[0].path() ).fileName() ) );
             event->accept();
             return;
         }
