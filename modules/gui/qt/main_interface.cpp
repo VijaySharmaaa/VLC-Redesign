@@ -1224,8 +1224,10 @@ void MainInterface::setVideoSize( unsigned int w, unsigned int h )
 
 void MainInterface::videoSizeChanged( int w, int h )
 {
+    /* the video at its size, the docked side panels beside it (resizeStack
+     * keeps the window in the work area) */
     if( !playlistWidget || playlistWidget->artContainer->currentWidget() != videoWidget )
-        resizeStack( w, h );
+        resizeStack( w + stackAreaSize().width() - stackCentralW->width(), h );
 }
 
 void MainInterface::setVideoFullScreen( bool fs )
@@ -1784,7 +1786,7 @@ void MainInterface::toggleMinimalView( bool b_minimal )
         {
             if( stackCentralW->height() < 16 )
             {
-                resizeStack( stackCentralW->width(), 100 );
+                resizeStack( stackAreaSize().width(), 100 );
             }
         }
     }
