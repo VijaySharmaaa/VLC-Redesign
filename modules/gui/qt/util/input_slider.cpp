@@ -494,7 +494,9 @@ void SeekSlider::paintEvent( QPaintEvent *ev )
         if ( chapters ) foreach( const SeekPoint &point, chapters->getPoints() )
             option.points << point.time;
         QPainter painter( this );
-        style()->drawComplexControl( QStyle::CC_Slider, &option, &painter, this );
+        /* Not style(): with an application stylesheet that is a QStyleSheetStyle,
+         * which forwards a copy sliced to QStyleOptionSlider and loses our fields. */
+        alternativeStyle->drawComplexControl( QStyle::CC_Slider, &option, &painter, this );
     }
     else
         QSlider::paintEvent( ev );
