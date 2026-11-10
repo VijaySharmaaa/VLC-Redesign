@@ -75,6 +75,7 @@ protected:
     void paintEvent( QPaintEvent * ) Q_DECL_OVERRIDE;
 
 private:
+    float level() const;
     bool buffering() const;
     void refresh();
     void place();
@@ -84,7 +85,6 @@ private:
     QVariantAnimation *spin;
     QTimer delay;
     QString url;
-    float level;
     bool onPlayer;
 };
 
