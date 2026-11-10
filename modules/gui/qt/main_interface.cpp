@@ -924,15 +924,35 @@ int MainInterface::windowWidthFor( int stackWidth, int otherWidth, bool withSide
     return otherWidth + stackWidth + Sidebar::widthAt( BreakpointWatcher::L );
 }
 
+/* The stack and the docked side panels (playlist, Effects sheet) beside it:
+ * a panel takes its width from the view, it never widens the window */
+QSize MainInterface::stackAreaSize() const
+{
+    int w = stackCentralW->width();
+    foreach( QWidget *panel, stackCentralW->parentWidget()->findChildren<QWidget *>(
+                                 QString(), Qt::FindDirectChildrenOnly ) )
+        if( panel != sidebar && panel != stackCentralW && panel->isVisible() )
+            w += panel->width();
+    return QSize( w, stackCentralW->height() );
+}
+
+/* w is the width of the stack area (see stackAreaSize) */
 void MainInterface::resizeStack( int w, int h )
 {
     if( !isFullScreen() && !isMaximized() && !b_isWindowTiled )
     {
         const bool withSidebar = !sidebar->isHidden();
-        const int other = width() - stackCentralW->width()
+        const int other = width() - stackAreaSize().width()
                         - ( withSidebar ? sidebar->width() : 0 );
-        resizeWindow( windowWidthFor( w, other, withSidebar ),
-                      height() - stackCentralW->height() + h );
+        /* never past the work area, nor below what the sidebar and the
+         * rows need (a small video squashed them) */
+        const QSize frame = frameGeometry().size() - size();
+        const QSize work = QApplication::desktop()->availableGeometry( this ).size() - frame;
+        const QSize target = QSize( windowWidthFor( w, other, withSidebar ),
+                                    height() - stackCentralW->height() + h )
+                .expandedTo( QSize( 0, minimumSizeHint().height() ) )
+                .boundedTo( work );
+        resizeWindow( target.width(), target.height() );
     }
     debug();
 }
@@ -962,7 +982,7 @@ inline void MainInterface::showTab( QWidget *widget, bool video_closing )
 
     stackCentralOldWidget = stackCentralW->currentWidget();
     if( !isFullScreen() )
-        stackWidgetsSizes[stackCentralOldWidget] = stackCentralW->size();
+        stackWidgetsSizes[stackCentralOldWidget] = stackAreaSize();
 
     /* If we are playing video, embedded */
     if( !video_closing && videoWidget && THEMIM->getIM()->hasVideo() )
@@ -1146,7 +1166,7 @@ void MainInterface::setVideoSize( unsigned int w, unsigned int h )
             {
                 /* the stack's width in a window as wide as the screen */
                 const bool withSidebar = !sidebar->isHidden();
-                w = screen.width() - ( width() - stackCentralW->width() );
+                w = screen.width() - ( width() - stackAreaSize().width() );
                 if( withSidebar )
                     w += sidebar->width() - Sidebar::widthAt(
                              BreakpointWatcher::fromWidth( screen.width() ) );
@@ -1222,7 +1242,7 @@ void MainInterface::setVideoFullScreen( bool fs )
             showTab( videoWidget );
 
         /* we won't be able to get its windowed sized once in fullscreen, so update it now */
-        stackWidgetsSizes[stackCentralW->currentWidget()] = stackCentralW->size();
+        stackWidgetsSizes[stackCentralW->currentWidget()] = stackAreaSize();
 
         /* */
         displayNormalView();
