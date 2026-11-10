@@ -40,6 +40,7 @@
 #include "util/theme.hpp"
 #include "util/redesign_icons.hpp"
 
+#include <QAccessible>
 #include <QApplication>
 #include <QBoxLayout>
 #include <QGridLayout>
@@ -51,6 +52,8 @@
 #include <QPainter>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QStyleOptionTab>
+#include <QStylePainter>
 #include <QTabBar>
 #include <QTabWidget>
 #include <QToolButton>
@@ -100,6 +103,67 @@ void asPages( QTabWidget *pages )
     fit( pages->currentIndex() );
 }
 
+/* QTabBar elides a label for the whole tab: Qt 5.6's style sheet style
+ * counts no padding for the label (SE_TabBarTabText), so in the narrow
+ * drawer the padded label was clipped at both ends instead. This bar
+ * elides for the padded width; the rest is QTabBar's own painting.
+ * shortcut: paints only what this bar uses (no scroll buttons, tear or
+ * moved tab); drop it once the Qt contrib counts style sheet padding */
+class SheetTabBar : public QTabBar
+{
+public:
+    explicit SheetTabBar( QWidget *parent ) : QTabBar( parent ) {}
+
+protected:
+    void paintEvent( QPaintEvent * ) Q_DECL_OVERRIDE
+    {
+        QStylePainter p( this );
+        if( drawBase() )
+        {
+            QStyleOptionTabBarBase base;
+            base.initFrom( this );
+            base.shape = shape();
+            base.documentMode = documentMode();
+            /* as QTabBar: the whole bar unless the style overlaps it */
+            QStyleOptionTab shapeOnly;
+            shapeOnly.shape = shape();
+            const int overlap = style()->pixelMetric( QStyle::PM_TabBarBaseOverlap, &shapeOnly, this );
+            if( overlap > 0 )
+                base.rect = QRect( 0, height() - overlap, width(), overlap );
+            for( int i = 0; i < count(); i++ )
+                base.tabBarRect |= tabRect( i );
+            base.selectedTabRect = tabRect( currentIndex() );
+            p.drawPrimitive( QStyle::PE_FrameTabBarBase, base );
+        }
+        /* the current tab last, over its neighbours */
+        for( int i = 0; i < count(); i++ )
+            if( i != currentIndex() )
+                drawTab( p, i );
+        if( currentIndex() >= 0 )
+            drawTab( p, currentIndex() );
+    }
+
+private:
+    void drawTab( QStylePainter &p, int i )
+    {
+        QStyleOptionTab tab;
+        initStyleOption( &tab, i );
+        /* the style sheet's tab: tabPadX and the focus ring on each side */
+        const int label = tab.rect.width() - 2 * Theme::instance()->px( Size::ButtonPadX );
+        tab.text = fontMetrics().elidedText( tabText( i ), elideMode(), label, Qt::TextShowMnemonic );
+        p.drawControl( QStyle::CE_TabBarTab, tab );
+    }
+};
+
+class SheetTabs : public QTabWidget
+{
+public:
+    explicit SheetTabs( QWidget *parent ) : QTabWidget( parent )
+    {
+        setTabBar( new SheetTabBar( this ) );
+    }
+};
+
 }
 
 ExtendedDialog::ExtendedDialog( intf_thread_t *_p_intf )
@@ -147,7 +211,7 @@ ExtendedDialog::ExtendedDialog( intf_thread_t *_p_intf )
     head->addWidget( close );
     layout->addLayout( head );
 
-    mainTabW = new QTabWidget( content );
+    mainTabW = new SheetTabs( content );
     mainTabW->setObjectName( "effectsTabs" );
     mainTabW->setDocumentMode( true );
     /* the drawer is narrow: a long tab shortens, no scroll arrows under "More" */
@@ -281,6 +345,17 @@ ExtendedDialog::ExtendedDialog( intf_thread_t *_p_intf )
             buddy->setAccessibleName( label->text().remove( QLatin1Char( '&' ) )
                                                    .remove( QLatin1Char( ':' ) ).trimmed() );
     }
+
+    /* A checkable group box disables each child while that child is still
+     * being constructed (QGroupBox::childEvent); with a screen reader on,
+     * the state event caches the child's accessible interface as a plain
+     * QWidget's (see QAccessible::updateAccessibility), so the effects'
+     * sliders were no sliders. Drop those interfaces: Qt makes them again,
+     * now from the finished widgets. */
+    if( QAccessible::isActive() )
+        foreach( QWidget *w, content->findChildren<QWidget *>() )
+            if( QAccessibleInterface *iface = QAccessible::queryAccessibleInterface( w ) )
+                QAccessible::deleteAccessibleInterface( QAccessible::uniqueId( iface ) );
 
     connect( THEMIM->getIM(), &InputManager::playingStatusChanged, this, &ExtendedDialog::changedItem );
     connect( t, &Theme::changed, this, static_cast<void (QWidget::*)()>( &QWidget::update ) );
