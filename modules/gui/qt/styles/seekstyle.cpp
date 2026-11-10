@@ -74,8 +74,9 @@ void SeekStyle::drawComplexControl( ComplexControl cc, const QStyleOptionComplex
         if ( const SeekStyle::SeekStyleOption *slideroptions =
              qstyleoption_cast<const SeekStyle::SeekStyleOption *>( option ) )
         {
-            /* theme detection */
-            bool dark = Theme::instance()->isDark();
+            /* colours from the theme (DESIGN_SPEC 3); sizes are still the classic ones */
+            const Theme *theme = Theme::instance();
+            const bool enabled = option->state & QStyle::State_Enabled;
             qreal sliderPos = -1;
 
             /* Get the needed subcontrols to draw the slider */
@@ -96,59 +97,9 @@ void SeekStyle::drawComplexControl( ComplexControl cc, const QStyleOptionComplex
                 sliderPos = ( ( (qreal)groove.width() ) / (qreal)slideroptions->maximum )
                         * (qreal)slideroptions->sliderPosition;
 
-                /* set the background color and gradient */
-                QColor backgroundBase = slideroptions->palette.color(QPalette::Window);
-                QLinearGradient backgroundGradient( 0, 0, 0, slideroptions->rect.height() );
-
-                if (dark)
-                {
-                    QColor top(0x25, 0x25, 0x25);
-                    QColor bot(0x65, 0x65, 0x65);
-
-                    backgroundGradient.setColorAt(0.00, top);
-                    backgroundGradient.setColorAt(1.00, bot);
-                } else {
-                    backgroundGradient.setColorAt(0.0, backgroundBase.darker(140));
-                    backgroundGradient.setColorAt(1.0, backgroundBase);
-                }
-
-                /* set the foreground color and gradient */
-                QColor foregroundBase( 50, 156, 255 );
-                QLinearGradient foregroundGradient( 0, 0, 0, groove.height() );
-
-                if (dark) {
-                    #ifdef Q_OS_WIN
-                        /* use accent color on windows dark mode */
-                        foregroundBase = slideroptions->palette.color(QPalette::Highlight);
-                    #endif
-                    /* adjust gradient dynamically based on accent */
-                    int v = foregroundBase.value();
-                    int lighterFactor = 130 + (255 - v) / 3;
-                    lighterFactor = qBound(130, lighterFactor, 200);
-
-                    int darkerFactor = 100 + v / 20;
-                    darkerFactor = qBound(100, darkerFactor, 115);
-
-                    foregroundGradient.setColorAt(0.0, foregroundBase.lighter(lighterFactor));
-                    foregroundGradient.setColorAt(1.0, foregroundBase.darker(darkerFactor));
-                } else {
-                    /* original vlc blue gloss */
-                    foregroundGradient.setColorAt(0.0, foregroundBase);
-                    foregroundGradient.setColorAt(1.0, foregroundBase.darker(125));
-                }
-
-                /* draw a slight 3d effect on the bottom */
-                if (dark)
-                    painter->setPen(slideroptions->palette.color(QPalette::Mid));
-                else
-                    painter->setPen(QColor(230, 230, 230));
-
-                painter->setBrush( Qt::NoBrush );
-                painter->drawRoundedRect( groove.adjusted( 0, 2, 0, 0 ), RADIUS, RADIUS );
-
-                /* draw background */
+                /* draw the track */
                 painter->setPen( Qt::NoPen );
-                painter->setBrush( backgroundGradient );
+                painter->setBrush( theme->ink( RedesignTokens::InkAlpha::Track ) );
                 painter->drawRoundedRect( groove, RADIUS, RADIUS );
 
                 /* adjusted foreground rectangle */
@@ -156,22 +107,21 @@ void SeekStyle::drawComplexControl( ComplexControl cc, const QStyleOptionComplex
 
                 valueRect.setWidth( sliderPos );
 
-                /* draw foreground */
+                /* draw the played part */
                 if ( slideroptions->sliderPosition > slideroptions->minimum && slideroptions->sliderPosition <= slideroptions->maximum )
                 {
-                    painter->setPen( Qt::NoPen );
-                    painter->setBrush( foregroundGradient );
+                    painter->setBrush( enabled ? theme->color( Theme::Accent )
+                                               : theme->ink( RedesignTokens::InkAlpha::ToggleOff ) );
                     painter->drawRoundedRect( valueRect, RADIUS, RADIUS );
                 }
 
+                /* loading: a segment bouncing along the track */
                 if ( slideroptions->buffering == 0.0 && slideroptions->animationloading > 0.0 )
                 {
                     int width = groove.width() - groove.width() / 6;
                     QRect innerRect = groove.adjusted( slideroptions->animationloading * width + 1, 1,
                             width * ( -1.0 + slideroptions->animationloading ) - 1, 0);
-                    QColor overlayColor = QColor( "Orange" );
-                    overlayColor.setAlpha( 128 );
-                    painter->setBrush( overlayColor );
+                    painter->setBrush( theme->color( Theme::AccentBorder50 ) );
                     painter->drawRoundedRect( innerRect, RADIUS, RADIUS );
                 }
 
@@ -180,9 +130,7 @@ void SeekStyle::drawComplexControl( ComplexControl cc, const QStyleOptionComplex
                 {
                     QRect innerRect = groove.adjusted( 1, 1,
                                         groove.width() * ( -1.0 + slideroptions->buffering ) - 1, 0 );
-                    QColor overlayColor = QColor( "Orange" );
-                    overlayColor.setAlpha( 128 );
-                    painter->setBrush( overlayColor );
+                    painter->setBrush( theme->ink( RedesignTokens::InkAlpha::Outline ) );
                     painter->drawRoundedRect( innerRect, RADIUS, RADIUS );
                 }
             }
@@ -201,97 +149,37 @@ void SeekStyle::drawComplexControl( ComplexControl cc, const QStyleOptionComplex
 
                 if ( option->state & QStyle::State_MouseOver || slideroptions->animate )
                 {
-                    QPalette p = slideroptions->palette;
-
                     /* draw chapters tickpoints */
                     if ( slideroptions->points.size() && slideroptions->length && groove.width() )
                     {
-                        QColor background = p.color( QPalette::Active, QPalette::Window );
-                        QColor foreground = p.color( QPalette::Active, QPalette::WindowText );
-                        foreground.setHsv( foreground.hue(),
-                                        ( background.saturation() + foreground.saturation() ) / 2,
-                                        ( background.value() + foreground.value() ) / 2 );
                         if ( slideroptions->orientation == Qt::Horizontal ) /* TODO: vertical */
                         {
+                            painter->setPen( theme->color( Theme::Mute ) );
+                            painter->setBrush( Qt::NoBrush );
                             foreach( int64_t time, slideroptions->points )
                             {
                                 int x = groove.x() + time / 1000000.0 / slideroptions->length * groove.width();
-                                QColor tick = p.color(QPalette::Mid);
-                                if (dark)
-                                    tick = p.color(QPalette::Light);
-                                painter->setPen(tick);
-                                painter->setBrush( Qt::NoBrush );
                                 painter->drawLine( x, slideroptions->rect.height(), x, slideroptions->rect.height() - CHAPTERSSPOTSIZE );
                             }
                         }
                     }
 
-                    /* draw handle */
-                    if ( option->state & QStyle::State_Enabled && sliderPos != -1 )
+                    /* draw handle: white knob in an accent halo */
+                    if ( enabled && sliderPos != -1 )
                     {
-                        QSize hSize = QSize( handle.height(), handle.height() ) - QSize( 6, 6 );;
+                        QSize hSize = QSize( handle.height(), handle.height() ) - QSize( 6, 6 );
                         QPoint pos = QPoint( handle.center().x() - ( hSize.width() / 2 ), handle.center().y() - ( hSize.height() / 2 ) );
 
-                        QPoint shadowPos( pos - QPoint( 2, 2 ) );
-                        QSize sSize( QSize( handle.height(), handle.height() ) - QSize( 2, 2 ) );
-
-                        /* prepare the handle's gradient */
-                        QLinearGradient handleGradient( 0, 0, 0, hSize.height() );
-
-                        // pick theme-based base color
-                        QColor base = p.color(QPalette::Window);
-
-                        QColor handleTop;
-                        QColor handleBottom;
-
-                        if (dark) {
-                            handleTop = base.lighter(105);
-                            handleBottom = base.darker(110);
-                        } else {
-                            handleTop = base.lighter(120);
-                            handleBottom = base.darker(120);
-                        }
-
-                        handleGradient.setColorAt(0.0, handleTop);
-                        handleGradient.setColorAt(0.9, handleBottom);
-
-                        /* prepare the handle's shadow gradient */
-                        QColor shadowBase = p.color(QPalette::Shadow);
-
-                        QColor shadowDark;
-                        QColor shadowLight;
-
-                        if (dark) {
-                            if (shadowBase.lightness() > 70)
-                                shadowBase = QColor(20,20,20);
-
-                            shadowDark = shadowBase.darker(130);
-                            shadowLight = shadowBase.lighter(140);
-                            shadowLight.setAlpha(40);
-                        } else {
-                            if (shadowBase.lightness() < 200)
-                                shadowBase = QColor(60,60,60);
-
-                            shadowDark = shadowBase.darker(150);
-                            shadowLight = shadowBase.lighter(180);
-                            shadowLight.setAlpha(60);
-}
-
-                        QRadialGradient shadowGradient( shadowPos.x() + ( sSize.width() / 2 ),
-                                                        shadowPos.y() + ( sSize.height() / 2 ),
-                                                        qMax( sSize.width(), sSize.height() ) / 2 );
-                        shadowGradient.setColorAt( 0.4, shadowDark );
-                        shadowGradient.setColorAt( 1.0, shadowLight );
+                        QPoint haloPos( pos - QPoint( 2, 2 ) );
+                        QSize haloSize( QSize( handle.height(), handle.height() ) - QSize( 2, 2 ) );
 
                         painter->setPen( Qt::NoPen );
                         painter->setOpacity( slideroptions->animationopacity );
 
-                        /* draw the handle's shadow */
-                        painter->setBrush( shadowGradient );
-                        painter->drawEllipse( shadowPos.x(), shadowPos.y() + 1, sSize.width(), sSize.height() );
+                        painter->setBrush( theme->color( Theme::AccentKnobHalo ) );
+                        painter->drawEllipse( haloPos.x(), haloPos.y(), haloSize.width(), haloSize.height() );
 
-                        /* finally draw the handle */
-                        painter->setBrush( handleGradient );
+                        painter->setBrush( theme->color( Theme::SeekKnobFill ) );
                         painter->drawEllipse( pos.x(), pos.y(), hSize.width(), hSize.height() );
                     }
                 }

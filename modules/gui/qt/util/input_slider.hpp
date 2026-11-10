@@ -104,14 +104,6 @@ private:
     bool b_seekable;
     int mHandleLength;
 
-    /* Colors & gradients */
-    QSize gradientsTargetSize;
-    QLinearGradient backgroundGradient;
-    QLinearGradient foregroundGradient;
-    QLinearGradient handleGradient;
-    QColor tickpointForeground;
-    QColor shadowDark;
-    QColor shadowLight;
     QCommonStyle *alternativeStyle;
 
     /* Handle's animation */
@@ -171,7 +163,8 @@ private:
 
     QPixmap pixGradient; /* Gradient pix storage */
     QPixmap pixGradient2; /* Muted Gradient pix storage */
-    QPixmap pixOutside; /* OutLine pix storage */
+    QPixmap pixOutside; /* OutLine and track pix storage */
+    QStringList colorList; /* qt-slider-colours when customised, else empty */
     QPainter painter;
     QFont textfont;
     QRect textrect;
@@ -179,6 +172,7 @@ private:
     WheelToVLCConverter wheelEventConverter;
 
     void changeValue( int x ); /* Function to modify the value from pixel x() */
+    void buildPixmaps(); /* from the theme or qt-slider-colours */
 };
 
 #endif

@@ -31,6 +31,7 @@
 #include "components/playlist/playlist_model.hpp"
 #include "input_manager.hpp"                            /* THEMIM */
 #include "util/qt_dirs.hpp"
+#include "util/theme.hpp"
 #include "recents.hpp"                                  /* Open:: */
 
 #include <vlc_intf_strings.h>                           /* I_DIR */
@@ -365,7 +366,7 @@ QVariant PLModel::data( const QModelIndex &index, const int role ) const
 
         case Qt::BackgroundRole:
             if( isCurrent( index ) )
-                return QVariant( QBrush( Qt::gray ) );
+                return QVariant( QBrush( Theme::instance()->color( Theme::AccentTint14 ) ) );
             break;
 
         case CURRENT_ITEM_ROLE:

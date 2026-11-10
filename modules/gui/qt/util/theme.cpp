@@ -22,20 +22,25 @@
 
 #include "util/theme.hpp"
 #include "util/imagehelper.hpp"
+#include "util/redesign_icons.hpp"
 
 #include <cassert>
 
 #include <QApplication>
+#include <QDir>
 #include <QEvent>
 #include <QFile>
 #include <QFontDatabase>
 #include <QFontMetrics>
 #include <QPainter>
 #include <QPalette>
+#include <QProxyStyle>
+#include <QSaveFile>
 #include <QSettings>
 #include <QStringList>
 #include <QStyle>
 #include <QStyleFactory>
+#include <QStyleOptionMenuItem>
 #include <QWidget>
 
 #ifdef _WIN32
@@ -61,7 +66,7 @@ namespace
     };
     const QRgb fixedColors[] = {
         Accent, AccentHover, OnAccent, AccentTint12, AccentTint14, AccentBorder50,
-        AccentFocusRing, AccentKnobHalo, VolumeBoost,
+        AccentFocusRing, AccentKnobHalo, VolumeBoost, SeekKnobFill,
         Error, ErrorTint, DestructiveText, WindowCloseHover,
         VideoSurface, PausedBadgeBg, SubtitleBox,
     };
@@ -122,6 +127,187 @@ namespace
         return false;
 #endif
     }
+
+    /* A redesign icon recoloured with tint; the cone keeps its colours. */
+    QPixmap tintedIcon(const QString &name, const QColor &tint, const QSize &size)
+    {
+        QPixmap pixmap = ImageHelper::loadSvgToPixmap(
+            QString(":/redesign/%1.svg").arg(name), size.width(), size.height());
+        if (name != QLatin1String(RedesignIcons::IconCone))
+        {
+            QPainter painter(&pixmap);
+            painter.setCompositionMode(QPainter::CompositionMode_SourceIn);
+            painter.fillRect(QRect(QPoint(0, 0), pixmap.size()), tint);
+        }
+        return pixmap;
+    }
+
+    /* Stylesheet `image:` needs a file: write the tinted icon, at twice the
+     * glyph size so it stays sharp at 200 %, to the temporary directory. The
+     * colour is in the name, so a theme change gets a new url, not a stale
+     * cached image. */
+    QString tintedIconFile(intf_thread_t *p_intf, const char *name,
+                           const QColor &tint, int rotation)
+    {
+        const QString path = QDir::temp().filePath(
+            QString("vlc-qt-%1-%2-%3.png").arg(QLatin1String(name))
+                .arg(rotation).arg(tint.rgba(), 8, 16, QLatin1Char('0')));
+        if (QFile::exists(path))
+            return path;
+        const int px = 2 * Size::IconGlyph;
+        QImage image = tintedIcon(QLatin1String(name), tint, QSize(px, px)).toImage();
+        if (rotation)
+            image = image.transformed(QTransform().rotate(rotation));
+        QSaveFile file(path);  /* atomic: another VLC may read it meanwhile */
+        if (file.open(QIODevice::WriteOnly) && image.save(&file, "PNG") && file.commit())
+            return path;
+        msg_Warn(p_intf, "theme: cannot write %s", qtu(path));
+        return QString(":/redesign/%1.svg").arg(QLatin1String(name));
+    }
+
+    /* What the stylesheet cannot do (DESIGN_SPEC 7, 11): menu items whose
+     * check is the accent `check` icon and whose shortcut column is dimmed,
+     * and check boxes and radio buttons with an outline that stays visible
+     * in dark mode. The stylesheet hands these to its base style, this one,
+     * because it styles neither QMenu::item nor ::indicator. */
+    class ThemeStyle : public QProxyStyle
+    {
+    public:
+        explicit ThemeStyle(QStyle *base) : QProxyStyle(base) {}
+
+        QSize sizeFromContents(ContentsType type, const QStyleOption *opt,
+                               const QSize &size, const QWidget *w) const Q_DECL_OVERRIDE
+        {
+            const QStyleOptionMenuItem *mi = qstyleoption_cast<const QStyleOptionMenuItem *>(opt);
+            if (type != CT_MenuItem || !mi || mi->menuItemType == QStyleOptionMenuItem::Separator)
+                return QProxyStyle::sizeFromContents(type, opt, size, w);
+            /* QMenu adds the shortcut column width (tabWidth) itself */
+            int width = labelX() + size.width() + Size::MenuTitlePadX;
+            if (mi->text.contains(QLatin1Char('\t')))
+                width += 2 * Size::MenuTitlePadX;
+            if (mi->menuItemType == QStyleOptionMenuItem::SubMenu)
+                width += Size::IconGlyph;
+            return QSize(width, qMax(size.height(), int(Size::MenuItemH)));
+        }
+
+        void drawControl(ControlElement element, const QStyleOption *opt,
+                         QPainter *p, const QWidget *w) const Q_DECL_OVERRIDE
+        {
+            const QStyleOptionMenuItem *mi = qstyleoption_cast<const QStyleOptionMenuItem *>(opt);
+            Theme *t = Theme::instance();
+            if (element != CE_MenuItem || !mi || !t
+             || mi->menuItemType == QStyleOptionMenuItem::Separator)
+            {
+                QProxyStyle::drawControl(element, opt, p, w);
+                return;
+            }
+            const bool enabled = mi->state & State_Enabled;
+            const QRect r = mi->rect;
+            const Qt::LayoutDirection dir = mi->direction;
+            p->save();
+            p->setRenderHint(QPainter::Antialiasing);
+            if ((mi->state & State_Selected) && enabled)
+            {
+                p->setPen(Qt::NoPen);
+                p->setBrush(t->ink(InkAlpha::HoverFill));
+                p->drawRoundedRect(r, Size::RadiusSm, Size::RadiusSm);
+            }
+
+            /* icon column: checked items show the accent check instead */
+            const int iconPx = proxy()->pixelMetric(PM_SmallIconSize, opt, w);
+            const QSize iconSize(iconPx, iconPx);
+            QPixmap pix;
+            if (mi->checkType != QStyleOptionMenuItem::NotCheckable && mi->checked)
+                pix = t->icon(RedesignIcons::IconCheck, enabled ? Theme::Accent : Theme::Dim,
+                              iconSize).pixmap(iconSize);
+            else if (!mi->icon.isNull())
+                pix = mi->icon.pixmap(iconSize, !enabled ? QIcon::Disabled
+                                      : (mi->state & State_Selected) ? QIcon::Active : QIcon::Normal);
+            if (!pix.isNull())
+                drawItemPixmap(p, visualRect(dir, r, QRect(r.x() + Size::MenuTitlePadX, r.y(),
+                                                           Size::MenuIconCol, r.height())),
+                               Qt::AlignCenter, pix);
+
+            const int arrowW = mi->menuItemType == QStyleOptionMenuItem::SubMenu ? Size::IconGlyph : 0;
+            const QRect textRect = visualRect(dir, r, QRect(r.x() + labelX(), r.y(),
+                r.width() - labelX() - Size::MenuTitlePadX - arrowW, r.height()));
+            int flags = Qt::AlignVCenter | Qt::TextShowMnemonic | Qt::TextDontClip | Qt::TextSingleLine;
+            if (!proxy()->styleHint(SH_UnderlineShortcut, mi, w))
+                flags |= Qt::TextHideMnemonic;
+            QString label = mi->text;
+            const int tab = label.indexOf(QLatin1Char('\t'));
+            if (tab >= 0)
+            {
+                p->setPen(t->color(Theme::Dim));
+                p->setFont(t->font(Theme::Meta));
+                p->drawText(textRect, flags | visualAlignment(dir, Qt::AlignRight), label.mid(tab + 1));
+                label.truncate(tab);
+            }
+            p->setPen(t->color(enabled ? Theme::Text : Theme::Dim));
+            p->setFont(mi->font);
+            p->drawText(textRect, flags | visualAlignment(dir, Qt::AlignLeft), label);
+
+            if (arrowW)
+            {
+                QPixmap arrow = t->icon(RedesignIcons::IconSubmenu, enabled ? Theme::Text2 : Theme::Dim,
+                                        iconSize).pixmap(iconSize);
+                if (dir == Qt::RightToLeft)
+                    arrow = QPixmap::fromImage(arrow.toImage().mirrored(true, false));
+                drawItemPixmap(p, visualRect(dir, r, QRect(r.right() + 1 - Size::MenuTitlePadX - arrowW,
+                                                           r.y(), arrowW, r.height())),
+                               Qt::AlignCenter, arrow);
+            }
+            p->restore();
+        }
+
+        void drawPrimitive(PrimitiveElement pe, const QStyleOption *opt, QPainter *p,
+                           const QWidget *w) const Q_DECL_OVERRIDE
+        {
+            Theme *t = Theme::instance();
+            if ((pe != PE_IndicatorCheckBox && pe != PE_IndicatorRadioButton) || !t)
+            {
+                QProxyStyle::drawPrimitive(pe, opt, p, w);
+                return;
+            }
+            const bool on = opt->state & (State_On | State_NoChange);
+            const QRectF r = QRectF(opt->rect).adjusted(0.5, 0.5, -0.5, -0.5);
+            p->save();
+            p->setRenderHint(QPainter::Antialiasing);
+            if (!(opt->state & State_Enabled))
+                p->setOpacity(0.35);  /* DESIGN_SPEC 3: disabled controls */
+            /* unchecked: ToggleOff outline, at least 3:1 against the window */
+            p->setPen(on ? t->color(Theme::Accent) : t->ink(InkAlpha::ToggleOff));
+            p->setBrush(on ? t->color(Theme::Accent) : t->color(Theme::Surface));
+            if (pe == PE_IndicatorRadioButton)
+            {
+                p->drawEllipse(r);
+                if (on)
+                {
+                    p->setPen(Qt::NoPen);
+                    p->setBrush(t->color(Theme::OnAccent));
+                    p->drawEllipse(r.center(), r.width() / 6, r.height() / 6);
+                }
+            }
+            else
+            {
+                p->drawRoundedRect(r, Size::RadiusXs, Size::RadiusXs);
+                if (opt->state & State_NoChange)
+                {
+                    p->setPen(QPen(t->color(Theme::OnAccent), 2));
+                    p->drawLine(QPointF(r.left() + r.width() / 4, r.center().y()),
+                                QPointF(r.right() - r.width() / 4, r.center().y()));
+                }
+                else if (on)
+                    p->drawPixmap(opt->rect, t->icon(RedesignIcons::IconCheck, Theme::OnAccent,
+                                                     opt->rect.size()).pixmap(opt->rect.size()));
+            }
+            p->restore();
+        }
+
+    private:
+        /* the label starts after the 22 px icon column */
+        static int labelX() { return 2 * Size::MenuTitlePadX + Size::MenuIconCol; }
+    };
 }
 
 Theme::Theme(intf_thread_t *_p_intf)
@@ -168,19 +354,21 @@ void Theme::apply(QApplication &app)
 
     /* The user's style choice from the preferences wins over Fusion. */
     const QString style = getSettings()->value("MainWindow/QtStyle", "").toString();
-    if (!style.isEmpty())
-        QApplication::setStyle(style);
 
     if (highContrast)
     {
+        if (!style.isEmpty())
+            QApplication::setStyle(style);
         /* Keep the system style and colours; only report light or dark. */
         dark = app.palette().color(QPalette::Window).lightness() < 128;
         msg_Dbg(p_intf, "theme: high contrast, keeping the system colours");
     }
     else
     {
-        if (style.isEmpty())
-            QApplication::setStyle(QStyleFactory::create("Fusion"));
+        /* shortcut: a style picked live in Simple Preferences replaces this
+         * wrapper until the next start, upgrade when that panel is redesigned */
+        QApplication::setStyle(new ThemeStyle(
+            QStyleFactory::create(style.isEmpty() ? QString("Fusion") : style)));
         app.setFont(font(Body));
         applyPalette();
         app.setStyleSheet(styleSheet());
@@ -274,14 +462,7 @@ QIcon Theme::icon(const QString &name, ColorRole role, const QSize &size)
     if (!QFile::exists(path))
         msg_Warn(p_intf, "theme: missing icon %s", qtu(path));
     else
-    {
-        QPixmap pixmap = ImageHelper::loadSvgToPixmap(path, size.width(), size.height());
-        QPainter painter(&pixmap);
-        painter.setCompositionMode(QPainter::CompositionMode_SourceIn);
-        painter.fillRect(QRect(QPoint(0, 0), pixmap.size()), tint);
-        painter.end();
-        result = QIcon(pixmap);
-    }
+        result = QIcon(tintedIcon(name, tint, size));
     icons.insert(key, result);  /* also caches a miss, so it warns once */
     return result;
 }
@@ -322,10 +503,8 @@ QMenuBar::item { background: transparent; padding: @menuTitlePadY@px @menuTitleP
 QMenuBar::item:selected { background: @hoverFill@; color: @tx@; }
 QMenuBar::item:pressed { background: @openFill@; color: @tx@; }
 
-QMenu { background: @raised@; color: @tx@; border: 1px solid @border@; padding: @menuPad@px; min-width: @menuMinW@px; }
-QMenu::item { background: transparent; padding: @menuItemPadY@px @menuTitlePadX@px @menuItemPadY@px @menuLabelX@px; border-radius: @radiusSm@px; }
-QMenu::item:selected { background: @hoverFill@; }
-QMenu::item:disabled { color: @dim@; }
+QMenu { background: @raised@; color: @tx@; border: 1px solid @border@; padding: @menuPad@px; min-width: @menuMinW@px;
+    -qt-style-features: background-color; }
 QMenu::separator { height: 1px; background: @border@; margin: @menuPad@px @menuSepX@px; }
 
 QToolTip { background: @raised@; color: @tx@; border: 1px solid @border@; padding: @menuPad@px @menuTitlePadX@px; }
@@ -348,6 +527,13 @@ QLineEdit, QAbstractSpinBox, QComboBox, QTextEdit, QPlainTextEdit {
 QLineEdit, QAbstractSpinBox, QComboBox { padding: 1px @menuPad@px; }
 QLineEdit:hover, QAbstractSpinBox:hover, QComboBox:hover { border-color: @toggleOff@; }
 QLineEdit:disabled, QAbstractSpinBox:disabled, QComboBox:disabled { background: @panel@; color: @dim@; border-color: @divider@; }
+QComboBox::drop-down, QAbstractSpinBox::up-button, QAbstractSpinBox::down-button { border: none; background: transparent; width: @iconGlyph@px; }
+QComboBox::down-arrow { width: @iconGlyph@px; height: @iconGlyph@px; }
+QAbstractSpinBox::up-arrow, QAbstractSpinBox::down-arrow { width: @iconGlyph@px; height: @halfGlyph@px; }
+QComboBox::down-arrow, QAbstractSpinBox::down-arrow { image: url("@arrowDown@"); }
+QAbstractSpinBox::up-arrow { image: url("@arrowUp@"); }
+QComboBox::down-arrow:disabled, QAbstractSpinBox::down-arrow:disabled, QAbstractSpinBox::down-arrow:off { image: url("@arrowDownDim@"); }
+QAbstractSpinBox::up-arrow:disabled, QAbstractSpinBox::up-arrow:off { image: url("@arrowUpDim@"); }
 QComboBox QAbstractItemView { background: @raised@; border: 1px solid @border@; selection-background-color: @hoverFill@; selection-color: @tx@; outline: 0; }
 
 QLineEdit:focus, QAbstractSpinBox:focus, QComboBox:focus { border: 2px solid @accent@; padding: 0px @menuPadFocus@px; }
@@ -428,15 +614,19 @@ QStatusBar::item { border: none; }
         { "menuSepX", QString::number(2 * Size::MenuPanelPadding) },
         { "menuMinW", QString::number(Size::MenuMinW) },
         { "menuTitlePadX", QString::number(Size::MenuTitlePadX) },
-        /* the label starts after the 22 px icon column */
-        { "menuLabelX", QString::number(2 * Size::MenuTitlePadX + Size::MenuIconCol) },
         { "menuTitlePadY", QString::number(qMax(0, (Size::MenuTitleH - lineH) / 2)) },
         { "menuItemPadY", QString::number(qMax(0, (Size::MenuItemH - lineH) / 2)) },
         { "buttonPadX", QString::number(Size::ButtonPadX) },
         { "buttonPadXFocus", QString::number(Size::ButtonPadX - 1) },
         { "groupTitleH", QString::number(metaH) },
         { "scrollW", QString::number(Size::ScrollBarW) },
-        { "iconGlyph", QString::number(Size::IconGlyph) },        { "track", QString::number(Size::SeekTrack) },
+        { "iconGlyph", QString::number(Size::IconGlyph) },
+        { "halfGlyph", QString::number(Size::IconGlyph / 2) },
+        { "arrowDown", tintedIconFile(p_intf, RedesignIcons::IconExpandMore, QColor::fromRgb(p.tx2), 0) },
+        { "arrowUp", tintedIconFile(p_intf, RedesignIcons::IconExpandMore, QColor::fromRgb(p.tx2), 180) },
+        { "arrowDownDim", tintedIconFile(p_intf, RedesignIcons::IconExpandMore, QColor::fromRgb(p.dim), 0) },
+        { "arrowUpDim", tintedIconFile(p_intf, RedesignIcons::IconExpandMore, QColor::fromRgb(p.dim), 180) },
+        { "track", QString::number(Size::SeekTrack) },
         { "trackRadius", QString::number(Size::SeekTrack / 2) },
         { "knob", QString::number(Size::SeekKnob) },
         { "knobRadius", QString::number(Size::SeekKnob / 2) },

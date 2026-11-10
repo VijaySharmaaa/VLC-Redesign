@@ -20,6 +20,7 @@
  *****************************************************************************/
 
 #include "RoundButton.hpp"
+#include "util/theme.hpp"
 
 #include <QPainter>
 #include <QStyleOptionToolButton>
@@ -39,34 +40,17 @@ QSize RoundButton::sizeHint() const
 QBrush RoundButton::pen( QStyleOptionToolButton* option ) const
 {
     const bool over = option->state & QStyle::State_MouseOver;
-    return QBrush( over ? QColor( 61, 165, 225 ) : QColor( 109, 106, 102 ) );
+    const Theme *theme = Theme::instance();
+    return QBrush( over ? theme->color( Theme::Accent )
+                        : theme->ink( RedesignTokens::InkAlpha::Outline ) );
 }
 
 QBrush RoundButton::brush( QStyleOptionToolButton* option ) const
 {
     const bool over = option->state & QStyle::State_MouseOver;
     const bool pressed = option->state & QStyle::State_Sunken;
-    QColor g1 = QColor( 219, 217, 215 );
-    QColor g2 = QColor( 205, 202, 199 );
-    QColor g3 = QColor( 187, 183, 180 );
-
-    if ( pressed ) {
-        g1 = g1.darker( 120 );
-        g2 = g2.darker( 120 );
-        g3 = g3.darker( 120 );
-    }
-    else if ( over ) {
-        g1 = g1.lighter( 110 );
-        g2 = g2.lighter( 110 );
-        g3 = g3.lighter( 110 );
-    }
-
-    QLinearGradient gradient( 0, 0, 0, height() );
-    gradient.setColorAt( 0.0, g1 );
-    gradient.setColorAt( 0.40, g2 );
-    gradient.setColorAt( 1.0, g3 );
-
-    return QBrush( gradient );
+    const Theme *theme = Theme::instance();
+    return QBrush( theme->color( pressed ? Theme::Hover2 : over ? Theme::Hover : Theme::Raised ) );
 }
 
 void RoundButton::paintEvent( QPaintEvent* event )

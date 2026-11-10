@@ -36,6 +36,7 @@
 #include "util/customwidgets.hpp"               // qtEventToVLCKey, QVLCStackedWidget
 #include "util/qt_dirs.hpp"                     // toNativeSeparators
 #include "util/imagehelper.hpp"
+#include "util/theme.hpp"
 
 #include "components/interface_widgets.hpp"     // bgWidget, videoWidget
 #include "components/controller.hpp"            // controllers
@@ -578,15 +579,19 @@ inline void MainInterface::createStatusBar()
     speedLabel->setFrameStyle( QFrame::Sunken | QFrame::Panel );
     nameLabel->setFrameStyle( QFrame::Sunken | QFrame::StyledPanel);
     auto updateStyle = [=]() {
-        timeLabel->setStyleSheet(
-            "QLabel:hover { color: black; background-color: rgba(255, 255, 255, 50%) }" );
-        speedLabel->setStyleSheet(
-            "QLabel:hover { color: black; background-color: rgba(255, 255, 255, 50%) }" );
+        const Theme *theme = Theme::instance();
+        const QColor fill = theme->ink( RedesignTokens::InkAlpha::HoverFill );
+        const QString hover = QString( "QLabel:hover { color: %1; background-color: rgba(%2,%3,%4,%5) }" )
+            .arg( theme->color( Theme::Text ).name() )
+            .arg( fill.red() ).arg( fill.green() ).arg( fill.blue() ).arg( fill.alpha() );
+        timeLabel->setStyleSheet( hover );
+        speedLabel->setStyleSheet( hover );
         /* pad both label and its tooltip */
         nameLabel->setStyleSheet( "padding-left: 5px; padding-right: 5px;" );
 
     };
     updateStyle();
+    connect( Theme::instance(), &Theme::changed, this, updateStyle );
 //same as Qt::AA_UseStyleSheetPropagationInWidgetStyles
 #if !HAS_QT57
     connect(qApp, &QApplication::paletteChanged, this, [updateStyle](){

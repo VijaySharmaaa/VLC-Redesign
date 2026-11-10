@@ -44,6 +44,7 @@
 #include "../components/playlist/playlist_model.hpp" /* getArtPixmap etc */
 #include "../components/playlist/sorting.h"          /* Columns List */
 #include "input_manager.hpp"
+#include "util/theme.hpp"
 
 
 // ------------- PictureFlowState ---------------------------------------
@@ -454,15 +455,18 @@ static QImage* prepareSurface(const QImage* slideImage, int w, int h, QRgb bgcol
     imagePainter.setTransform( rotation );
     imagePainter.drawImage( (w-img.width())/2, (h-img.height())/2, img );
     imagePainter.setBrush( QColor(bg));//QBrush( Qt::lightGray ) );
-    imagePainter.setPen( QColor( Qt::lightGray ) );
+    /* text over a shadow in the window colour; shortcut: slides already
+     * cached keep the old colours after a theme change, until they reload */
+    const Theme *theme = Theme::instance();
+    const QColor text = theme->color( Theme::Text ), shadow = theme->color( Theme::Bg );
     QFontMetrics fm = imagePainter.fontMetrics();
-    imagePainter.setPen( QColor( Qt::darkGray ) );
+    imagePainter.setPen( shadow );
     imagePainter.drawText( 0+1, 1+h-fm.height()*2, VLCModel::getMeta( index, COLUMN_TITLE ) );
-    imagePainter.setPen( QColor( Qt::lightGray ) );
+    imagePainter.setPen( text );
     imagePainter.drawText( 0, h-fm.height()*2, VLCModel::getMeta( index, COLUMN_TITLE ) );
-    imagePainter.setPen( QColor( Qt::darkGray ) );
+    imagePainter.setPen( shadow );
     imagePainter.drawText( 0+1, 1+h-fm.height()*1, VLCModel::getMeta( index, COLUMN_ARTIST ) );
-    imagePainter.setPen( QColor( Qt::lightGray ) );
+    imagePainter.setPen( text );
     imagePainter.drawText( 0, h-fm.height()*1, VLCModel::getMeta( index, COLUMN_ARTIST ) );
 
     return result;

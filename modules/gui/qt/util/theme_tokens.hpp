@@ -28,6 +28,7 @@ namespace RedesignTokens
     static const QRgb AccentFocusRing = 0x2EFF8A1F; /* 18 % */
     static const QRgb AccentKnobHalo  = 0x59FF8A1F; /* 35 % */
     static const QRgb VolumeBoost     = 0xFFFF5A1F;
+    static const QRgb SeekKnobFill    = 0xFFFFFFFF; /* DESIGN_SPEC 3: white in both themes */
 
     /* ---- Status ---- */
     static const QRgb Error            = 0xFFFF5A4E;
