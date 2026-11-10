@@ -138,6 +138,7 @@ libqt_plugin_la_SOURCES = \
 	gui/qt/util/qt_dirs.cpp gui/qt/util/qt_dirs.hpp \
 	gui/qt/util/pictureflow.cpp gui/qt/util/pictureflow.hpp \
 	gui/qt/util/validators.cpp gui/qt/util/validators.hpp \
+	gui/qt/util/redesign_icons.hpp \
 	gui/qt/util/buttons/BrowseButton.cpp \
 	gui/qt/util/buttons/BrowseButton.hpp \
 	gui/qt/util/buttons/DeckButtonsLayout.cpp \
@@ -445,8 +446,122 @@ libqt_plugin_la_RES = \
 	gui/qt/pixmaps/update.svg \
 	gui/qt/pixmaps/valid.svg \
 	gui/qt/pixmaps/search_clear.svg \
-	gui/qt/pixmaps/lock.svg
-EXTRA_DIST += gui/qt/vlc.qrc $(libqt_plugin_la_RES)
+	gui/qt/pixmaps/lock.svg \
+	gui/qt/pixmaps/redesign/add.svg \
+	gui/qt/pixmaps/redesign/album.svg \
+	gui/qt/pixmaps/redesign/arrow_back.svg \
+	gui/qt/pixmaps/redesign/aspect_ratio.svg \
+	gui/qt/pixmaps/redesign/av_timer.svg \
+	gui/qt/pixmaps/redesign/blur_linear.svg \
+	gui/qt/pixmaps/redesign/bookmarks.svg \
+	gui/qt/pixmaps/redesign/call_to_action.svg \
+	gui/qt/pixmaps/redesign/cast.svg \
+	gui/qt/pixmaps/redesign/check.svg \
+	gui/qt/pixmaps/redesign/check_box_outline_blank.svg \
+	gui/qt/pixmaps/redesign/chevron_right.svg \
+	gui/qt/pixmaps/redesign/close.svg \
+	gui/qt/pixmaps/redesign/code.svg \
+	gui/qt/pixmaps/redesign/computer.svg \
+	gui/qt/pixmaps/redesign/cone.svg \
+	gui/qt/pixmaps/redesign/construction.svg \
+	gui/qt/pixmaps/redesign/content_copy.svg \
+	gui/qt/pixmaps/redesign/create_new_folder.svg \
+	gui/qt/pixmaps/redesign/crop.svg \
+	gui/qt/pixmaps/redesign/crop_square.svg \
+	gui/qt/pixmaps/redesign/delete.svg \
+	gui/qt/pixmaps/redesign/dns.svg \
+	gui/qt/pixmaps/redesign/dock_to_bottom.svg \
+	gui/qt/pixmaps/redesign/draft.svg \
+	gui/qt/pixmaps/redesign/equalizer.svg \
+	gui/qt/pixmaps/redesign/error.svg \
+	gui/qt/pixmaps/redesign/event_note.svg \
+	gui/qt/pixmaps/redesign/expand_more.svg \
+	gui/qt/pixmaps/redesign/extension.svg \
+	gui/qt/pixmaps/redesign/fast_rewind_fill.svg \
+	gui/qt/pixmaps/redesign/fiber_manual_record.svg \
+	gui/qt/pixmaps/redesign/fiber_manual_record_fill.svg \
+	gui/qt/pixmaps/redesign/file_copy.svg \
+	gui/qt/pixmaps/redesign/file_open.svg \
+	gui/qt/pixmaps/redesign/fit_screen.svg \
+	gui/qt/pixmaps/redesign/folder.svg \
+	gui/qt/pixmaps/redesign/folder_open.svg \
+	gui/qt/pixmaps/redesign/forward_10.svg \
+	gui/qt/pixmaps/redesign/fullscreen.svg \
+	gui/qt/pixmaps/redesign/fullscreen_exit.svg \
+	gui/qt/pixmaps/redesign/graphic_eq.svg \
+	gui/qt/pixmaps/redesign/graphic_eq_fill.svg \
+	gui/qt/pixmaps/redesign/help.svg \
+	gui/qt/pixmaps/redesign/history.svg \
+	gui/qt/pixmaps/redesign/home_fill.svg \
+	gui/qt/pixmaps/redesign/info.svg \
+	gui/qt/pixmaps/redesign/input.svg \
+	gui/qt/pixmaps/redesign/keyboard.svg \
+	gui/qt/pixmaps/redesign/keyboard_tab.svg \
+	gui/qt/pixmaps/redesign/lan_fill.svg \
+	gui/qt/pixmaps/redesign/language.svg \
+	gui/qt/pixmaps/redesign/laps.svg \
+	gui/qt/pixmaps/redesign/library_music.svg \
+	gui/qt/pixmaps/redesign/library_music_fill.svg \
+	gui/qt/pixmaps/redesign/logout.svg \
+	gui/qt/pixmaps/redesign/memory.svg \
+	gui/qt/pixmaps/redesign/menu.svg \
+	gui/qt/pixmaps/redesign/movie.svg \
+	gui/qt/pixmaps/redesign/movie_fill.svg \
+	gui/qt/pixmaps/redesign/music_note.svg \
+	gui/qt/pixmaps/redesign/note_add.svg \
+	gui/qt/pixmaps/redesign/open_in_full.svg \
+	gui/qt/pixmaps/redesign/pause.svg \
+	gui/qt/pixmaps/redesign/pause_fill.svg \
+	gui/qt/pixmaps/redesign/photo_camera.svg \
+	gui/qt/pixmaps/redesign/picture_in_picture_alt.svg \
+	gui/qt/pixmaps/redesign/play_arrow.svg \
+	gui/qt/pixmaps/redesign/play_arrow_fill.svg \
+	gui/qt/pixmaps/redesign/playlist_add_check.svg \
+	gui/qt/pixmaps/redesign/playlist_play.svg \
+	gui/qt/pixmaps/redesign/playlist_remove.svg \
+	gui/qt/pixmaps/redesign/podcasts.svg \
+	gui/qt/pixmaps/redesign/radio.svg \
+	gui/qt/pixmaps/redesign/remove.svg \
+	gui/qt/pixmaps/redesign/repeat.svg \
+	gui/qt/pixmaps/redesign/repeat_one.svg \
+	gui/qt/pixmaps/redesign/replay.svg \
+	gui/qt/pixmaps/redesign/replay_10.svg \
+	gui/qt/pixmaps/redesign/rss_feed.svg \
+	gui/qt/pixmaps/redesign/save.svg \
+	gui/qt/pixmaps/redesign/schedule.svg \
+	gui/qt/pixmaps/redesign/search.svg \
+	gui/qt/pixmaps/redesign/settings.svg \
+	gui/qt/pixmaps/redesign/shuffle.svg \
+	gui/qt/pixmaps/redesign/skip_next.svg \
+	gui/qt/pixmaps/redesign/skip_next_fill.svg \
+	gui/qt/pixmaps/redesign/skip_previous.svg \
+	gui/qt/pixmaps/redesign/skip_previous_fill.svg \
+	gui/qt/pixmaps/redesign/slow_motion_video.svg \
+	gui/qt/pixmaps/redesign/sort.svg \
+	gui/qt/pixmaps/redesign/speaker.svg \
+	gui/qt/pixmaps/redesign/speed.svg \
+	gui/qt/pixmaps/redesign/stop.svg \
+	gui/qt/pixmaps/redesign/stop_fill.svg \
+	gui/qt/pixmaps/redesign/subtitles.svg \
+	gui/qt/pixmaps/redesign/surround_sound.svg \
+	gui/qt/pixmaps/redesign/sync_alt.svg \
+	gui/qt/pixmaps/redesign/terminal.svg \
+	gui/qt/pixmaps/redesign/title.svg \
+	gui/qt/pixmaps/redesign/tune.svg \
+	gui/qt/pixmaps/redesign/update.svg \
+	gui/qt/pixmaps/redesign/upload_file.svg \
+	gui/qt/pixmaps/redesign/video_library.svg \
+	gui/qt/pixmaps/redesign/videocam.svg \
+	gui/qt/pixmaps/redesign/volume_down.svg \
+	gui/qt/pixmaps/redesign/volume_down_fill.svg \
+	gui/qt/pixmaps/redesign/volume_off.svg \
+	gui/qt/pixmaps/redesign/volume_off_fill.svg \
+	gui/qt/pixmaps/redesign/volume_up.svg \
+	gui/qt/pixmaps/redesign/volume_up_fill.svg \
+	gui/qt/pixmaps/redesign/wallpaper.svg \
+	gui/qt/pixmaps/redesign/web.svg \
+	gui/qt/pixmaps/redesign/zoom_in.svg
+EXTRA_DIST += gui/qt/vlc.qrc $(libqt_plugin_la_RES) gui/qt/pixmaps/redesign/LICENSE
 
 nodist_libqt_plugin_la_SOURCES += gui/qt/resources.cpp
 
