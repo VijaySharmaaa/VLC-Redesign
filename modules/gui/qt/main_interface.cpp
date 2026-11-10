@@ -216,8 +216,6 @@ MainInterface::MainInterface( intf_thread_t *_p_intf, bool customFrame ) : QVLCM
     /* Main settings; the window takes the keys at startup, after Back and
      * on a click, but is no Tab stop of its own (no ring to show it) */
     setFocusPolicy( Qt::ClickFocus );
-    /* see createMainWidget: no native siblings either */
-    QCoreApplication::setAttribute( Qt::AA_DontCreateNativeWidgetSiblings );
     setAcceptDrops( true );
     setWindowRole( "vlc-main" );
     setWindowIcon( QApplication::windowIcon() );
@@ -491,9 +489,10 @@ void MainInterface::computeMinimumSize( bool b_minimal )
     }
     const Theme *t = Theme::instance();
     const QSize work = QApplication::desktop()->availableGeometry( this ).size();
-    /* at most half the work area high, so a quarter snap fits */
+    /* at most half the work area high, so a quarter snap fits; the deck
+     * spans the window, stock's 80 px beside it are gone */
     setMinimumSize( qMin( work.width(), qMax( t->px( RedesignTokens::Breakpoint::XSMinW ),
-                                              80 + controls->compactWidth() ) ),
+                                              controls->compactWidth() ) ),
                     qMin( work.height() / 2, t->px( RedesignTokens::Breakpoint::XSMinH ) ) );
 }
 
@@ -626,6 +625,21 @@ void MainInterface::onInputChanged( bool hasInput )
     if( hasInput )
     {
         b_audioModeCheck = true;
+        /* a stream buffers before it plays: show the player at once, where
+         * the buffering ring is (the prototype's startStream()); audio mode
+         * then takes over from it as for a file. Files keep the page until
+         * they play, as before.
+         * shortcut: b_browsing can't tell a stream the user opened from the
+         * playlist moving on, so one opened while browsing during playback
+         * keeps the page (as audio mode does); clear it in the Open paths
+         * if that matters. */
+        input_item_t *item = input_GetItem( THEMIM->getInput() );
+        char *uri = input_item_GetURI( item );
+        QWidget *current = stackCentralW->currentWidget();
+        if( uri && strncmp( uri, "file://", 7 ) && !b_browsing && isLibraryPage( current )
+         && current != sidebar->page( Sidebar::Preferences ) )
+            showTab( bgWidget );
+        free( uri );
         /* a new audio output (device change) starts without the tap */
         SpectrumWidget::setTap( p_intf, true );
         if( !b_nowPlayingSeen )
@@ -695,7 +709,7 @@ void MainInterface::createMainWidget( QSettings *creationSettings )
          * video played; Qt then sent the focus events of their widgets
          * for HWNDs that never hold the Windows focus, so screen readers
          * saw only the window and Tab looked dead. Only the video widget
-         * stays native. */
+         * stays native (siblings: an application attribute, qt.cpp). */
         videoWidget->setAttribute( Qt::WA_DontCreateNativeAncestors );
         stackCentralW->addWidget( videoWidget );
     }
@@ -926,15 +940,35 @@ int MainInterface::windowWidthFor( int stackWidth, int otherWidth, bool withSide
     return otherWidth + stackWidth + Sidebar::widthAt( BreakpointWatcher::L );
 }
 
+/* The stack and the docked side panels (playlist, Effects sheet) beside it:
+ * a panel takes its width from the view, it never widens the window */
+QSize MainInterface::stackAreaSize() const
+{
+    int w = stackCentralW->width();
+    foreach( QWidget *panel, stackCentralW->parentWidget()->findChildren<QWidget *>(
+                                 QString(), Qt::FindDirectChildrenOnly ) )
+        if( panel != sidebar && panel != stackCentralW && panel->isVisible() )
+            w += panel->width();
+    return QSize( w, stackCentralW->height() );
+}
+
+/* w is the width of the stack area (see stackAreaSize) */
 void MainInterface::resizeStack( int w, int h )
 {
     if( !isFullScreen() && !isMaximized() && !b_isWindowTiled )
     {
         const bool withSidebar = !sidebar->isHidden();
-        const int other = width() - stackCentralW->width()
+        const int other = width() - stackAreaSize().width()
                         - ( withSidebar ? sidebar->width() : 0 );
-        resizeWindow( windowWidthFor( w, other, withSidebar ),
-                      height() - stackCentralW->height() + h );
+        /* never past the work area, nor below what the sidebar and the
+         * rows need (a small video squashed them) */
+        const QSize frame = frameGeometry().size() - size();
+        const QSize work = QApplication::desktop()->availableGeometry( this ).size() - frame;
+        const QSize target = QSize( windowWidthFor( w, other, withSidebar ),
+                                    height() - stackCentralW->height() + h )
+                .expandedTo( QSize( 0, minimumSizeHint().height() ) )
+                .boundedTo( work );
+        resizeWindow( target.width(), target.height() );
     }
     debug();
 }
@@ -964,7 +998,7 @@ inline void MainInterface::showTab( QWidget *widget, bool video_closing )
 
     stackCentralOldWidget = stackCentralW->currentWidget();
     if( !isFullScreen() )
-        stackWidgetsSizes[stackCentralOldWidget] = stackCentralW->size();
+        stackWidgetsSizes[stackCentralOldWidget] = stackAreaSize();
 
     /* If we are playing video, embedded */
     if( !video_closing && videoWidget && THEMIM->getIM()->hasVideo() )
@@ -997,8 +1031,14 @@ inline void MainInterface::showTab( QWidget *widget, bool video_closing )
     }
 
     stackCentralW->setCurrentWidget( widget );
-    /* a widget shown for the first time keeps the current size */
-    if( b_autoresize && stackWidgetsSizes.contains( widget ) )
+    /* a widget shown for the first time keeps the current size, and so does
+     * every switch from or to a library page or Preferences: the sizes per
+     * view are stock's, for its own views */
+    const auto stockView = [this]( QWidget *w ) {
+        return w == bgWidget || w == videoWidget || w == playlistWidget;
+    };
+    if( b_autoresize && stockView( stackCentralOldWidget ) && stockView( widget )
+     && stackWidgetsSizes.contains( widget ) )
         resizeStack( stackWidgetsSizes[widget].width(), stackWidgetsSizes[widget].height() );
 
 #ifdef DEBUG_INTF
@@ -1142,7 +1182,7 @@ void MainInterface::setVideoSize( unsigned int w, unsigned int h )
             {
                 /* the stack's width in a window as wide as the screen */
                 const bool withSidebar = !sidebar->isHidden();
-                w = screen.width() - ( width() - stackCentralW->width() );
+                w = screen.width() - ( width() - stackAreaSize().width() );
                 if( withSidebar )
                     w += sidebar->width() - Sidebar::widthAt(
                              BreakpointWatcher::fromWidth( screen.width() ) );
@@ -1218,7 +1258,7 @@ void MainInterface::setVideoFullScreen( bool fs )
             showTab( videoWidget );
 
         /* we won't be able to get its windowed sized once in fullscreen, so update it now */
-        stackWidgetsSizes[stackCentralW->currentWidget()] = stackCentralW->size();
+        stackWidgetsSizes[stackCentralW->currentWidget()] = stackAreaSize();
 
         /* */
         displayNormalView();

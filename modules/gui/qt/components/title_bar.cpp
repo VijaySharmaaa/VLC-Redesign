@@ -25,6 +25,7 @@
 #include "util/redesign_icons.hpp"
 #include "util/breakpoints.hpp"
 
+#include <QAccessibleWidget>
 #include <QApplication>
 #include <QEvent>
 #include <QHBoxLayout>
@@ -59,6 +60,42 @@ namespace
         p.drawPolyline( back, sizeof( back ) / sizeof( back[0] ) );
         return QIcon( pixmap );
     }
+
+    /* Decision P6-3: the window's own caption buttons (the non-client ones
+     * Windows reports) are the ones screen readers get; the drawn copies
+     * are left out of the bar's children, the mouse still uses them. */
+    class TitleBarAccessible : public QAccessibleWidget
+    {
+    public:
+        explicit TitleBarAccessible( QWidget *w ) : QAccessibleWidget( w ) {}
+        int childCount() const Q_DECL_OVERRIDE { return children().count(); }
+        QAccessibleInterface *child( int index ) const Q_DECL_OVERRIDE
+        {
+            QWidget *w = children().value( index );
+            return w ? QAccessible::queryAccessibleInterface( w ) : NULL;
+        }
+        int indexOfChild( const QAccessibleInterface *child ) const Q_DECL_OVERRIDE
+        {
+            return child ? children().indexOf( qobject_cast<QWidget *>( child->object() ) ) : -1;
+        }
+
+    private:
+        QList<QWidget *> children() const
+        {
+            QList<QWidget *> list;
+            foreach( QWidget *w, widget()->findChildren<QWidget *>( QString(), Qt::FindDirectChildrenOnly ) )
+                if( !w->isWindow() && !w->property( "captionButton" ).toBool() )
+                    list << w;
+            return list;
+        }
+    };
+
+    QAccessibleInterface *titleBarFactory( const QString &className, QObject *o )
+    {
+        if( className == QLatin1String( "TitleBar" ) && o && o->isWidgetType() )
+            return new TitleBarAccessible( static_cast<QWidget *>( o ) );
+        return NULL;
+    }
 }
 
 TitleBar::TitleBar( QWidget *_window )
@@ -69,6 +106,11 @@ TitleBar::TitleBar( QWidget *_window )
     QHBoxLayout *layout = new QHBoxLayout( this );
     layout->setContentsMargins( 0, 0, 0, 0 );
     layout->setSpacing( 0 );
+
+    static bool factory = false;
+    if( !factory )
+        QAccessible::installFactory( titleBarFactory );
+    factory = true;
 
     Theme *t = Theme::instance();
     cone = addButton( qtr( "Go to library" ), t->px( Size::TitleConeW ) );
@@ -83,6 +125,8 @@ TitleBar::TitleBar( QWidget *_window )
     maxButton = addButton( QString(), t->metric( Theme::CaptionButtonW ) );
     closeButton = addButton( qtr( "Close" ), t->metric( Theme::CaptionButtonW ) );
     closeButton->setObjectName( "captionClose" );
+    foreach( QToolButton *b, QList<QToolButton *>() << minButton << maxButton << closeButton )
+        b->setProperty( "captionButton", true );
     connect( minButton, &QToolButton::clicked, window, &QWidget::showMinimized );
     connect( maxButton, &QToolButton::clicked, this, &TitleBar::toggleMaximized );
     connect( closeButton, &QToolButton::clicked, window, &QWidget::close );
@@ -227,8 +271,13 @@ void TitleBar::paintEvent( QPaintEvent * )
     if( !b_captionButtons || b_minimal || b_fullScreen
      || BreakpointWatcher::fromWidth( window->width() ) == BreakpointWatcher::XS )
         return;
-    const int left = bar->geometry().right() + 1 + t->px( Size::TitlePadX );
-    const QRect r( left, 0, minButton->x() - t->px( Size::TitlePadX ) - left, height() );
+    /* between the menus and the window buttons, which a right-to-left
+     * layout swaps */
+    const int pad = t->px( Size::TitlePadX );
+    const int left = ( isRightToLeft() ? minButton->geometry().right()
+                                       : bar->geometry().right() ) + 1 + pad;
+    const int right = isRightToLeft() ? bar->x() : minButton->x();
+    const QRect r( left, 0, right - pad - left, height() );
     if( r.width() <= 0 )
         return;
     p.setFont( t->font( Theme::Meta ) );

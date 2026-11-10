@@ -42,10 +42,10 @@
 
 #include <QWindow>
 #include <qpa/qplatformnativeinterface.h>
-/* shortcut: the contribs only expose qplatformnativeinterface.h among the
- * QPA headers; this one is reached through the private include tree of the
- * pinned Qt 5.6.3, update the path if the Qt contrib ever changes */
-#include <QtGui/5.6.3/QtGui/qpa/qwindowsysteminterface.h>
+/* the contribs only expose qplatformnativeinterface.h among the QPA
+ * headers; this one is in the private include tree of the Qt version
+ * (Makefile.am) */
+#include VLC_QT_WSI_H
 
 #include <windowsx.h>   /* GET_X_LPARAM */
 
@@ -376,6 +376,9 @@ bool MainInterfaceWin32::nativeEventFilter(const QByteArray &, void *message, lo
     if (msg->message == WM_SETTINGCHANGE && msg->hwnd == WinId(this) && msg->lParam
         && wcscmp(reinterpret_cast<LPCWSTR>(msg->lParam), L"ImmersiveColorSet") == 0)
         Theme::instance()->reload();
+    /* shortcut: no reload on SPI_SETHIGHCONTRAST, Theme::reload() keeps the
+     * high contrast state read at start; call it here once reload() re-reads
+     * that state and rebuilds the palette for it */
 
     short cmd;
     bool handled = false;

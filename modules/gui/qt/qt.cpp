@@ -542,6 +542,9 @@ static void *ThreadPlatform( void *obj, char *platform_name )
 #if HAS_QT57
     QApplication::setAttribute( Qt::AA_UseStyleSheetPropagationInWidgetStyles, true);
 #endif
+    /* the embedded video's native window must not make its siblings
+     * native too (see MainInterface::createMainWidget) */
+    QApplication::setAttribute( Qt::AA_DontCreateNativeWidgetSiblings );
 
     /* Start the QApplication here */
     QVLCApp app( argc, argv );

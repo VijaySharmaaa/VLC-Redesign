@@ -32,6 +32,8 @@
 #include "util/input_slider.hpp"     /* SoundSlider */
 #include "util/theme.hpp"
 
+#include <vlc_input_item.h>
+
 #include <math.h>
 
 #include <QHBoxLayout>
@@ -293,6 +295,56 @@ void AspectRatioBadge::setVout()
     updateRatios();
 }
 
+/* The playing video's own ratio, as the nearest of the choices' names
+ * ("16:9") or else as "2.00:1"; empty while its size is unknown.
+ * shortcut: the size the demuxer reported to the item, so a stream that
+ * only the decoder sizes shows "Default"; take the vout's format once 3.0
+ * exposes it to the interface. */
+static QString pictureRatio( intf_thread_t *p_intf, const vlc_value_t &val_list )
+{
+    input_thread_t *p_input = THEMIM->getInput();
+    if( !p_input )
+        return QString();
+    const int64_t id = var_GetInteger( p_input, "video-es" );
+    input_item_t *item = input_GetItem( p_input );
+    double ratio = 0.;
+    vlc_mutex_lock( &item->lock );
+    for( int i = 0; i < item->i_es; i++ )
+    {
+        const es_format_t *es = item->es[i];
+        if( es->i_cat != VIDEO_ES || ( ratio > 0. && es->i_id != id ) )
+            continue;
+        const video_format_t &v = es->video;
+        const unsigned w = v.i_visible_width ? v.i_visible_width : v.i_width;
+        const unsigned h = v.i_visible_height ? v.i_visible_height : v.i_height;
+        if( w && h )
+            ratio = (double)w * ( v.i_sar_num ? v.i_sar_num : 1 )
+                  / ( (double)h * ( v.i_sar_den ? v.i_sar_den : 1 ) );
+        if( es->i_id == id )
+            break;
+    }
+    vlc_mutex_unlock( &item->lock );
+    if( ratio <= 0. )
+        return QString();
+
+    /* the choices are "num:den" ("16:9", "2.35:1") */
+    QString best;
+    double bestError = .02;  /* within 2 % */
+    for( int i = 0; i < val_list.p_list->i_count; i++ )
+    {
+        const QStringList parts = qfu( val_list.p_list->p_values[i].psz_string ).split( ':' );
+        if( parts.count() != 2 || parts[1].toDouble() <= 0. )
+            continue;
+        const double error = fabs( parts[0].toDouble() / parts[1].toDouble() / ratio - 1. );
+        if( error < bestError )
+        {
+            bestError = error;
+            best = parts.join( ':' );
+        }
+    }
+    return best.isEmpty() ? QString( "%1:1" ).arg( ratio, 0, 'f', 2 ) : best;
+}
+
 void AspectRatioBadge::updateRatios()
 {
     menu->clear();
@@ -312,6 +364,13 @@ void AspectRatioBadge::updateRatios()
     /* a value that is not a choice (--aspect-ratio) shows as it is */
     setText( EMPTY_STR( current ) ? qtr( "Default" ) : qfu( current ) );
     var_Change( p_vout, "aspect-ratio", VLC_VAR_GETCHOICES, &val_list, &text_list );
+    /* Default: the picture's own ratio, when its size is known */
+    if( EMPTY_STR( current ) )
+    {
+        const QString own = pictureRatio( p_intf, val_list );
+        if( !own.isEmpty() )
+            setText( own );
+    }
     for( int i = 0; i < val_list.p_list->i_count; i++ )
     {
         const char *value = val_list.p_list->p_values[i].psz_string;

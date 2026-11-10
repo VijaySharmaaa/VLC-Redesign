@@ -36,6 +36,9 @@ libqt_plugin_la_CXXFLAGS += -DQT_HAS_XCB
 endif
 if HAVE_WIN32
 libqt_plugin_la_LIBADD += $(LIBCOM) -lcomctl32 -luuid
+# a private QPA header (main_interface_win32.cpp), in the include tree of
+# the Qt version the build found
+libqt_plugin_la_CPPFLAGS += '-DVLC_QT_WSI_H=<QtGui/$(QT_VERSION)/QtGui/qpa/qwindowsysteminterface.h>'
 endif
 if UPDATE_CHECK
 libqt_plugin_la_CPPFLAGS += -DUPDATE_CHECK

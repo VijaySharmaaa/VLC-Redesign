@@ -239,6 +239,11 @@ bool AbstractController::eventFilter( QObject *obj, QEvent *e )
     /* Space and Enter: MainInterface's ButtonKeys, for every button */
     switch( e->type() )
     {
+    case QEvent::Polish:
+        /* the shortcut for screen readers, as the tooltip shows it */
+        button->setAccessibleDescription(
+            hotkeyText( p_intf, button->property( "hotkey" ).toByteArray().constData() ) );
+        break;
     case QEvent::ToolTip:
     {
         /* read when shown, so a changed hotkey shows at once */
@@ -692,15 +697,21 @@ QWidget *AbstractController::createWidget( buttonType_e button, int options )
         tracksButton->setCheckable( true );
         ENABLE_ON_INPUT( tracksButton );
         intf_thread_t *intf = p_intf;
+        /* our own state changes are silent: toggled() is then the user's,
+         * a click or a screen reader's toggle (which emits no clicked()) */
         auto sync = [intf, tracksButton]() {
             input_thread_t *p_input = MainInputManager::getInstance( intf )->getInput();
+            const QSignalBlocker silent( tracksButton );
             tracksButton->setChecked( p_input && var_GetInteger( p_input, "spu-es" ) >= 0 );
         };
         connect( THEMIM->getIM(), &InputManager::esChanged, tracksButton, sync );
         connect( THEMIM, &MainInputManager::inputChanged, tracksButton, sync );
         sync();
-        connect( tracksButton, &QToolButton::clicked, tracksButton, [intf, tracksButton, sync]() {
-            tracksButton->setChecked( true );  /* open: accent glyph */
+        connect( tracksButton, &QToolButton::toggled, tracksButton, [intf, tracksButton, sync]() {
+            {
+                const QSignalBlocker silent( tracksButton );
+                tracksButton->setChecked( true );  /* open: accent glyph */
+            }
             QWidget *popover = showTracksPopover( intf, tracksButton );
             if( popover )
                 connect( popover, &QObject::destroyed, tracksButton, sync );
@@ -979,29 +990,47 @@ QList<QWidget *> ControlsWidget::optionalItems() const
 int ControlsWidget::compactWidth() const
 {
     /* the hint, not the minimum: below it the volume squeezes its label */
+    const int gap = Theme::instance()->px( Deck::Gap );
     int width = layout()->sizeHint().width();
     foreach( QWidget *w, optionalItems() )
         if( !w->isHidden() )
-            width -= w->sizeHint().width() + Theme::instance()->px( Deck::Gap );
+            width -= w->sizeHint().width() + gap;
+    if( advControls && !advControls->isHidden() )
+        width -= advControls->sizeHint().width() + gap;
     return width;
 }
 
 /* The optional items go at the XS breakpoint (of the main window, also for
- * the immersive bar's deck) and whenever the deck would not fit with them,
- * e.g. the expert row at S or M: nothing clips. */
+ * the immersive bar's deck) and whenever the deck would not fit with them;
+ * then the expert row, if it still doesn't fit: all of them are in the
+ * menus, and nothing clips. */
 void ControlsWidget::fitWidth()
 {
+    const int gap = Theme::instance()->px( Deck::Gap );
     const QList<QWidget *> items = optionalItems();
-    int hidden = 0;
+    QWidget *expert = b_advancedVisible ? advControls : NULL;
+    /* the width with everything shown, and what each step gives back */
+    int full = layout()->sizeHint().width();
+    int itemsWidth = 0;
     foreach( QWidget *w, items )
+    {
+        itemsWidth += w->sizeHint().width() + gap;
         if( w->isHidden() )
-            hidden += w->sizeHint().width() + Theme::instance()->px( Deck::Gap );
+            full += w->sizeHint().width() + gap;
+    }
+    const int expertWidth = expert ? expert->sizeHint().width() + gap : 0;
+    if( expert && expert->isHidden() )
+        full += expertWidth;
+
     QWidget *main = p_intf->p_sys->p_mi ? static_cast<QWidget *>( p_intf->p_sys->p_mi ) : window();
     const bool fits = BreakpointWatcher::fromWidth( main->width() ) != BreakpointWatcher::XS
-                   && layout()->sizeHint().width() + hidden <= width();
+                   && full <= width();
     foreach( QWidget *w, items )
         if( w->isHidden() == fits )
             w->setVisible( fits );
+    const bool expertFits = full - ( fits ? 0 : itemsWidth ) <= width();
+    if( expert && expert->isHidden() == expertFits )
+        expert->setVisible( expertFits );
 }
 
 void ControlsWidget::resizeEvent( QResizeEvent *e )

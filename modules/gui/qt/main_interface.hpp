@@ -297,6 +297,7 @@ protected slots:
 
     void resizeStack( int w, int h );
     int windowWidthFor( int stackWidth, int otherWidth, bool withSidebar ) const;
+    QSize stackAreaSize() const;
 
     void setVideoSize( unsigned int, unsigned int );
     void videoSizeChanged( int, int );
