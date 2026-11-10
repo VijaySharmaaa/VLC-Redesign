@@ -38,6 +38,7 @@
 #include <QHash>
 #include <QLabel>
 #include <QListWidget>
+#include <QLocale>
 #include <QMenu>
 #include <QPainter>
 #include <QPointer>
@@ -87,13 +88,16 @@ namespace
             if( index.data( CheckedRole ).toBool() )
             {
                 const int check = t->px( Deck::PopoverCheck );
-                const QRect box( r.left() + ( col - check ) / 2, r.center().y() - check / 2 + 1, check, check );
+                /* the check column is on the leading side (right in RTL) */
+                const QRect box = QStyle::visualRect( opt.direction, opt.rect,
+                    QRect( r.left() + ( col - check ) / 2, r.center().y() - check / 2 + 1, check, check ) );
                 /* the accent is 2.4:1 on light surfaces: marks take the accent text there */
                 p->drawPixmap( box, t->icon( RedesignIcons::IconCheck,
                                              t->isDark() ? Theme::Accent : Theme::AccentText,
                                              box.size() ).pixmap( box.size() ) );
             }
-            const QRect text = r.adjusted( col + t->px( Deck::PopoverRowGap ), 0, 0, 0 );
+            const QRect text = QStyle::visualRect( opt.direction, opt.rect,
+                                                   r.adjusted( col + t->px( Deck::PopoverRowGap ), 0, 0, 0 ) );
             const QString detail = index.data( DetailRole ).toString();
             const QFont body = t->font( Theme::Body ), meta = t->font( Theme::Meta );
             const int bodyH = QFontMetrics( body ).height();
@@ -292,12 +296,16 @@ namespace
         column->addWidget( list );
 
         auto choose = [list, menu]( QListWidgetItem *item ) {
-            QAction *action = menu->actions().value( list->row( item ) );
+            const int row = list->row( item );
+            QAction *action = menu->actions().value( row );
             if( !action )
                 return;
             action->trigger();
+            /* not the actions' isChecked(): CreateAndConnect's disconnect()
+             * cuts them from their exclusive QActionGroup, so the previous
+             * choice stays checked; setting the variable always selects */
             for( int i = 0; i < list->count(); i++ )
-                list->item( i )->setData( CheckedRole, menu->actions().value( i )->isChecked() );
+                list->item( i )->setData( CheckedRole, i == row );
         };
         QObject::connect( list, &QListWidget::itemClicked, list, choose );
         QObject::connect( list, &QListWidget::itemActivated, list, choose );
@@ -374,7 +382,7 @@ QWidget *showSpeedPopover( intf_thread_t *p_intf, QAbstractButton *anchor )
     QListWidget *list = makeList( pop, qtr( "Playback speed" ) );
     const float rate = var_GetFloat( THEPL, "rate" );
     for( size_t i = 0; i < sizeof( rates ) / sizeof( rates[0] ); i++ )
-        addRow( list, QString::number( rates[i], 'f', 2 ) + QChar( 0x00D7 ), QString(),
+        addRow( list, QLocale().toString( rates[i], 'f', 2 ) + QChar( 0x00D7 ), QString(),
                 qAbs( rates[i] - rate ) < .001f );
     fitRows( list );
     layout->addWidget( list );
