@@ -29,6 +29,7 @@
 #include "util/qt_dirs.hpp"
 
 #include <QStringList>
+#include <QDateTime>
 #include <QRegularExpression>
 #include <QSignalMapper>
 
@@ -53,9 +54,6 @@
 
 RecentsMRL::RecentsMRL( intf_thread_t *_p_intf ) : p_intf( _p_intf )
 {
-    recents = QStringList();
-    times = QStringList();
-
     signalMapper = new QSignalMapper( this );
     connect( signalMapper,
             QSIGNALMAPPER_MAPPEDSTR_SIGNAL,
@@ -104,18 +102,41 @@ void RecentsMRL::addRecent( const QString &mrl )
         /* move to the front */
         recents.move( i_index, 0 );
         times.move( i_index, 0 );
+        lengths.move( i_index, 0 );
+        dates.move( i_index, 0 );
     }
     else
     {
         recents.prepend( mrl );
         times.prepend( "-1" );
+        lengths.prepend( "0" );
+        dates.prepend( QString() );
         if( recents.count() > RECENTS_LIST_SIZE ) {
             recents.takeLast();
             times.takeLast();
+            lengths.takeLast();
+            dates.takeLast();
         }
     }
+    dates[0] = QDateTime::currentDateTimeUtc().toString( Qt::ISODate );
     VLCMenuBar::updateRecents( p_intf );
     save();
+    emit changed();
+}
+
+void RecentsMRL::removeRecent( const QString &mrl )
+{
+    int i_index = recents.indexOf( mrl );
+    if( i_index < 0 )
+        return;
+
+    recents.removeAt( i_index );
+    times.removeAt( i_index );
+    lengths.removeAt( i_index );
+    dates.removeAt( i_index );
+    VLCMenuBar::updateRecents( p_intf );
+    save();
+    emit changed();
 }
 
 void RecentsMRL::clear()
@@ -125,8 +146,11 @@ void RecentsMRL::clear()
 
     recents.clear();
     times.clear();
+    lengths.clear();
+    dates.clear();
     if( isActive ) VLCMenuBar::updateRecents( p_intf );
     save();
+    emit changed();
 }
 
 QStringList RecentsMRL::recentList()
@@ -139,6 +163,9 @@ void RecentsMRL::load()
     /* Load from the settings */
     QStringList list = getSettings()->value( "RecentsMRL/list" ).toStringList();
     QStringList list2 = getSettings()->value( "RecentsMRL/times" ).toStringList();
+    /* missing or short in configurations from before these lists */
+    QStringList list3 = getSettings()->value( "RecentsMRL/lengths" ).toStringList();
+    QStringList list4 = getSettings()->value( "RecentsMRL/dates" ).toStringList();
 
     /* And filter the regexp on the list */
     for( int i = 0; i < list.count(); ++i )
@@ -146,6 +173,8 @@ void RecentsMRL::load()
         if ( !filter || !filter->match( list.at(i) ).hasMatch() ) {
             recents.append( list.at(i) );
             times.append( list2.value(i, "-1" ) );
+            lengths.append( list3.value(i, "0" ) );
+            dates.append( list4.value(i) );
         }
     }
 }
@@ -154,6 +183,8 @@ void RecentsMRL::save()
 {
     getSettings()->setValue( "RecentsMRL/list", recents );
     getSettings()->setValue( "RecentsMRL/times", times );
+    getSettings()->setValue( "RecentsMRL/lengths", lengths );
+    getSettings()->setValue( "RecentsMRL/dates", dates );
 }
 
 void RecentsMRL::playMRL( const QString &mrl )
@@ -173,11 +204,30 @@ int RecentsMRL::time( const QString &mrl )
         return -1;
 }
 
-void RecentsMRL::setTime( const QString &mrl, const int64_t time )
+void RecentsMRL::setTime( const QString &mrl, const int64_t time,
+                          const int64_t length )
 {
     int i_index = recents.indexOf( mrl );
     if( i_index != -1 )
+    {
         times[i_index] = QString::number( time / 1000 );
+        lengths[i_index] = QString::number( qMax<int64_t>( length / 1000, 0 ) );
+        dates[i_index] = QDateTime::currentDateTimeUtc().toString( Qt::ISODate );
+        emit changed();
+    }
+}
+
+int64_t RecentsMRL::length( const QString &mrl )
+{
+    int i_index = recents.indexOf( mrl );
+    return i_index != -1 ? lengths.value( i_index ).toLongLong() : 0;
+}
+
+QDateTime RecentsMRL::date( const QString &mrl )
+{
+    int i_index = recents.indexOf( mrl );
+    return i_index != -1 ? QDateTime::fromString( dates.value( i_index ), Qt::ISODate )
+                         : QDateTime();
 }
 
 int Open::openMRL( intf_thread_t *p_intf,
