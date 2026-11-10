@@ -54,6 +54,7 @@ private:
     void initComboBoxItems( QObject* );
     void setWidgetValue( QObject* );
     void clean();
+    void resetAdjust();
     void setFilterOption( const char *psz_module, const char *psz_option, int,
                           double, const char * );
     void changeVFiltersString( const char *psz_name, bool b_add );
@@ -184,10 +185,16 @@ protected:
 private:
     FilterSliderData *preamp;
     FilterSliderData::slider_data_t preamp_values;
+    QSlider *preampSlider;
+    QList<QSlider *> bandSliders;
+    QList<QPushButton *> chips;
+    QLabel *presetName;
 
 private slots:
     void setCorePreset( int );
     void enable2Pass( bool );
+    /* the chip of the preset the sliders match, or "Custom" */
+    void updatePreset();
 };
 
 class Compressor: public AudioFilterControlWidget
@@ -222,19 +229,20 @@ public:
     PitchShifter( intf_thread_t *, QWidget * );
 };
 
+/* A delay stepper (DESIGN_SPEC 7): minus, the value in seconds, plus. The
+ * buttons step 50 ms (decision P5-2); the value can be typed too. */
 class SyncWidget : public QWidget
 {
     Q_OBJECT
 public:
-    SyncWidget( QWidget * );
+    /* the keys are the hotkeys' texts for the buttons' tooltips */
+    SyncWidget( QWidget *, const QString &name,
+                const QString &downKey, const QString &upKey );
     void setValue( double d );
 signals:
     void valueChanged( double );
-private slots:
-    void valueChangedHandler( double d );
 private:
-    QDoubleSpinBox spinBox;
-    QLabel spinLabel;
+    QDoubleSpinBox *spinBox;
 };
 
 class SyncControls : public QWidget
