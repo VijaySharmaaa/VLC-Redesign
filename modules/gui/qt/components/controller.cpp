@@ -151,6 +151,28 @@ QIcon deckIcon( const char *name, bool onAccent )
     return QIcon( new DeckIconEngine( name, onAccent ) );
 }
 
+/* Tab follows the screen. Focus order is parenting order, and plain
+ * buttons are parented only when their group joins the layout, after the
+ * special widgets around them (createAndAddWidget). */
+static void tabInLayoutOrder( QLayout *layout, QWidget *&previous )
+{
+    for( int i = 0; i < layout->count(); i++ )
+    {
+        QLayoutItem *item = layout->itemAt( i );
+        QWidget *w = item->widget();
+        if( item->layout() )
+            tabInLayoutOrder( item->layout(), previous );
+        else if( w && w->focusPolicy() == Qt::NoFocus && w->layout() )
+            tabInLayoutOrder( w->layout(), previous );  /* volume, advanced row */
+        else if( w && ( w->focusPolicy() & Qt::TabFocus ) )
+        {
+            if( previous )
+                QWidget::setTabOrder( previous, w );
+            previous = w;
+        }
+    }
+}
+
 /* DESIGN_SPEC 3: open (accent glyph, ink 0.09 fill) while the panel or
  * dialog the button toggles is shown. The click toggles that, so the
  * button only mirrors it: connected after the action, sync undoes the
@@ -225,7 +247,7 @@ void AbstractController::setupButton( QAbstractButton *aButton )
     aButton->setSizePolicy( sizePolicy );
     aButton->setFixedSize( QSize( t->metric( Theme::IconButton ), t->metric( Theme::IconButton ) ) );
     aButton->setIconSize( QSize( t->metric( Theme::IconGlyph ), t->metric( Theme::IconGlyph ) ) );
-    /* Tab reaches it; eventFilter keeps Space for the play/pause hotkey */
+    /* Tab reaches it; Space stays the play/pause hotkey (ButtonKeys) */
     aButton->setFocusPolicy( Qt::TabFocus );
     aButton->setProperty( "role", "deck" );
     aButton->installEventFilter( this );
@@ -237,26 +259,9 @@ bool AbstractController::eventFilter( QObject *obj, QEvent *e )
     if( !button || button->property( "role" ).isNull() )
         return QFrame::eventFilter( obj, e );
 
+    /* Space and Enter: MainInterface's ButtonKeys, for every button */
     switch( e->type() )
     {
-    case QEvent::KeyPress:
-    case QEvent::KeyRelease:
-    {
-        QKeyEvent *ke = static_cast<QKeyEvent *>( e );
-        if( ke->key() == Qt::Key_Space && ke->modifiers() == Qt::NoModifier )
-        {
-            /* ignored, it goes on to the window, whose hotkeys get it */
-            e->ignore();
-            return true;
-        }
-        if( ke->key() == Qt::Key_Return || ke->key() == Qt::Key_Enter )
-        {
-            if( e->type() == QEvent::KeyPress && !ke->isAutoRepeat() )
-                button->click();
-            return true;
-        }
-        break;
-    }
     case QEvent::ToolTip:
     {
         /* read when shown, so a changed hotkey shows at once */
@@ -388,6 +393,7 @@ void AbstractController::createAndAddWidget( QBoxLayout *controlLayout_,
     a_button->setIcon( deckIcon( deckIconL[button] ) );
 #define BUTTON_SET_BAR2( button, image, tooltip ) \
     button->setToolTip( tooltip );          \
+    button->setAccessibleName( tooltip );   \
     button->setIcon( QIcon( ":/"#image ".svg" ) );
 
 #define ENABLE_ON_VIDEO( a ) \
@@ -979,6 +985,8 @@ ControlsWidget::ControlsWidget( intf_thread_t *_p_i,
 
     controlLayout->addLayout( controlLayout1 );
     controlLayout->addLayout( controlLayout2 );
+    QWidget *previous = NULL;
+    tabInLayoutOrder( controlLayout, previous );
 }
 
 QList<QWidget *> ControlsWidget::optionalItems() const
@@ -1081,6 +1089,8 @@ InputControlsWidget::InputControlsWidget( intf_thread_t *_p_i, QWidget *_parent 
 
     QString line = getSettings()->value( "MainWindow/InputToolbar", INPT_TB_DEFAULT ).toString();
     parseAndCreate( line, controlLayout );
+    QWidget *previous = NULL;
+    tabInLayoutOrder( controlLayout, previous );
 }
 /**********************************************************************
  * Fullscrenn control widget

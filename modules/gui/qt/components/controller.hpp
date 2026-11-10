@@ -194,8 +194,8 @@ protected:
                                      buttonType_e i_type, int i_option );
 
     QWidget *createWidget( buttonType_e, int options = WIDGET_NORMAL );
-    /* deck buttons: Space goes on to the hotkeys, Enter clicks, the
-     * tooltip gets the button's shortcut (hotkey property) */
+    /* deck buttons: the tooltip gets the button's shortcut (hotkey
+     * property); Space and Enter are MainInterface's ButtonKeys */
     bool eventFilter( QObject *, QEvent * ) Q_DECL_OVERRIDE;
 private:
     void setupButton( QAbstractButton * );

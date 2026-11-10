@@ -72,6 +72,9 @@
 #include <QStackedWidget>
 #include <QScreen>
 #include <QShortcut>
+#include <QAbstractButton>
+#include <QApplication>
+#include <QDialog>
 #include <QDesktopWidget>
 #ifdef _WIN32
 #include <QFileInfo>
@@ -106,6 +109,51 @@ static int IntfRaiseMainCB( vlc_object_t *p_this, const char *psz_variable,
 
 const QEvent::Type MainInterface::ToolbarsNeedRebuild =
         (QEvent::Type)QEvent::registerEventType();
+
+namespace
+{
+    /* Space is the player's (play/pause) in its windows, never a focused
+     * button's; buttons there click on Enter instead. One filter for the
+     * deck, its immersive and FSC copies, the now-playing bar, audio mode,
+     * the sidebar and the mini player. Dialogs and pop-ups keep Space. */
+    class ButtonKeys : public QObject
+    {
+    public:
+        explicit ButtonKeys( QWidget *_main ) : QObject( _main ), main( _main ) {}
+
+    protected:
+        bool eventFilter( QObject *obj, QEvent *e ) Q_DECL_OVERRIDE
+        {
+            if( e->type() != QEvent::KeyPress && e->type() != QEvent::KeyRelease )
+                return false;
+            QAbstractButton *button = qobject_cast<QAbstractButton *>( obj );
+            if( !button )
+                return false;
+            const QWidget *w = button->window();
+            if( qobject_cast<const QDialog *>( w ) || w->windowType() == Qt::Popup
+             || ( w != main && w->parentWidget() != main && w->objectName() != "miniPlayer" ) )
+                return false;
+            QKeyEvent *ke = static_cast<QKeyEvent *>( e );
+            if( ke->modifiers() & ~Qt::KeypadModifier )
+                return false;
+            if( ke->key() == Qt::Key_Space )
+            {
+                e->ignore();    /* on to the window, whose hotkeys get it */
+                return true;
+            }
+            if( ke->key() == Qt::Key_Return || ke->key() == Qt::Key_Enter )
+            {
+                if( e->type() == QEvent::KeyPress && !ke->isAutoRepeat() )
+                    button->click();
+                return true;
+            }
+            return false;
+        }
+
+    private:
+        QWidget *main;
+    };
+}
 
 MainInterface::MainInterface( intf_thread_t *_p_intf, bool customFrame ) : QVLCMW( _p_intf )
 {
@@ -311,6 +359,7 @@ MainInterface::MainInterface( intf_thread_t *_p_intf, bool customFrame ) : QVLCM
     /* A->B loop: one shortcut for the window, not one per deck button (the
      * deck, the immersive bar and the FSC each have one, often hidden) */
     QShortcut *atob = new QShortcut( QKeySequence( qtr( "Shift+L" ) ), this );
+    qApp->installEventFilter( new ButtonKeys( this ) );
     connect( atob, &QShortcut::activated, THEMIM->getIM(), &InputManager::setAtoB );
 
 
@@ -434,8 +483,9 @@ void MainInterface::recreateToolbars()
     delete controls;
     delete inputC;
 
-    controls = new ControlsWidget( p_intf, b_adv, this );
+    /* the seek row first: the tab order is creation order */
     inputC = new InputControlsWidget( p_intf, this );
+    controls = new ControlsWidget( p_intf, b_adv, this );
     /* below the stack and the now-playing bar, or controls on top */
     const int deckRow = mainLayout->indexOf( nowPlayingBar ) + 1;
     mainLayout->insertWidget( deckRow, inputC );
@@ -664,10 +714,11 @@ void MainInterface::createMainWidget( QSettings *creationSettings )
     /* Resize even if no-auto-resize, because we are at creation */
     resizeStack( stackWidgetsSizes[bgWidget].width(), stackWidgetsSizes[bgWidget].height() );
 
-    /* Create the CONTROLS Widget */
+    /* Create the CONTROLS Widget; the seek row first: the tab order is
+     * creation order */
+    inputC = new InputControlsWidget( p_intf, this );
     controls = new ControlsWidget( p_intf,
         creationSettings->value( "MainWindow/adv-controls", false ).toBool(), this );
-    inputC = new InputControlsWidget( p_intf, this );
 
     const int deckRow = mainLayout->indexOf( nowPlayingBar ) + 1;
     mainLayout->insertWidget( deckRow, inputC );
