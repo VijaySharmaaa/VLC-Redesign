@@ -115,13 +115,14 @@ const QEvent::Type MainInterface::ToolbarsNeedRebuild =
 namespace
 {
     /* A button of the player controls: the deck and its immersive and FSC
-     * copies, the now-playing bar, the mini player */
+     * copies, the now-playing bar, the mini player, the player header */
     bool inPlayerControls( const QWidget *w )
     {
         for( ; w; w = w->parentWidget() )
             if( qobject_cast<const AbstractController *>( w )
              || qobject_cast<const NowPlayingBar *>( w )
-             || qobject_cast<const MiniPlayer *>( w ) )
+             || qobject_cast<const MiniPlayer *>( w )
+             || w->objectName() == QLatin1String( "playerHeader" ) )
                 return true;
         return false;
     }
@@ -190,6 +191,7 @@ MainInterface::MainInterface( intf_thread_t *_p_intf, bool customFrame ) : QVLCM
     controls             = NULL;
     inputC               = NULL;
     pausedBadge          = NULL;
+    playerHeader         = NULL;
     buffering            = NULL;
     immersiveBar         = NULL;
 
@@ -370,10 +372,12 @@ MainInterface::MainInterface( intf_thread_t *_p_intf, bool customFrame ) : QVLCM
                             && stackCentralW->currentWidget() == videoWidget ); } );
     dropOverlay = new DropOverlay( this );
     buffering = new BufferingOverlay( p_intf, this, stackCentralW );
-    createPausedBadge();
+    createVideoOverlays();
     if( var_InheritBool( p_intf, "qt-immersive" ) )
         immersiveBar = new ImmersiveBar( p_intf, this, stackCentralW,
                                          getControlsVisibilityStatus() & CONTROLS_ADVANCED );
+    if( immersiveBar )
+        immersiveBar->setHeader( playerHeader );
     connect( stackCentralW, &QStackedWidget::currentChanged,
              this, &MainInterface::updateDeckPlacement );
     updateDeckPlacement();
@@ -1104,7 +1108,7 @@ void MainInterface::getVideoSlot( struct vout_window_t *p_wnd,
         videoWidget = new VideoWidget( p_intf, stackCentralW );
         videoWidget->setAttribute( Qt::WA_DontCreateNativeAncestors );  /* see createMainWidget */
         stackCentralW->addWidget( videoWidget );
-        createPausedBadge();
+        createVideoOverlays();
     }
     *res = videoWidget->request( p_wnd );
     if( *res ) /* The videoWidget is available */
@@ -1220,8 +1224,10 @@ void MainInterface::setVideoSize( unsigned int w, unsigned int h )
 
 void MainInterface::videoSizeChanged( int w, int h )
 {
+    /* the video at its size, the docked side panels beside it (resizeStack
+     * keeps the window in the work area) */
     if( !playlistWidget || playlistWidget->artContainer->currentWidget() != videoWidget )
-        resizeStack( w, h );
+        resizeStack( w + stackAreaSize().width() - stackCentralW->width(), h );
 }
 
 void MainInterface::setVideoFullScreen( bool fs )
@@ -1309,11 +1315,18 @@ void MainInterface::setVideoOnTop( bool on_top )
     }
 }
 
-/* The paused badge follows the video widget, which may be created late */
-void MainInterface::createPausedBadge()
+/* The paused badge and the header follow the video widget, which may be
+ * created late */
+void MainInterface::createVideoOverlays()
 {
-    if( videoWidget && !pausedBadge )
-        pausedBadge = new PausedBadge( p_intf, this, videoWidget );
+    if( !videoWidget || pausedBadge )
+        return;
+    pausedBadge = new PausedBadge( p_intf, this, videoWidget );
+    playerHeader = new PlayerHeader( p_intf, this, videoWidget, nowPlayingInfo );
+    connect( playerHeader->backButton(), &QAbstractButton::clicked,
+             this, [this]() { sidebar->showPage( Sidebar::Home ); } );
+    if( immersiveBar )
+        immersiveBar->setHeader( playerHeader );
 }
 
 bool MainInterface::onPlayerPage() const
@@ -1340,6 +1353,9 @@ void MainInterface::updateDeckPlacement()
         setDeckVisible( true );
     if( immersiveBar )
         immersiveBar->setActive( floats );
+    if( playerHeader )
+        playerHeader->setActive( stackCentralW->currentWidget() == videoWidget
+                                 && !b_videoFullScreen && !b_minimalView );
 }
 
 void MainInterface::setImmersive( bool on )
@@ -1348,8 +1364,11 @@ void MainInterface::setImmersive( bool on )
     if( on == ( immersiveBar != NULL ) )
         return;
     if( on )
+    {
         immersiveBar = new ImmersiveBar( p_intf, this, stackCentralW,
                                          getControlsVisibilityStatus() & CONTROLS_ADVANCED );
+        immersiveBar->setHeader( playerHeader );
+    }
     else
     {
         delete immersiveBar;
@@ -1561,7 +1580,8 @@ void MainInterface::setMinimalView( bool b_minimal )
 #endif
     bool b_inputCVisible = inputC->isVisible();
     const bool b_barVisible = nowPlayingBar->isVisible();
-    /* the sidebar goes too: its width, and the stack's for the way back */
+    /* the sidebar goes too (setDeckVisible): its width, and the stack's
+     * for the way back */
     const bool b_sidebarShown = !sidebar->isHidden();
     const int i_stackWidth = stackCentralW->width();
     const int i_otherWidth = width() - i_stackWidth - ( b_sidebarShown ? sidebar->width() : 0 );
@@ -1597,7 +1617,6 @@ void MainInterface::setMinimalView( bool b_minimal )
             resizeWindow( width() - i_widthChange, height() - i_heightChange );
     }
 
-    sidebar->setVisible( !b_minimal );
     if( b_plDocked )   /* back from full screen; minimal view keeps it */
         showPlaylistPanel( playlistVisible );
     setDeckVisible( !b_minimal );
@@ -1620,7 +1639,9 @@ void MainInterface::setMinimalView( bool b_minimal )
         if( !b_barVisible && nowPlayingBar->isVisible() )
             i_heightChange += nowPlayingBar->height();
 
-        const int i_width = b_sidebarShown ? width()
+        /* the player pages have no sidebar to bring back */
+        const bool withSidebar = !onPlayerPage();
+        const int i_width = b_sidebarShown || !withSidebar ? width()
                           : windowWidthFor( i_stackWidth, i_otherWidth, true );
         if( i_heightChange != 0 || i_width != width() )
             resizeWindow( i_width, height() + i_heightChange );
@@ -1636,6 +1657,10 @@ void MainInterface::setDeckVisible( bool visible )
     /* a library page has the now-playing bar once something played, and
      * no deck before (inventory 1.1.1): the hotkeys work without it */
     const bool library = isLibraryPage( stackCentralW->currentWidget() );
+    /* the player pages take the sidebar's width (renders 1.2.x): hidden
+     * before the stack resizes (showTab runs this from currentChanged),
+     * so the window keeps its width */
+    sidebar->setVisible( visible && !onPlayerPage() );
     nowPlayingBar->setVisible( visible && library && b_nowPlayingSeen );
     /* in the immersive layout the deck floats over the video instead */
     controls->setVisible( visible && !library && !deckFloats() );
@@ -1761,7 +1786,7 @@ void MainInterface::toggleMinimalView( bool b_minimal )
         {
             if( stackCentralW->height() < 16 )
             {
-                resizeStack( stackCentralW->width(), 100 );
+                resizeStack( stackAreaSize().width(), 100 );
             }
         }
     }

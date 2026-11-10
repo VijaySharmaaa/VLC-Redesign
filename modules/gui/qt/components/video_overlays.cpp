@@ -1,5 +1,5 @@
 /*****************************************************************************
- * video_overlays.cpp : paused badge, buffering ring and immersive bar
+ * video_overlays.cpp : paused badge, buffering ring, immersive bar, header
  *****************************************************************************
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -22,6 +22,8 @@
 
 #include "components/video_overlays.hpp"
 #include "components/controller.hpp"
+#include "components/now_playing.hpp"
+#include "components/library/library_widgets.hpp"
 #include "input_manager.hpp"
 #include "util/theme.hpp"
 #include "util/redesign_icons.hpp"
@@ -36,7 +38,9 @@
 #include <QAbstractButton>
 #include <QApplication>
 #include <QKeyEvent>
+#include <QLinearGradient>
 #include <QPainter>
+#include <QStyle>
 #include <QWindow>
 #include <QVariantAnimation>
 #include <QPropertyAnimation>
@@ -71,6 +75,41 @@ namespace
             t->icon( RedesignIcons::IconPlay, Theme::OnVideo, QSize( g, g ) )
                 .paint( &p, QRect( rect().center() - QPoint( g / 2, g / 2 ), QSize( g, g ) ) );
         }
+    };
+
+    /* The header's round back button, white on the video in both themes */
+    class HeaderBackButton : public QAbstractButton
+    {
+    public:
+        explicit HeaderBackButton( QWidget *parent )
+            : QAbstractButton( parent ), glyph( backIcon( Theme::OnVideo ) ) {}
+
+    protected:
+        void enterEvent( QEvent * ) Q_DECL_OVERRIDE { update(); }
+        void leaveEvent( QEvent * ) Q_DECL_OVERRIDE { update(); }
+        void paintEvent( QPaintEvent * ) Q_DECL_OVERRIDE
+        {
+            Theme *t = Theme::instance();
+            QPainter p( this );
+            p.setRenderHint( QPainter::Antialiasing );
+            QColor fill = t->color( Theme::OnVideo );
+            fill.setAlpha( underMouse() || isDown() ? V::HeaderBackHoverAlpha : V::HeaderBackAlpha );
+            p.setPen( Qt::NoPen );
+            p.setBrush( fill );
+            p.drawEllipse( QRectF( rect() ) );
+            if( hasFocus() )
+            {
+                const qreal inset = RedesignTokens::Size::FocusRing / 2.;
+                p.setPen( QPen( t->color( Theme::Accent ), RedesignTokens::Size::FocusRing ) );
+                p.setBrush( Qt::NoBrush );
+                p.drawEllipse( QRectF( rect() ).adjusted( inset, inset, -inset, -inset ) );
+            }
+            const int g = t->px( V::HeaderBackGlyph );
+            glyph.paint( &p, QRect( rect().center() - QPoint( g / 2, g / 2 ), QSize( g, g ) ) );
+        }
+
+    private:
+        QIcon glyph;
     };
 
     const QEvent::Type WakeEvent = static_cast<QEvent::Type>( QEvent::registerEventType() );
@@ -363,6 +402,22 @@ ImmersiveBar::ImmersiveBar( intf_thread_t *_p_intf, QWidget *owner, QWidget *_ar
 ImmersiveBar::~ImmersiveBar()
 {
     setVoutList( NULL, 0 );
+    if( header )
+        header->setAsleep( false );
+}
+
+void ImmersiveBar::setHeader( PlayerHeader *h )
+{
+    header = h;
+    if( header )
+        header->setAsleep( asleep );
+}
+
+void ImmersiveBar::setAsleep( bool s )
+{
+    asleep = s;
+    if( header )
+        header->setAsleep( s );
 }
 
 void ImmersiveBar::rebuild( bool advanced )
@@ -377,6 +432,14 @@ void ImmersiveBar::rebuild( bool advanced )
         place();
 }
 
+/* The lift is added to the vout's "sub-margin", never cached: the subtitle
+ * position hotkeys (key-subpos-up/down) change the same variable meanwhile */
+static void shiftSubMargin( vout_thread_t *p_vout, int by )
+{
+    if( by )
+        var_SetInteger( p_vout, "sub-margin", var_GetInteger( p_vout, "sub-margin" ) + by );
+}
+
 /* Qt thread: voutListChanged is emitted by InputManager::UpdateVout */
 void ImmersiveBar::setVoutList( vout_thread_t **pp_vout, int i_vout )
 {
@@ -389,7 +452,7 @@ void ImmersiveBar::setVoutList( vout_thread_t **pp_vout, int i_vout )
         {
             /* returns once no callback runs: none posts to us after it */
             var_DelCallback( p_vout, "mouse-moved", MouseMovedCB, this );
-            var_SetInteger( p_vout, "sub-margin", userMargin.take( p_vout ) );
+            shiftSubMargin( p_vout, -lift );
             vlc_object_release( p_vout );
         }
     foreach( vout_thread_t *p_vout, set )
@@ -397,9 +460,7 @@ void ImmersiveBar::setVoutList( vout_thread_t **pp_vout, int i_vout )
         {
             vlc_object_hold( p_vout );
             var_AddCallback( p_vout, "mouse-moved", MouseMovedCB, this );
-            userMargin.insert( p_vout, var_GetInteger( p_vout, "sub-margin" ) );
-            if( lift )
-                var_SetInteger( p_vout, "sub-margin", userMargin.value( p_vout ) + lift );
+            shiftSubMargin( p_vout, lift );
         }
     vouts = set;
     if( i_vout )
@@ -446,9 +507,9 @@ void ImmersiveBar::liftSubtitles()
                        up ? host->targetRect().bottom() + 1 - restingRect().top() : 0 );
     if( units == lift )
         return;
-    lift = units;
     foreach( vout_thread_t *p_vout, vouts )
-        var_SetInteger( p_vout, "sub-margin", userMargin.value( p_vout ) + lift );
+        shiftSubMargin( p_vout, units - lift );
+    lift = units;
 }
 
 /* vout thread: no widget access, only a posted event to the Qt thread */
@@ -492,27 +553,6 @@ bool ImmersiveBar::eventFilter( QObject *o, QEvent *e )
     return false;
 }
 
-/* The keys its buttons leave (Space, the hotkeys) are the window's */
-void ImmersiveBar::keyPressEvent( QKeyEvent *e )
-{
-    if( parentWidget() )
-        QApplication::sendEvent( parentWidget(), e );
-}
-
-bool ImmersiveBar::nativeEvent( const QByteArray &type, void *message, long *result )
-{
-#ifdef _WIN32
-    /* a click is not a request for the keys: the window keeps them */
-    MSG *msg = static_cast<MSG *>( message );
-    if( msg->message == WM_MOUSEACTIVATE )
-    {
-        *result = MA_NOACTIVATE;
-        return true;
-    }
-#endif
-    return OverlayWindow::nativeEvent( type, message, result );
-}
-
 /* Shows it and gives the keys to its first control */
 bool ImmersiveBar::takeFocus()
 {
@@ -529,21 +569,12 @@ bool ImmersiveBar::takeFocus()
     return true;
 }
 
-void ImmersiveBar::giveFocusBack()
-{
-    /* not isActiveWindow(): a tool window can share its owner's */
-    if( QApplication::activeWindow() != this || !parentWidget() )
-        return;
-    parentWidget()->activateWindow();
-    parentWidget()->setFocus( Qt::OtherFocusReason );
-}
-
 void ImmersiveBar::setActive( bool on )
 {
     if( on == active )
         return;
     active = on;
-    asleep = false;
+    setAsleep( false );
     if( on )
     {
         place();
@@ -564,7 +595,7 @@ void ImmersiveBar::wake()
     idle.start();
     if( asleep )
     {
-        asleep = false;
+        setAsleep( false );
         animate( true );
     }
 }
@@ -575,10 +606,11 @@ void ImmersiveBar::sleepIfIdle()
 {
     InputManager *im = THEMIM->getIM();
     if( !active || asleep || im->playingStatus() != PLAYING_S || !im->hasVideo()
-        || underMouse() || QApplication::activePopupWidget() )
+        || underMouse() || ( header && header->hovered() )
+        || QApplication::activePopupWidget() )
         return;
     giveFocusBack();   /* idle: the keys go back with it */
-    asleep = true;
+    setAsleep( true );
     animate( false );
 }
 
@@ -642,4 +674,232 @@ void ImmersiveBar::paintEvent( QPaintEvent * )
     p.setPen( t->ink( V::ImmersiveBorderAlpha ) );
     p.setBrush( t->color( Theme::Glass ) );
     p.drawRoundedRect( QRectF( rect() ).adjusted( .5, .5, -.5, -.5 ), radius, radius );
+}
+
+/**********************************************************************
+ * Player header
+ **********************************************************************/
+PlayerHeader::PlayerHeader( intf_thread_t *_p_intf, QWidget *owner, QWidget *_video,
+                            NowPlayingInfo *_info )
+    : OverlayWindow( owner ), p_intf( _p_intf ), info( _info ), video( _video ), active( false ), asleep( false )
+{
+    /* only the button takes the mouse: the strip leaves it to the video */
+    backWindow = new OverlayWindow( owner, TakeInput );
+    /* one of the player controls: Space on it plays or pauses (ButtonKeys) */
+    backWindow->setObjectName( "playerHeader" );
+    backWindow->setWindowFlags( backWindow->windowFlags() & ~Qt::WindowDoesNotAcceptFocus );
+    back = new HeaderBackButton( backWindow );
+    back->setFocusPolicy( Qt::TabFocus );
+    back->setAccessibleName( qtr( "Go to library" ) );
+    back->setToolTip( qtr( "Go to library" ) );
+    /* its Tab, Shift+Tab and Esc, before the button takes them */
+    backWindow->winId();   /* creates its window */
+    backWindow->windowHandle()->installEventFilter( this );
+    owner->installEventFilter( this );
+
+    fade = new QVariantAnimation( this );
+    fade->setEasingCurve( enterCurve() );
+    connect( fade, &QVariantAnimation::valueChanged, this,
+             [this]( const QVariant &v ) { setOpacity( v.toReal() ); } );
+    connect( fade, &QAbstractAnimation::finished, this, [this]() {
+        if( asleep )
+            place();
+    } );
+
+    host = new OverlayHost( video, this );
+    connect( host, &OverlayHost::changed, this, &PlayerHeader::place );
+    connect( Theme::instance(), &Theme::changed, this, &PlayerHeader::place );
+    connect( info, &NowPlayingInfo::changed, this, &PlayerHeader::refresh );
+    refresh();
+}
+
+PlayerHeader::~PlayerHeader()
+{
+    delete backWindow;
+}
+
+void PlayerHeader::refresh()
+{
+    input_thread_t *input = THEMIM->getInput();
+    meta = input ? mediaMetaLine( input_GetItem( input ) ) : QString();
+    setAccessibleName( info->title );
+    update();
+}
+
+void PlayerHeader::setActive( bool on )
+{
+    if( on == active )
+        return;
+    active = on;
+    place();
+}
+
+void PlayerHeader::setAsleep( bool s )
+{
+    if( s == asleep )
+        return;
+    asleep = s;
+    const int ms = Theme::instance()->duration( Theme::ImmersiveFade );
+    if( !ms || !active || !host->targetShown() )
+    {
+        place();
+        return;
+    }
+    fade->stop();
+    fade->setDuration( ms );
+    fade->setStartValue( isVisible() ? windowOpacity() : 0. );
+    fade->setEndValue( asleep ? 0. : 1. );
+    fade->start();
+    /* after the start: a hidden header shows from transparent */
+    if( !asleep )
+        place();
+}
+
+bool PlayerHeader::hovered() const
+{
+    return backWindow->isVisible() && back->underMouse();
+}
+
+void PlayerHeader::setOpacity( qreal o )
+{
+    setWindowOpacity( o );
+    backWindow->setWindowOpacity( o );
+}
+
+/* Follows the video; a running fade keeps its opacity */
+void PlayerHeader::place()
+{
+    if( !active || asleep || !host->targetShown() )
+    {
+        fade->stop();
+        backWindow->giveFocusBack();
+        backWindow->hide();
+        hide();
+        return;
+    }
+    const Theme *t = Theme::instance();
+    const QRect r = host->targetRect();
+    const int h = qMin( r.height(), 2 * t->px( V::HeaderPadY ) + rowHeight() );
+    setGeometry( QRect( r.topLeft(), QSize( r.width(), h ) ) );
+    const QRect b = backRect( r.width() );
+    backWindow->setGeometry( b.translated( r.topLeft() ) );
+    back->setGeometry( QRect( QPoint(), b.size() ) );
+    if( fade->state() != QAbstractAnimation::Running )
+        setOpacity( 1. );
+    if( !isVisible() )
+    {
+        show();
+        backWindow->show();
+        raiseDrawers();
+    }
+}
+
+/* The XS drawers (playlist, Effects sheet) are tool windows of the same
+ * owner over the video: a header shown after them stays below them */
+void PlayerHeader::raiseDrawers()
+{
+    foreach( QWidget *w, parentWidget()->findChildren<QWidget *>( QString(),
+                                                                 Qt::FindDirectChildrenOnly ) )
+    {
+        if( !w->isWindow() || !w->isVisible()
+         || !( w->inherits( "PlaylistPanel" ) || w->inherits( "ExtendedDialog" ) ) )
+            continue;
+#ifdef _WIN32
+        /* not raise(): it would take the keys from the main window */
+        SetWindowPos( reinterpret_cast<HWND>( w->winId() ), HWND_TOP, 0, 0, 0, 0,
+                      SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE );
+#else
+        w->raise();
+#endif
+    }
+}
+
+QFont PlayerHeader::titleFont() const
+{
+    /* PanelTitle's semibold, at the header's size */
+    QFont f = Theme::instance()->font( Theme::PanelTitle );
+    f.setPointSizeF( f.pointSizeF() * V::HeaderTitle / RedesignTokens::Type::PanelTitle );
+    return f;
+}
+
+int PlayerHeader::rowHeight() const
+{
+    const QFontMetrics title( titleFont() ), meta( Theme::instance()->font( Theme::Meta ) );
+    return qMax( Theme::instance()->px( V::HeaderBack ), title.height() + meta.height() );
+}
+
+QRect PlayerHeader::backRect( int width ) const
+{
+    const Theme *t = Theme::instance();
+    const int b = t->px( V::HeaderBack );
+    const QRect r( t->px( V::HeaderPadX ), t->px( V::HeaderPadY ) + ( rowHeight() - b ) / 2, b, b );
+    return QStyle::visualRect( layoutDirection(), QRect( 0, 0, width, b ), r );
+}
+
+bool PlayerHeader::eventFilter( QObject *o, QEvent *e )
+{
+    if( e->type() != QEvent::KeyPress )
+        return false;
+    const QKeyEvent *ke = static_cast<QKeyEvent *>( e );
+    if( o == parentWidget() )
+    {
+        /* Shift+Tab while the window itself or the video has the keys: to
+         * the back button, before the deck in the tab order */
+        const QWidget *fw = QApplication::focusWidget();
+        if( ke->key() != Qt::Key_Backtab || !backWindow->isVisible() || asleep
+         || ( fw && fw != o && fw != video && !video->isAncestorOf( fw ) ) )
+            return false;
+        back->setFocus( Qt::BacktabFocusReason );
+        backWindow->activateWindow();
+        return true;
+    }
+    /* in the back button's window: Tab goes on to the deck, Shift+Tab and
+     * Esc give the keys back */
+    if( ke->key() == Qt::Key_Tab && ke->modifiers() == Qt::NoModifier )
+    {
+        backWindow->giveFocusBack();
+        QKeyEvent tab( QEvent::KeyPress, Qt::Key_Tab, Qt::NoModifier );
+        QApplication::sendEvent( parentWidget(), &tab );
+        return true;
+    }
+    if( ke->key() == Qt::Key_Backtab || ke->key() == Qt::Key_Escape )
+    {
+        backWindow->giveFocusBack();
+        return true;
+    }
+    return false;
+}
+
+void PlayerHeader::paintEvent( QPaintEvent * )
+{
+    Theme *t = Theme::instance();
+    QPainter p( this );
+    QLinearGradient scrim( 0, 0, 0, height() );
+    scrim.setColorAt( 0, QColor::fromRgba( RedesignTokens::HeaderScrim ) );
+    scrim.setColorAt( 1, Qt::transparent );
+    p.fillRect( rect(), scrim );
+
+    /* title and meta beside the button; in the dark theme's colours, as
+     * everything drawn on the video */
+    const QFont title = titleFont(), metaFont = t->font( Theme::Meta );
+    const QFontMetrics titleFm( title ), metaFm( metaFont );
+    const int x = t->px( V::HeaderPadX ) + t->px( V::HeaderBack ) + t->px( V::HeaderGap );
+    const int w = width() - x - t->px( V::HeaderPadX );
+    if( w <= 0 )
+        return;
+    const int block = titleFm.height() + ( meta.isEmpty() ? 0 : metaFm.height() );
+    int y = t->px( V::HeaderPadY ) + ( rowHeight() - block ) / 2;
+    const Qt::LayoutDirection dir = layoutDirection();
+    const Qt::Alignment align = QStyle::visualAlignment( dir, Qt::AlignLeft | Qt::AlignVCenter );
+    p.setLayoutDirection( dir );
+
+    p.setFont( title );
+    p.setPen( QColor::fromRgb( RedesignTokens::Dark.tx ) );
+    p.drawText( QStyle::visualRect( dir, rect(), QRect( x, y, w, titleFm.height() ) ), align,
+                titleFm.elidedText( info->title, Qt::ElideRight, w ) );
+    y += titleFm.height();
+    p.setFont( metaFont );
+    p.setPen( QColor::fromRgb( RedesignTokens::Dark.tx2 ) );
+    p.drawText( QStyle::visualRect( dir, rect(), QRect( x, y, w, metaFm.height() ) ), align,
+                metaFm.elidedText( meta, Qt::ElideRight, w ) );
 }

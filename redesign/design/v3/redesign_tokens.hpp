@@ -35,6 +35,7 @@ namespace RedesignTokens
     static const QRgb VideoSurface  = 0xFF000000;
     static const QRgb PausedBadgeBg = 0x8C000000; /* 55 % */
     static const QRgb SubtitleBox   = 0xA6000000; /* 65 % */
+    static const QRgb HeaderScrim   = 0x99000000; /* 60 %, fading to none below */
 
     struct Palette
     {
@@ -135,6 +136,15 @@ namespace RedesignTokens
         static const int ImmersiveIdle = 2500, ImmersiveFade = 300;
         static const int SeekLoading = 2000, SeekLoadingDelay = 500;
         static const int SlideOffset = 28, RiseOffset = 8, DropOffset = 6, ToastOffset = 12;
+    }
+
+    /* ---- Player header over the top of the video (px) ---- */
+    namespace VideoOverlay
+    {
+        static const int HeaderPadY = 16, HeaderPadX = 18, HeaderGap = 12;
+        static const int HeaderBack = 34, HeaderBackGlyph = 20;
+        static const int HeaderBackAlpha = 20, HeaderBackHoverAlpha = 41; /* white 0.08, 0.16 */
+        static const int HeaderTitle = 15;        /* semibold; the meta is Type::Meta */
     }
 
     /* ---- Dialogs (px) ---- */

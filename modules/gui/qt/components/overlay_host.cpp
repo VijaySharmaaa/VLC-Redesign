@@ -23,7 +23,13 @@
 #include "components/overlay_host.hpp"
 #include "util/theme.hpp"
 
+#include <QApplication>
 #include <QEvent>
+#include <QKeyEvent>
+
+#ifdef _WIN32
+# include <windows.h>
+#endif
 
 OverlayWindow::OverlayWindow( QWidget *owner, InputMode input )
     : QWidget( owner, Qt::Tool | Qt::FramelessWindowHint | Qt::NoDropShadowWindowHint
@@ -54,6 +60,36 @@ bool OverlayWindow::event( QEvent *e )
     default:
         return QWidget::event( e );
     }
+}
+
+/* The keys its buttons leave (Space, the hotkeys) are the owner's */
+void OverlayWindow::keyPressEvent( QKeyEvent *e )
+{
+    if( parentWidget() )
+        QApplication::sendEvent( parentWidget(), e );
+}
+
+bool OverlayWindow::nativeEvent( const QByteArray &type, void *message, long *result )
+{
+#ifdef _WIN32
+    /* a click is not a request for the keys: the owner keeps them */
+    MSG *msg = static_cast<MSG *>( message );
+    if( msg->message == WM_MOUSEACTIVATE )
+    {
+        *result = MA_NOACTIVATE;
+        return true;
+    }
+#endif
+    return QWidget::nativeEvent( type, message, result );
+}
+
+void OverlayWindow::giveFocusBack()
+{
+    /* not isActiveWindow(): a tool window can share its owner's */
+    if( QApplication::activeWindow() != this || !parentWidget() )
+        return;
+    parentWidget()->activateWindow();
+    parentWidget()->setFocus( Qt::OtherFocusReason );
 }
 
 QEasingCurve OverlayWindow::enterCurve()

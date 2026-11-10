@@ -806,7 +806,8 @@ QComboBox::down-arrow, QAbstractSpinBox::down-arrow { image: url("@arrowDown@");
 QAbstractSpinBox::up-arrow { image: url("@arrowUp@"); }
 QComboBox::down-arrow:disabled, QAbstractSpinBox::down-arrow:disabled, QAbstractSpinBox::down-arrow:off { image: url("@arrowDownDim@"); }
 QAbstractSpinBox::up-arrow:disabled, QAbstractSpinBox::up-arrow:off { image: url("@arrowUpDim@"); }
-QComboBox QAbstractItemView { background: @raised@; border: @popupBorder@; selection-background-color: @hoverFill@; selection-color: @tx@; outline: 0; }
+/* popup lists: a combo's, and a completer's (a window of its own, see eventFilter) */
+QComboBox QAbstractItemView, QAbstractItemView[popup="true"] { background: @raised@; border: @popupBorder@; padding: 0; selection-background-color: @hoverFill@; selection-color: @tx@; outline: 0; }
 
 QLineEdit:focus, QAbstractSpinBox:focus, QComboBox:focus { border: 2px solid @focusRing@; padding: 0px @menuPadFocus@px; }
 QComboBox:focus { margin: 0; }
@@ -825,13 +826,14 @@ QTabBar::tab:focus { color: @tx@; background: @hoverFill@; border-color: @focusR
 QGroupBox { border: 1px solid @divider@; border-radius: @radiusLg@px; margin-top: @groupTitleH@px; padding-top: @menuPad@px; }
 QGroupBox::title { subcontrol-origin: margin; subcontrol-position: top left; left: @menuTitlePadX@px; padding: 0 @menuPad@px; color: @mute@; }
 
-QAbstractItemView { background: @surface@; alternate-background-color: @panel@; border: 1px solid @divider@;
+/* the focus ring's second px comes from the padding: the content stays put */
+QAbstractItemView { background: @surface@; alternate-background-color: @panel@; border: 1px solid @divider@; padding: 1px;
     selection-background-color: @accentTint@; selection-color: @tx@; }
 QAbstractItemView::item:hover { background: @hoverFill@; }
 QAbstractItemView::item:selected { background: @accentTint@; color: @tx@; }
 /* views that draw their own row rings set [role] rules with no border, later */
-QAbstractItemView:focus { border: 2px solid @focusRing@; }
-QComboBox QAbstractItemView:focus { border: @popupBorder@; }
+QAbstractItemView:focus { border: 2px solid @focusRing@; padding: 0; }
+QComboBox QAbstractItemView:focus, QAbstractItemView[popup="true"]:focus { border: @popupBorder@; padding: 0; }
 QHeaderView::section { background: @panel@; color: @mute@; border: none; border-bottom: 1px solid @divider@; border-right: 1px solid @divider@; padding: @menuPad@px @menuTitlePadX@px; }
 
 QScrollBar:vertical { background: transparent; width: @scrollW@px; margin: 0; }
@@ -903,7 +905,7 @@ QToolButton[role="play"]:focus { border-color: @tx@; }
 QFrame[role="deckSeparator"] { background: @separatorInk@; border: none; margin: 0 @deckSepMargin@px; }
 QLabel[role="deckTime"] { color: @tx2@; }
 QFrame[role="popover"] { background: @raised@; border: @popupBorder@; }
-QFrame[role="popover"] QListView { background: transparent; border: none; }
+QFrame[role="popover"] QListView { background: transparent; border: none; padding: 0; }
 QFrame[role="popover"] QLabel { color: @dim@; }
 QFrame[role="popoverDivider"] { background: @divider@; border: none; }
 QPushButton[role="popoverLink"] { background: transparent; color: @accTx@; border: 2px solid transparent; border-top: 1px solid @divider@;
@@ -911,7 +913,7 @@ QPushButton[role="popoverLink"] { background: transparent; color: @accTx@; borde
 QPushButton[role="popoverLink"]:hover { background: @hoverFill@; }
 QPushButton[role="popoverLink"]:focus { border: 2px solid @focusRing@; border-radius: @radiusMd@px; }
 /* Phase 4: home (components/library/home_page.cpp); the delegate draws the row focus ring */
-QTreeView[role="homeRecent"] { background: transparent; border: none; outline: 0; }
+QTreeView[role="homeRecent"] { background: transparent; border: none; padding: 0; outline: 0; }
 QTreeView[role="homeRecent"]::item { padding: 0 @homeCellPad@px; border-bottom: 1px solid @homeRowLine@; }
 QTreeView[role="homeRecent"]::item:first { padding-left: @homeRowPad@px; }
 QTreeView[role="homeRecent"]::item:last { padding-right: @homeRowPad@px; }
@@ -921,7 +923,7 @@ QPushButton[role="primary"]:hover { background: @accentHover@; }
 /* like role="play": @focusRing@ is the accent fill itself in the dark theme */
 QPushButton[role="primary"]:focus { border-color: @tx@; }
 /* Phase 4: library (components/library/) */
-QListView[role="library"], QScrollArea[role="library"] { background: transparent; border: none; outline: 0; }
+QListView[role="library"], QScrollArea[role="library"] { background: transparent; border: none; padding: 0; outline: 0; }
 QScrollArea[role="library"] > QWidget > QWidget { background: transparent; }
 QLineEdit[role="librarySearch"]:focus { border: 2px solid @focusRing@; }
 QPushButton[role="outline"] { background: transparent; }
@@ -971,7 +973,7 @@ QPushButton[role="link"]:focus { border-color: @focusRing@; }
 QComboBox[role="netUrl"]::drop-down { width: 0; border: none; }
 QComboBox[role="netUrl"]::down-arrow { image: none; width: 0; }
 QComboBox[role="netUrl"]:focus { border-color: @focusRing@; }
-QListWidget[role="netRecent"] { background: transparent; border: none; outline: 0; }
+QListWidget[role="netRecent"] { background: transparent; border: none; padding: 0; outline: 0; }
 QListWidget[role="netRecent"]::item { padding: @menuPad@px 0; border-radius: @radiusSm@px; }
 QListWidget[role="netRecent"]::item:selected { background: @hoverFill@; color: @tx@; }
 QListWidget[role="netRecent"]:focus { border: 2px solid @focusRing@; border-radius: @radiusMd@px; }
@@ -1137,6 +1139,17 @@ void Theme::applyWindowFrame(QWidget *w) const
 
 bool Theme::eventFilter(QObject *o, QEvent *e)
 {
+    /* a list that is a window of its own (QCompleter's popup) is styled
+     * as a popup, without the focus ring of the lists in a window */
+    if (e->type() == QEvent::Show && o->isWidgetType()
+     && static_cast<QWidget *>(o)->isWindow() && o->inherits("QAbstractItemView")
+     && !o->property("popup").toBool())
+    {
+        QWidget *w = static_cast<QWidget *>(o);
+        w->setProperty("popup", true);
+        w->style()->unpolish(w);
+        w->style()->polish(w);
+    }
 #ifdef _WIN32
     if (e->type() == QEvent::Show && o->isWidgetType() && !highContrast)
     {
