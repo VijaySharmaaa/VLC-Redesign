@@ -26,6 +26,7 @@
 #include "input_manager.hpp"
 #include "util/theme.hpp"
 
+#include <QItemSelectionModel>
 #include <QLineEdit>
 #include <QStackedWidget>
 #include <QTimer>
@@ -41,7 +42,7 @@ static const int albumColumns[] = { Library::AlbumColsXS, Library::AlbumColsS,
 
 MediaPage::MediaPage( intf_thread_t *_p_intf, Kind _kind, QWidget *parent )
     : QWidget( parent ), p_intf( _p_intf ), kind( _kind ), model( NULL ),
-      expandingId( -1 ), loaded( false )
+      expandingId( -1 ), loaded( false ), burstRows( 0 )
 {
     const Theme *t = Theme::instance();
     const QString title = kind == Videos ? qtr( "Videos" ) : qtr( "Music" );
@@ -69,7 +70,10 @@ MediaPage::MediaPage( intf_thread_t *_p_intf, Kind _kind, QWidget *parent )
     settle = new QTimer( this );
     settle->setSingleShot( true );
     settle->setInterval( Library::SettleMs );
-    connect( settle, &QTimer::timeout, this, &MediaPage::updateState );
+    connect( settle, &QTimer::timeout, this, [this]() {
+        setAttached( true );
+        updateState();
+    } );
 
     connect( header, &LibraryHeader::backRequested, this, &MediaPage::goBack );
     connect( view, &CardView::backRequested, this, &MediaPage::goBack );
@@ -106,7 +110,21 @@ void MediaPage::load()
 
     model = new PLModel( THEPL, p_intf, node, this );
     filter->setSourceModel( model );
-    connect( model, &QAbstractItemModel::rowsInserted, this, [this]() {
+    connect( model, &QAbstractItemModel::rowsInserted, this,
+             [this]( const QModelIndex &, int first, int last ) {
+        /* QListView takes about 1 ms per inserted row (layout, accessibility):
+         * a 10,000-file folder arrives as one burst of single rows and froze
+         * the window for 10 s. During a burst the grid waits, detached, and
+         * lays out once when the scan settles. */
+        enum { BurstRows = 200, BurstWindowMs = 250 };
+        if( !burstClock.isValid() || burstClock.elapsed() > BurstWindowMs )
+        {
+            burstClock.start();
+            burstRows = 0;
+        }
+        burstRows += last - first + 1;
+        if( burstRows > BurstRows && view->model() )
+            setAttached( false );
         settle->start();   /* "Scanning..." while items keep coming */
         updateState();
     } );
@@ -155,8 +173,27 @@ void MediaPage::activate( const QModelIndex &index )
     LibraryData::revealWhenPlaying( p_intf, input, true );
 }
 
+void MediaPage::setAttached( bool attach )
+{
+    if( attach == ( view->model() != NULL ) )
+        return;
+    if( !attach )
+        detachedRoot = filter->mapToSource( view->rootIndex() );
+    QItemSelectionModel *old = view->selectionModel();
+    view->setModel( attach ? filter : NULL );
+    delete old;   /* setModel() leaves it to us */
+    if( attach )
+        view->setRootIndex( filter->mapFromSource( detachedRoot ) );
+}
+
+QModelIndex MediaPage::rootIndex() const
+{
+    return view->model() ? view->rootIndex() : filter->mapFromSource( detachedRoot );
+}
+
 void MediaPage::browse( const QModelIndex &source )
 {
+    setAttached( true );
     header->search()->clear();   /* a search is for the folder it was typed in */
     filter->setBrowseRoot( source );
     const QModelIndex root = filter->mapFromSource( source );
@@ -168,6 +205,7 @@ void MediaPage::browse( const QModelIndex &source )
 
 void MediaPage::goBack()
 {
+    setAttached( true );
     const QModelIndex root = view->rootIndex();
     if( !root.isValid() )
         return;
@@ -184,7 +222,7 @@ void MediaPage::goBack()
 void MediaPage::updateState()
 {
     /* the browsed folder may have gone: the view is back at the top then */
-    const QModelIndex root = view->rootIndex();
+    const QModelIndex root = rootIndex();
     header->setFolder( root.isValid() ? root.data().toString() : QString() );
     view->setBackEnabled( root.isValid() );
 

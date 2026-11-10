@@ -21,6 +21,8 @@
 
 #include "qt.hpp"
 
+#include <QElapsedTimer>
+#include <QPersistentModelIndex>
 #include <QWidget>
 
 class CardView;
@@ -52,6 +54,8 @@ private:
     void browse( const QModelIndex &source );
     void goBack();
     void updateState();
+    void setAttached( bool );
+    QModelIndex rootIndex() const;
 
     intf_thread_t *p_intf;
     Kind kind;
@@ -64,6 +68,10 @@ private:
     QTimer *settle;
     int expandingId;   /* a folder being expanded, to browse into */
     bool loaded;
+    /* a burst of inserted rows detaches the grid until the scan settles */
+    QElapsedTimer burstClock;
+    int burstRows;
+    QPersistentModelIndex detachedRoot;
 };
 
 #endif
