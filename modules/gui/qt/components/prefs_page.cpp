@@ -42,6 +42,7 @@
 #include <QPushButton>
 #include <QScrollArea>
 #include <QStackedWidget>
+#include <QStyledItemDelegate>
 #include <QVBoxLayout>
 
 #include <algorithm>
@@ -132,6 +133,22 @@ protected:
 private:
     QWidget *row;
     QLabel *name;
+};
+
+/* A list's rows at the redesign's list row height.
+ * shortcut: plain text cells, draw the hotkeys as keycaps here if wanted */
+class ListRowDelegate : public QStyledItemDelegate
+{
+public:
+    explicit ListRowDelegate( QObject *parent ) : QStyledItemDelegate( parent ) {}
+
+    QSize sizeHint( const QStyleOptionViewItem &option,
+                    const QModelIndex &index ) const Q_DECL_OVERRIDE
+    {
+        QSize s = QStyledItemDelegate::sizeHint( option, index );
+        s.setHeight( qMax( s.height(), Theme::instance()->metric( Theme::PlaylistRowH ) ) );
+        return s;
+    }
 };
 
 /* The widgets of a layout, nested layouts included, in reading order */
@@ -225,8 +242,11 @@ static QFrame *buildRow( const Row &r, const QString &orphan, bool first, QList<
         module_config_t *p_config = option.isEmpty() ? NULL : config_FindConfig( option.constData() );
         if( p_config && p_config->psz_longtext )
         {
-            /* its first line: the rest stays in the tooltip */
+            /* its first line: the rest stays in the tooltip; none when that
+             * line only leads in to the rest ("You have two choices:") */
             desc = qtr( p_config->psz_longtext ).section( QLatin1Char( '\n' ), 0, 0 );
+            if( desc.trimmed().endsWith( QLatin1Char( ':' ) ) )
+                desc.clear();
             break;
         }
     }
@@ -331,12 +351,26 @@ static void toRows( QWidget *box, const QString &orphan, bool inCard, bool place
     layout->setContentsMargins( 0, 0, 0, 0 );
     layout->setSpacing( inCard ? 0 : t->px( Prefs::HeaderBelow ) );
     QVBoxLayout *card = NULL;
+    bool filled = false;
     foreach( const Row &r, rows )
     {
         if( r.block )
         {
             card = NULL;
-            layout->addWidget( r.block );
+            QAbstractItemView *list = qobject_cast<QAbstractItemView *>( r.block );
+            if( list && !inCard )
+            {
+                /* a list (Hotkeys) takes the page's free height, enough for
+                 * a screenful of rows at least (its header about one more).
+                 * shortcut: the row count is not a token, move it to
+                 * Prefs:: in theme_tokens.hpp */
+                static const int ListMinRows = 10;
+                list->setSizePolicy( list->sizePolicy().horizontalPolicy(), QSizePolicy::Expanding );
+                list->setMinimumHeight( ( ListMinRows + 1 ) * t->metric( Theme::PlaylistRowH ) );
+                list->setItemDelegate( new ListRowDelegate( list ) );
+                filled = true;
+            }
+            layout->addWidget( r.block, list && !inCard );
             if( QGroupBox *group = qobject_cast<QGroupBox *>( r.block ) )
                 toRows( group, group->title(), true, false, order );
             else if( QStackedWidget *pages = qobject_cast<QStackedWidget *>( r.block ) )
@@ -364,7 +398,7 @@ static void toRows( QWidget *box, const QString &orphan, bool inCard, bool place
         }
         placed = true;
     }
-    if( !inCard )
+    if( !inCard && !filled )
         layout->addStretch( 1 );
 }
 
