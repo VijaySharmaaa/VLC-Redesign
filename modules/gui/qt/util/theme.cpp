@@ -611,10 +611,10 @@ QComboBox::down-arrow:disabled, QAbstractSpinBox::down-arrow:disabled, QAbstract
 QAbstractSpinBox::up-arrow:disabled, QAbstractSpinBox::up-arrow:off { image: url("@arrowUpDim@"); }
 QComboBox QAbstractItemView { background: @raised@; border: @popupBorder@; selection-background-color: @hoverFill@; selection-color: @tx@; outline: 0; }
 
-QLineEdit:focus, QAbstractSpinBox:focus, QComboBox:focus { border: 2px solid @accent@; padding: 0px @menuPadFocus@px; }
+QLineEdit:focus, QAbstractSpinBox:focus, QComboBox:focus { border: 2px solid @focusRing@; padding: 0px @menuPadFocus@px; }
 QComboBox:focus { margin: 0; }
-QTextEdit:focus, QPlainTextEdit:focus, QPushButton:focus { border: 2px solid @accent@; }
-QToolButton:focus { border-color: @accent@; }
+QTextEdit:focus, QPlainTextEdit:focus, QPushButton:focus { border: 2px solid @focusRing@; }
+QToolButton:focus { border-color: @focusRing@; }
 QPushButton:focus { padding: @menuPadFocus@px @buttonPadXFocus@px; }
 
 QTabWidget::pane { background: @panel@; border: 1px solid @divider@; border-radius: @radiusLg@px; top: -1px; }
@@ -655,7 +655,7 @@ QLabel[role="hint"] { color: @mute@; }
 .QSlider::handle:hover { background: @accentHover@; }
 .QSlider::sub-page:horizontal:disabled, .QSlider::add-page:vertical:disabled, .QSlider::handle:disabled { background: @toggleOff@; }
 .QSlider { border: 2px solid transparent; border-radius: @radiusSm@px; }
-.QSlider:focus { border-color: @accent@; }
+.QSlider:focus { border-color: @focusRing@; }
 )QSS";
 
     const Palette &p = palette();
@@ -680,6 +680,8 @@ QLabel[role="hint"] { color: @mute@; }
         { "dim", css(QColor::fromRgb(p.dim)) },
         { "accent", css(color(Accent)) },
         { "accentHover", css(color(AccentHover)) },
+        /* the accent is 2.4:1 on light surfaces: focus rings need >= 3:1 */
+        { "focusRing", css(color(dark ? Accent : AccentText)) },
         { "onAccent", css(color(OnAccent)) },
         { "accentTint", css(color(AccentTint14)) },
         { "accentBorder", css(color(AccentBorder50)) },
