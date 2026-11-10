@@ -50,7 +50,7 @@ public:
         Accent, AccentHover, OnAccent, AccentTint12, AccentTint14, AccentBorder50,
         AccentFocusRing, AccentKnobHalo, VolumeBoost, SeekKnobFill,
         Error, ErrorTint, DestructiveText, WindowCloseHover, WindowCloseGlyph,
-        VideoSurface, PausedBadgeBg, SubtitleBox,
+        VideoSurface, PausedBadgeBg, SubtitleBox, OnVideo,
         ColorRoleCount
     };
 
@@ -73,6 +73,7 @@ public:
         MenuDrop, Popover, ContextMenu, DialogBackdrop, Dialog, PanelSlide,
         ViewChange, Toast, ToastHold, PausedBadgeFade, MiniPlayer, DropTarget,
         SeekTick, VolumeFill, EqBand, Toggle, PlayPress, ImmersiveIdle, ImmersiveFade,
+        Spinner,    /* one turn of the buffering ring */
         MotionRoleCount
     };
 

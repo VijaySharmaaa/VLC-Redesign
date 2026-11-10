@@ -57,6 +57,9 @@ class QTimer;
 class StandardPLPanel;
 class Toast;
 class DropOverlay;
+class PausedBadge;
+class BufferingOverlay;
+class ImmersiveBar;
 class Sidebar;
 class BreakpointWatcher;
 class TitleBar;
@@ -152,6 +155,10 @@ protected:
     void setMinimalView( bool );
     void setInterfaceFullScreen( bool );
     void computeMinimumSize( bool b_minimal );
+    bool onPlayerPage() const;
+    bool deckFloats() const;
+    void updateDeckPlacement();
+    void createPausedBadge();
 
     /* */
     QSettings           *settings;
@@ -169,6 +176,9 @@ protected:
     QStackedWidget      *stackCentralW;
     Toast               *toast;
     DropOverlay         *dropOverlay;
+    PausedBadge         *pausedBadge;
+    BufferingOverlay    *buffering;
+    ImmersiveBar        *immersiveBar;  ///< only in the immersive layout
 
     VideoWidget         *videoWidget;
     BackgroundWidget    *bgWidget;
@@ -229,6 +239,7 @@ public slots:
     void toggleInterfaceFullScreen();
     void toggleFSC();
     void setInterfaceAlwaysOnTop( bool );
+    void setImmersive( bool );
 
     void setStatusBarVisibility(bool b_visible);
     void setPlaylistVisibility(bool b_visible);

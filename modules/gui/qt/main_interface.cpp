@@ -41,6 +41,7 @@
 #include "components/interface_widgets.hpp"     // bgWidget, videoWidget
 #include "components/toast.hpp"
 #include "components/drop_overlay.hpp"
+#include "components/video_overlays.hpp"
 #include "components/controller.hpp"            // controllers
 #include "components/title_bar.hpp"             // titleBar
 #include "components/playlist/playlist.hpp"     // plWidget
@@ -117,6 +118,9 @@ MainInterface::MainInterface( intf_thread_t *_p_intf, bool customFrame ) : QVLCM
     cryptedLabel         = NULL;
     controls             = NULL;
     inputC               = NULL;
+    pausedBadge          = NULL;
+    buffering            = NULL;
+    immersiveBar         = NULL;
 
     b_hideAfterCreation  = false; // --qt-start-minimized
     playlistVisible      = false;
@@ -255,6 +259,14 @@ MainInterface::MainInterface( intf_thread_t *_p_intf, bool customFrame ) : QVLCM
              [this]() { toast->setOverVideo( videoWidget
                             && stackCentralW->currentWidget() == videoWidget ); } );
     dropOverlay = new DropOverlay( this );
+    buffering = new BufferingOverlay( p_intf, this, stackCentralW );
+    createPausedBadge();
+    if( var_InheritBool( p_intf, "qt-immersive" ) )
+        immersiveBar = new ImmersiveBar( p_intf, this, stackCentralW,
+                                         getControlsVisibilityStatus() & CONTROLS_ADVANCED );
+    connect( stackCentralW, &QStackedWidget::currentChanged,
+             this, &MainInterface::updateDeckPlacement );
+    updateDeckPlacement();
 
     connect( this, &MainInterface::askToQuit, THEDP, &DialogsProvider::quit );
 
@@ -381,6 +393,8 @@ void MainInterface::recreateToolbars()
     mainLayout->insertWidget( 2, inputC );
     mainLayout->insertWidget( settings->value( "MainWindow/ToolbarPos", false ).toBool() ? 0: 3,
                               controls );
+    if( immersiveBar )
+        immersiveBar->rebuild( b_adv );
 
     if( fullscreenControls )
     {
@@ -878,6 +892,7 @@ void MainInterface::getVideoSlot( struct vout_window_t *p_wnd,
     {
         videoWidget = new VideoWidget( p_intf, stackCentralW );
         stackCentralW->addWidget( videoWidget );
+        createPausedBadge();
     }
     *res = videoWidget->request( p_wnd );
     if( *res ) /* The videoWidget is available */
@@ -1050,6 +1065,7 @@ void MainInterface::setVideoFullScreen( bool fs )
 
     }
     videoWidget->sync();
+    updateDeckPlacement();
 }
 
 void MainInterface::setHideMouse( bool hide )
@@ -1076,6 +1092,57 @@ void MainInterface::setVideoOnTop( bool on_top )
         setWindowFlags( newflags );
         show(); /* necessary to apply window flags */
     }
+}
+
+/* The paused badge follows the video widget, which may be created late */
+void MainInterface::createPausedBadge()
+{
+    if( videoWidget && !pausedBadge )
+        pausedBadge = new PausedBadge( p_intf, this, videoWidget );
+}
+
+bool MainInterface::onPlayerPage() const
+{
+    QWidget *page = stackCentralW->currentWidget();
+    return page == bgWidget || ( videoWidget && page == videoWidget );
+}
+
+/* The immersive layout floats the deck over the player view (video or cover
+ * art) of a window. Library pages keep the rows; minimal view and video full
+ * screen hide them as before, the latter showing the FSC. */
+bool MainInterface::deckFloats() const
+{
+    return immersiveBar && !b_videoFullScreen && !b_minimalView && onPlayerPage();
+}
+
+void MainInterface::updateDeckPlacement()
+{
+    if( buffering )
+        buffering->setOnPlayer( onPlayerPage() );
+    const bool floats = deckFloats();
+    if( !b_minimalView && !b_videoFullScreen )
+    {
+        controls->setVisible( !floats );
+        inputC->setVisible( !floats );
+    }
+    if( immersiveBar )
+        immersiveBar->setActive( floats );
+}
+
+void MainInterface::setImmersive( bool on )
+{
+    config_PutInt( p_intf, "qt-immersive", on );
+    if( on == ( immersiveBar != NULL ) )
+        return;
+    if( on )
+        immersiveBar = new ImmersiveBar( p_intf, this, stackCentralW,
+                                         getControlsVisibilityStatus() & CONTROLS_ADVANCED );
+    else
+    {
+        delete immersiveBar;
+        immersiveBar = NULL;
+    }
+    updateDeckPlacement();
 }
 
 void MainInterface::setInterfaceAlwaysOnTop( bool on_top )
@@ -1304,11 +1371,11 @@ void MainInterface::setMinimalView( bool b_minimal )
     }
 
     sidebar->setVisible( !b_minimal );
-    controls->setVisible( !b_minimal );
+    controls->setVisible( !b_minimal && !deckFloats() );
 #ifndef QT_NO_STATUSBAR
     statusBar()->setVisible( !b_minimal && b_statusbarVisible );
 #endif
-    inputC->setVisible( !b_minimal );
+    inputC->setVisible( !b_minimal && !deckFloats() );
 
     if( !isFullScreen() && !isMaximized() && !b_minimal && !b_isWindowTiled )
     {
@@ -1331,6 +1398,7 @@ void MainInterface::setMinimalView( bool b_minimal )
 
     if( !b_minimal )
         computeMinimumSize( false );
+    updateDeckPlacement();
 }
 
 /*
@@ -1361,6 +1429,8 @@ void MainInterface::toggleMinimalView( bool b_minimal )
 void MainInterface::toggleAdvancedButtons()
 {
     controls->toggleAdvanced();
+    if( immersiveBar )
+        immersiveBar->rebuild( controls->b_advancedVisible );
 //    if( fullscreenControls ) fullscreenControls->toggleAdvanced();
 }
 
@@ -1368,7 +1438,7 @@ void MainInterface::toggleAdvancedButtons()
 int MainInterface::getControlsVisibilityStatus()
 {
     if( !controls ) return 0;
-    return( (controls->isVisible() ? CONTROLS_VISIBLE : CONTROLS_HIDDEN )
+    return( (controls->isVisible() || deckFloats() ? CONTROLS_VISIBLE : CONTROLS_HIDDEN )
             + CONTROLS_ADVANCED * controls->b_advancedVisible );
 }
 

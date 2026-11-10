@@ -526,6 +526,11 @@ QMenu *VLCMenuBar::ViewMenu( intf_thread_t *p_intf, QMenu *current, MainInterfac
     connect( action, &QAction::triggered, mi, &MainInterface::toggleMinimalView );
     connect( mi, &MainInterface::minimalViewToggled, action, &QAction::setChecked );
 
+    action = menu->addAction( qtr( "&Immersive Layout" ) );
+    action->setCheckable( true );
+    action->setChecked( var_InheritBool( p_intf, "qt-immersive" ) );
+    connect( action, &QAction::triggered, mi, &MainInterface::setImmersive );
+
     /* FullScreen View */
     action = menu->addAction( qtr( "&Fullscreen Interface" ), mi,
             SLOT( toggleInterfaceFullScreen() ), QString( "F11" ) );

@@ -169,6 +169,9 @@ static void ShowDialog   ( intf_thread_t *, int, int, intf_dialog_args_t * );
 #define QT_AUTOLOAD_EXTENSIONS_LONGTEXT N_( "Automatically load the "\
                                             "extensions module on startup." )
 
+#define QT_IMMERSIVE_TEXT N_( "Immersive layout" )
+#define QT_IMMERSIVE_LONGTEXT N_( "The video fills the window and the controls float over it, hiding while a video plays and the mouse rests." )
+
 #define QT_MINIMAL_MODE_TEXT N_("Start in minimal view (without menus)" )
 
 #define QT_BGCONE_TEXT N_( "Display background cone or art" )
@@ -241,6 +244,8 @@ vlc_module_begin ()
 
     add_bool( "qt-minimal-view", false, QT_MINIMAL_MODE_TEXT,
               QT_MINIMAL_MODE_TEXT, false );
+    add_bool( "qt-immersive", false, QT_IMMERSIVE_TEXT,
+              QT_IMMERSIVE_LONGTEXT, false )
 
     add_bool( "qt-system-tray", true, SYSTRAY_TEXT, SYSTRAY_LONGTEXT, false)
 

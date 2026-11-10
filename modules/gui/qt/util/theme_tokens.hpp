@@ -161,6 +161,25 @@ namespace RedesignTokens
         static const int DropInset = 8, DropBorder = 2, DropFillAlpha = 26; /* accent 0.10 */
         static const int DropCardPadX = 36, DropCardPadY = 28, DropGap = 10, DropIcon = 40;
     }
+
+    /* ---- Phase 3: video overlays (DESIGN_SPEC 2 and 7; sizes from the prototype markup) ---- */
+    static const QRgb OnVideo        = 0xFFFFFFFF; /* glyphs drawn on the video, both themes */
+    static const QRgb BufferingScrim = 0x99000000; /* 60 % over the last frame */
+    namespace VideoOverlay
+    {
+        static const int BadgeGlyph = 44, BadgeBorderAlpha = 38; /* ink 0.15 */
+        static const int PopFromPercent = 96;     /* the "pop" enter scales from 0.96 */
+        static const int Ring = 48, RingWidth = 3, RingAlpha = 38; /* white 0.15 */
+        static const int RingTurn = 900;          /* ms per turn (motion.spinner) */
+        static const int BufferingGap = 14;
+        /* not in tokens.json: a local file buffers for a few frames on every
+         * start; the ring only shows when buffering lasts longer than that */
+        static const int BufferingShowDelay = 400;
+        static const int ImmersiveMargin = 16;    /* from the edges of the video */
+        static const int ImmersivePadTop = 10, ImmersivePadX = 16, ImmersivePadBottom = 12;
+        static const int ImmersiveBorderAlpha = 26; /* ink 0.10 */
+        static const int ImmersiveOffset = 12;    /* the idle hide sinks it 12 px */
+    }
 }
 
 #endif
