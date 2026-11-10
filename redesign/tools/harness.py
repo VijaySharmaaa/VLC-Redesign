@@ -16,7 +16,6 @@ import shutil
 import socket
 import subprocess
 import sys
-import tempfile
 import time
 
 import re
@@ -29,13 +28,22 @@ from pywinauto import Application
 HERE = os.path.dirname(os.path.abspath(__file__))
 MEDIA = os.path.join(HERE, '..', '.local', 'media')
 PACKAGES = os.path.abspath(os.path.join(HERE, '..', '..', '..'))  # D:\Projects\VLC: vlc-pkg*
-RC_PORT = 4212
+# One lock for every process on this machine: TEMP differs per session, so the
+# lock lives next to the packages it protects.
+LOCK_PATH = os.path.join(PACKAGES, '.vlc-harness.lock')
+
+
+def _free_port():
+    """A port nobody listens on, so parallel sessions never talk to each other's VLC."""
+    with socket.socket() as s:
+        s.bind(('127.0.0.1', 0))
+        return s.getsockname()[1]
 
 
 def _desktop_lock(timeout=1800):
     """Hold one machine-wide lock while a session drives the desktop: parallel
     sessions would steal each other's focus and keys. The OS drops it if we die."""
-    f = open(os.path.join(tempfile.gettempdir(), 'vlc-harness.lock'), 'a+')
+    f = open(LOCK_PATH, 'a+')
     deadline = time.time() + timeout
     while True:
         try:
@@ -58,9 +66,10 @@ class Vlc:
         self.profile = os.path.join(os.path.dirname(exe), 'portable')
         shutil.rmtree(self.profile, ignore_errors=True)     # every session starts clean
         os.makedirs(self.profile)
+        self.port = _free_port()
         self.proc = subprocess.Popen(
             [exe, '--no-qt-privacy-ask', '--no-qt-updates-notif',
-             '--extraintf=rc', '--rc-quiet', '--rc-host=127.0.0.1:%d' % RC_PORT,
+             '--extraintf=rc', '--rc-quiet', '--rc-host=127.0.0.1:%d' % self.port,
              *extra])
         try:
             self.sock = self._connect()
@@ -76,12 +85,12 @@ class Vlc:
         deadline = time.time() + 20
         while time.time() < deadline:
             try:
-                s = socket.create_connection(('127.0.0.1', RC_PORT), timeout=2)
+                s = socket.create_connection(('127.0.0.1', self.port), timeout=2)
                 s.settimeout(2)
                 return s
             except OSError:
                 time.sleep(0.3)
-        raise RuntimeError('rc interface did not open on port %d' % RC_PORT)
+        raise RuntimeError('rc interface did not open on port %d' % self.port)
 
     def rc(self, cmd, wait=0.5):
         """Send one rc command and return whatever VLC printed back."""
