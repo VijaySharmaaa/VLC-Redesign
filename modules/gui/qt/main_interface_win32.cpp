@@ -32,7 +32,9 @@
 #include "actions_manager.hpp"
 #include "dialogs_provider.hpp"
 #include "components/interface_widgets.hpp"
+#include "components/title_bar.hpp"
 #include "util/theme.hpp"
+#include "util/win_theme.hpp"
 
 #include <QBitmap>
 
@@ -40,6 +42,11 @@
 
 #include <QWindow>
 #include <qpa/qplatformnativeinterface.h>
+
+#include <windowsx.h>   /* GET_X_LPARAM */
+
+/* Same declaration as the Windows platform plugin, which reads "WindowsCustomMargins" */
+Q_DECLARE_METATYPE(QMargins)
 
 #define WM_APPCOMMAND 0x0319
 
@@ -82,8 +89,11 @@
 #define GET_FLAGS_LPARAM(lParam)      (LOWORD(lParam))
 #define GET_KEYSTATE_LPARAM(lParam)   GET_FLAGS_LPARAM(lParam)
 
+/* The title bar draws the caption from Windows 11, for its snap layouts.
+ * Windows 10 (untested with a custom caption) keeps the native caption and
+ * gets the menu row under it. */
 MainInterfaceWin32::MainInterfaceWin32( intf_thread_t *_p_intf )
-    : MainInterface( _p_intf )
+    : MainInterface( _p_intf, WinTheme::build() >= 22000 )
     , himl( NULL )
     , p_taskbl( NULL )
 {
@@ -93,6 +103,85 @@ MainInterfaceWin32::MainInterfaceWin32( intf_thread_t *_p_intf )
     if (taskbar_wmsg == 0)
         msg_Warn( p_intf, "Failed to register TaskbarButtonCreated message" );
     qApp->installNativeEventFilter(this);
+    /* the base constructor showed the window: later native windows get it
+     * from event() */
+    updateCustomFrame( isFullScreen() );
+}
+
+/* Remove only the native caption and top frame, as Windows Terminal does:
+ * the side and bottom frames stay, so DWM keeps the shadow, the rounded
+ * corners and the resize borders. Extending the DWM frame into the client
+ * area instead would keep the shadow too but kills the Windows 11 snap
+ * layouts flyout. Qt's own WM_NCCALCSIZE handler applies these "custom
+ * margins", so Qt's geometry stays right. Full screen needs none. */
+void MainInterfaceWin32::updateCustomFrame( bool fullscreen )
+{
+    if( !titleBar->hasCaptionButtons() || !windowHandle() || !windowHandle()->handle() )
+        return;
+    HWND hwnd = WinId( this );
+    QMargins margins;
+    if( !fullscreen )
+    {
+        /* frames are in system DPI: Qt 5.6 does not scale the non-client area */
+        RECT r = { 0, 0, 0, 0 };
+        AdjustWindowRectEx( &r, GetWindowLong( hwnd, GWL_STYLE ), FALSE,
+                            GetWindowLong( hwnd, GWL_EXSTYLE ) );
+        margins.setTop( r.top );
+    }
+    /* Qt keeps the client size when the margins change: a maximised window
+     * must keep its rectangle */
+    RECT before;
+    const bool zoomed = IsZoomed( hwnd ) && GetWindowRect( hwnd, &before );
+    QGuiApplication::platformNativeInterface()->setWindowProperty(
+            windowHandle()->handle(), "WindowsCustomMargins", QVariant::fromValue( margins ) );
+    if( zoomed )
+        SetWindowPos( hwnd, NULL, before.left, before.top, before.right - before.left,
+                      before.bottom - before.top,
+                      SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED );
+}
+
+bool MainInterfaceWin32::event( QEvent *e )
+{
+    /* setWindowFlags (always on top) recreates the native window */
+    if( e->type() == QEvent::WinIdChange )
+        updateCustomFrame( isFullScreen() );
+    return MainInterface::event( e );
+}
+
+LRESULT MainInterfaceWin32::hitTest( HWND hwnd, LPARAM lParam )
+{
+    /* the native side and bottom frames answer for themselves */
+    LRESULT hit = DefWindowProc( hwnd, WM_NCHITTEST, 0, lParam );
+    if( hit != HTCLIENT )
+        return hit;
+
+    POINT pt = { GET_X_LPARAM( lParam ), GET_Y_LPARAM( lParam ) };
+    ScreenToClient( hwnd, &pt );
+
+    /* The top frame went with the caption: resize from a band as thick as
+     * the side frames Windows drew, whatever DPI it drew them for */
+    RECT wr, rc;
+    POINT origin = { 0, 0 };
+    if( !IsZoomed( hwnd ) && GetWindowRect( hwnd, &wr ) && GetClientRect( hwnd, &rc )
+        && ClientToScreen( hwnd, &origin ) )
+    {
+        const LONG band = origin.x - wr.left;
+        if( pt.y < band )
+            return pt.x < band ? HTTOPLEFT : pt.x >= rc.right - band ? HTTOPRIGHT : HTTOP;
+    }
+
+    const QPoint pos = titleBar->mapFrom( this, QPoint( pt.x, pt.y ) / devicePixelRatioF() );
+    if( titleBar->isHidden() || !titleBar->rect().contains( pos ) )
+        return HTCLIENT;
+    switch( titleBar->areaAt( pos ) )
+    {
+        case TitleBar::Caption:
+            return HTCAPTION;
+        case TitleBar::MaximizeButton:
+            return HTMAXBUTTON; /* Windows 11 shows the snap layouts flyout */
+        default:
+            return HTCLIENT;
+    }
 }
 
 MainInterfaceWin32::~MainInterfaceWin32()
@@ -206,6 +295,8 @@ void MainInterfaceWin32::createTaskBarButtons()
         if( FAILED(hr) )
             msg_Err( p_intf, "%s failed with error %08lx",
                      "ThumbBarAddButtons", hr );
+        else
+            msg_Dbg( p_intf, "taskbar thumbnail buttons added" );
     }
     connect( THEMIM->getIM(), &InputManager::playingStatusChanged,
              this, &MainInterfaceWin32::changeThumbbarButtons );
@@ -224,6 +315,39 @@ bool MainInterfaceWin32::nativeEventFilter(const QByteArray &, void *message, lo
 #endif
 {
     MSG * msg = static_cast<MSG*>( message );
+
+    /* The drawn caption: the native filter is application-wide, so only
+     * the main window, never dialogs or the fullscreen controller */
+    if( ( msg->message == WM_NCHITTEST || msg->message == WM_NCMOUSELEAVE
+          || msg->message == WM_NCLBUTTONDOWN || msg->message == WM_NCLBUTTONDBLCLK
+          || msg->message == WM_NCLBUTTONUP )
+        && titleBar->hasCaptionButtons() && !isFullScreen() && msg->hwnd == WinId( this ) )
+    {
+        switch( msg->message )
+        {
+            case WM_NCHITTEST:
+            {
+                const LRESULT hit = hitTest( msg->hwnd, msg->lParam );
+                titleBar->setMaximizeHovered( hit == HTMAXBUTTON );
+                if( result )
+                    *result = hit;
+                return true;
+            }
+            case WM_NCMOUSELEAVE:
+                titleBar->setMaximizeHovered( false );
+                break;
+            default:
+                /* the maximise button is non-client for Windows: click it
+                 * here, DefWindowProc would paint a classic button over it */
+                if( msg->wParam != HTMAXBUTTON )
+                    break;
+                if( msg->message == WM_NCLBUTTONUP )
+                    titleBar->toggleMaximized();
+                if( result )
+                    *result = 0;
+                return true;
+        }
+    }
 
     if (msg->message == taskbar_wmsg)
     {
@@ -370,6 +494,29 @@ void MainInterfaceWin32::toggleUpdateSystrayMenuWhenVisible(bool requestActivate
 void MainInterfaceWin32::resizeEvent(QResizeEvent *event)
 {
     QWidget::resizeEvent(event);
+
+    /* A maximised window hangs over the monitor edges by its frame, which
+     * is client area at the top now: keep the content in the work area */
+    HWND hwnd = WinId( this );
+    QMargins inset;
+    if( titleBar->hasCaptionButtons() && hwnd && IsZoomed( hwnd ) )
+    {
+        MONITORINFO mi;
+        mi.cbSize = sizeof( mi );
+        RECT cr;
+        POINT origin = { 0, 0 };
+        if( GetMonitorInfo( MonitorFromWindow( hwnd, MONITOR_DEFAULTTONEAREST ), &mi )
+            && GetClientRect( hwnd, &cr ) && ClientToScreen( hwnd, &origin ) )
+        {
+            OffsetRect( &cr, origin.x, origin.y );
+            const qreal dpr = devicePixelRatioF();
+            inset = QMargins( qRound( qMax( 0L, mi.rcWork.left - cr.left ) / dpr ),
+                              qRound( qMax( 0L, mi.rcWork.top - cr.top ) / dpr ),
+                              qRound( qMax( 0L, cr.right - mi.rcWork.right ) / dpr ),
+                              qRound( qMax( 0L, cr.bottom - mi.rcWork.bottom ) / dpr ) );
+        }
+    }
+    setContentsMargins( inset );
 
     /*
      * Detects if window placement is not in its normal position (ex: win7 aero snap)

@@ -49,7 +49,7 @@ public:
         /* same in both themes */
         Accent, AccentHover, OnAccent, AccentTint12, AccentTint14, AccentBorder50,
         AccentFocusRing, AccentKnobHalo, VolumeBoost, SeekKnobFill,
-        Error, ErrorTint, DestructiveText, WindowCloseHover,
+        Error, ErrorTint, DestructiveText, WindowCloseHover, WindowCloseGlyph,
         VideoSurface, PausedBadgeBg, SubtitleBox,
         ColorRoleCount
     };

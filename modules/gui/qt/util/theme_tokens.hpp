@@ -35,6 +35,7 @@ namespace RedesignTokens
     static const QRgb ErrorTint        = 0x24FF5A4E;
     static const QRgb DestructiveText  = 0xFFE5483C;
     static const QRgb WindowCloseHover = 0xFFC42B1C;
+    static const QRgb WindowCloseGlyph = 0xFFFFFFFF; /* on WindowCloseHover, both themes */
 
     /* ---- Video surfaces (both themes) ---- */
     static const QRgb VideoSurface  = 0xFF000000;
@@ -95,6 +96,9 @@ namespace RedesignTokens
     namespace Size
     {
         static const int TitleBar = 40, CaptionButtonW = 46;
+        static const int TitleCone = 18, TitleConeW = 42; /* cone with 14 + 10 px padding */
+        static const int CaptionGlyph = 18, CaptionGlyphSmall = 16; /* close and minimise; maximise */
+        static const int TitlePadX = 16;
         static const int MenuTitleH = 28, MenuItemH = 30, MenuMinW = 290;
         static const int MenuTitlePadX = 9, MenuPanelPadding = 4, MenuIconCol = 22;
         static const int ButtonPadX = 16;

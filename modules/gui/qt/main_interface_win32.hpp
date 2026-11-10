@@ -47,10 +47,13 @@ private:
 
 protected:
     virtual void resizeEvent( QResizeEvent *event ) Q_DECL_OVERRIDE;
+    virtual bool event( QEvent * ) Q_DECL_OVERRIDE;
+    virtual void updateCustomFrame( bool fullscreen ) Q_DECL_OVERRIDE;
 
 private:
     HWND WinId( QWidget *);
     void createTaskBarButtons();
+    LRESULT hitTest( HWND, LPARAM );
 
 private:
     HIMAGELIST himl;

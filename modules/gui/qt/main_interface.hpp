@@ -38,6 +38,7 @@
 
 class QSettings;
 class QCloseEvent;
+class QMenuBar;
 class QKeyEvent;
 class QLabel;
 class QEvent;
@@ -58,6 +59,7 @@ class Toast;
 class DropOverlay;
 class Sidebar;
 class BreakpointWatcher;
+class TitleBar;
 struct vout_window_t;
 
 class MainInterface : public QVLCMW
@@ -68,7 +70,9 @@ class MainInterface : public QVLCMW
 
 public:
     /* tors */
-    MainInterface( intf_thread_t *);
+    /* customFrame: the window has no native caption, the title bar draws
+     * the window buttons (MainInterfaceWin32) */
+    MainInterface( intf_thread_t *, bool customFrame = false );
     virtual ~MainInterface();
 
     static const QEvent::Type ToolbarsNeedRebuild;
@@ -105,6 +109,8 @@ public:
     void showToast( const QString & );
     Sidebar *getSidebar() { return sidebar; }
     BreakpointWatcher *getBreakpoints() { return breakpoints; }
+    /* Hides QMainWindow::menuBar(), which would replace the title bar */
+    QMenuBar *menuBar() const;
 
 protected:
     void dropEventPlay( QDropEvent* event, bool b_play ) { dropEventPlay(event, b_play, true); }
@@ -116,10 +122,13 @@ protected:
     void dragLeaveEvent( QDragLeaveEvent * ) Q_DECL_OVERRIDE;
     void closeEvent( QCloseEvent *) Q_DECL_OVERRIDE;
     void keyPressEvent( QKeyEvent *) Q_DECL_OVERRIDE;
+    void keyReleaseEvent( QKeyEvent *) Q_DECL_OVERRIDE;
     void wheelEvent( QWheelEvent * ) Q_DECL_OVERRIDE;
     bool eventFilter(QObject *, QEvent *) Q_DECL_OVERRIDE;
     virtual void toggleUpdateSystrayMenuWhenVisible(bool requestActivate = false);
     void resizeWindow(int width, int height);
+    /* Called before entering and after leaving full screen */
+    virtual void updateCustomFrame( bool /* fullscreen */ ) {}
 
 protected:
     /* Main Widgets Creation */
@@ -142,7 +151,7 @@ protected:
     void displayNormalView();
     void setMinimalView( bool );
     void setInterfaceFullScreen( bool );
-    void computeMinimumSize();
+    void computeMinimumSize( bool b_minimal );
 
     /* */
     QSettings           *settings;
@@ -150,6 +159,7 @@ protected:
     QMenu               *systrayMenu;
 
     QString              input_name;
+    TitleBar            *titleBar;
     QVBoxLayout         *mainLayout;
     ControlsWidget      *controls;
     InputControlsWidget *inputC;
@@ -195,6 +205,7 @@ protected:
     bool                 b_pauseOnMinimize;
     bool                 b_maximizedView;
     bool                 b_isWindowTiled;
+    bool                 b_altAlone;            ///< Alt pressed without another key
     /* States */
     bool                 playlistVisible;       ///< Is the playlist visible ?
 //    bool                 videoIsActive;       ///< Having a video now / THEMIM->hasV
