@@ -28,6 +28,8 @@
 #include "util/singleton.hpp"
 
 class QCheckBox;
+class QPushButton;
+class QLabel;
 class QTextEdit;
 
 class ErrorsDialog : public QVLCDialog, public Singleton<ErrorsDialog>
@@ -35,18 +37,21 @@ class ErrorsDialog : public QVLCDialog, public Singleton<ErrorsDialog>
     Q_OBJECT
 public:
 
-    void addError( const QString&, const QString& );
+    void addError( const QString&, const QString&, bool retry = false );
     /*void addWarning( QString, QString );*/
 private:
     virtual ~ErrorsDialog() {}
     ErrorsDialog( intf_thread_t * );
     void add( bool, const QString&, const QString& );
 
+    QLabel *title;
+    QPushButton *retryButton;
     QCheckBox *stopShowing;
     QTextEdit *messages;
 private slots:
     void close();
     void clear();
+    void retry();
     void dontShow();
 
     friend class    Singleton<ErrorsDialog>;
