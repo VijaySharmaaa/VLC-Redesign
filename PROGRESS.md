@@ -218,3 +218,27 @@ Evidence: `D:\Projects\VLC\spike-results\p4-fix\` (scripts in `scripts\`: `t1_qu
 - Primary button focus uses `@tx@`, like the accent-filled play button, not `@focusRing@`: in the dark theme `@focusRing@` is the accent, the button's own fill, so the ring would not show.
 - The network tile glyph's `+ 1` became exact centring arithmetic (`(TileIcon - TileGlyph) / 2`), not a token: it only made up for `QRect::center()` rounding.
 - Home's search scrolls with the page (Home is one scroll area); on the other pages the header stays put.
+
+### Edge cases (`redesign/docs/EDGE_CASES.md`), Phase 4
+Evidence: `D:\Projects\VLC\spike-results\p4-edge\` (audit on `dc0c90c058`, before the fixes), `...\p4-fix\` (after the fixes), lane evidence `p4-1\`, `p4-2\`. Not committed.
+
+| Row | Result | Evidence or reason |
+|---|---|---|
+| Empty library (no folder, missing folder, permission denied) | **pass** / **fixed** | "Scanning…" then the empty state; both buttons work. Home's empty state was cut off in short windows and differed from the other pages; now one shared component that fits (`p4-fix` 8/9). |
+| A folder with 10,000+ files | **pass** | Worst UI stall 188 ms over 60 s; scrolling ≤ 211 ms; search 3 ms; quitting mid-scan exits cleanly. |
+| Recents pointing at deleted files or offline shares | **pass** / **fixed** | Deleted files dimmed with "not found". An offline share no longer blocks quitting (18.8 s → 0.2 s, one never-deleted worker pool). |
+| Unicode, emoji, very long paths | **pass** | Shown; a 343-character path elided in the middle; no crash. |
+| Old config without recents lengths/dates; stock VLC sharing the ini | **pass** / **fixed** | "—" shown. If stock VLC reorders the list, the extra lists are ignored instead of being misaligned (`listForExtras`). |
+| More than 30 recents, removal, `qt-recentplay` off, `qt-recentplay-filter` | **pass** | All four lists stay aligned; the off note shows; filtered entries hidden. |
+| Resume from Continue watching; replay from the playlist; `qt-continue` 0/1/2 | **pass** / **fixed** | The card resumes. Replay used to jump back to the old resume time (`:start-time` left on the item); now a one-shot resume, replay starts at 0. |
+| Folder browse/back, search, album → audio mode | **pass** | Search never changes the docked playlist; the album is appended and audio mode opens. |
+| Window width on page switch | **fixed** | 1600 → 1400 px drift on Home → Videos → Home; now stable over 12 switches. |
+| Network: discovery only on first visit; stream tiles; loading state | **pass** / **fixed** | UPnP/mDNS/SAP load on the first visit only. The Open network stream tile works. Lists now show "Loading…" until items arrive. |
+| Windows Firewall prompt on the Network page | **known** | Loading UPnP makes Windows ask whether VLC may use the network, as stock VLC does when its UPnP entry is opened. Test runs pressed Cancel (never Allow); the test package may now have a block rule. |
+| Quitting while the Icecast directory downloads | **deferred** (core) | 10–17 s quit in 4 of 5 runs: `modules/lua/services_discovery.c:287` runs the script with cancellation off and `Close()` waits for it (`:264-265`). Stock VLC behaves the same; the fix is outside `modules/gui/qt`. |
+| UPnP servers appearing and disappearing; removable drives and discs | **deferred** | No server or hardware here. The crash risk when a shown server leaves (proxy reset mid-removal) is fixed by a queued connection, and focus restore on tile changes is fixed; both have manual steps. |
+| Files added while the page is open | **stock limit** | VLC 3's media-folder discovery doesn't watch for changes. |
+| Old playlist window's selector beside the library | **pass** / **fixed** | The library doesn't re-root the docked playlist. The selector's Podcasts entry was empty after the Network page loaded podcasts; fixed. |
+| Rapid page switches and folder open/close (30–60×) | **pass** | GDI/USER handles stable; worst stall 26 ms. |
+
+**Decisions recorded (owner to confirm):** P4-1 recents keep lengths and dates; P4-2 "Add a folder" adds the folder to the playlist; P4-3 album cards append and play; P4-4 Continue watching always resumes; P4-5 no Windows-shares tile (libdsm not in this build); P4-6 network discovery starts on the first visit to Network. Not added: a "Folders" sidebar section (the design shows custom folders, which VLC 3's media folders can't hold).
