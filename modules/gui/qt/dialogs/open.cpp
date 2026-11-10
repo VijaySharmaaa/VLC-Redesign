@@ -259,6 +259,19 @@ OpenDialog::OpenDialog( QWidget *parent,
     ui.buttonsBox->addButton( selectButton, QDialogButtonBox::AcceptRole );
     ui.buttonsBox->addButton( cancelButton, QDialogButtonBox::RejectRole );
 
+    /* Tab order: tiles, the open panel, the options, the buttons. The tiles
+     * and the box's buttons are made after the .ui and its panels, so they
+     * came last: Tab from the checked tile skipped the panel */
+    QWidget::setTabOrder( ui.advancedLineInput, selectButton );
+    QWidget::setTabOrder( selectButton, cancelButton );
+    QWidget::setTabOrder( cancelButton, playButton );
+    QWidget *prev = playButton;
+    foreach( QAbstractButton *tile, tiles->buttons() )
+    {
+        QWidget::setTabOrder( prev, tile );
+        prev = tile;
+    }
+
     /* At creation time, modify the default buttons */
     setMenuAction();
 
