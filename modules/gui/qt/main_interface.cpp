@@ -216,8 +216,6 @@ MainInterface::MainInterface( intf_thread_t *_p_intf, bool customFrame ) : QVLCM
     /* Main settings; the window takes the keys at startup, after Back and
      * on a click, but is no Tab stop of its own (no ring to show it) */
     setFocusPolicy( Qt::ClickFocus );
-    /* see createMainWidget: no native siblings either */
-    QCoreApplication::setAttribute( Qt::AA_DontCreateNativeWidgetSiblings );
     setAcceptDrops( true );
     setWindowRole( "vlc-main" );
     setWindowIcon( QApplication::windowIcon() );
@@ -695,7 +693,7 @@ void MainInterface::createMainWidget( QSettings *creationSettings )
          * video played; Qt then sent the focus events of their widgets
          * for HWNDs that never hold the Windows focus, so screen readers
          * saw only the window and Tab looked dead. Only the video widget
-         * stays native. */
+         * stays native (siblings: an application attribute, qt.cpp). */
         videoWidget->setAttribute( Qt::WA_DontCreateNativeAncestors );
         stackCentralW->addWidget( videoWidget );
     }
