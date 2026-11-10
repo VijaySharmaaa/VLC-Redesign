@@ -163,9 +163,15 @@ void RecentsMRL::load()
     /* Load from the settings */
     QStringList list = getSettings()->value( "RecentsMRL/list" ).toStringList();
     QStringList list2 = getSettings()->value( "RecentsMRL/times" ).toStringList();
-    /* missing or short in configurations from before these lists */
-    QStringList list3 = getSettings()->value( "RecentsMRL/lengths" ).toStringList();
-    QStringList list4 = getSettings()->value( "RecentsMRL/dates" ).toStringList();
+    /* missing or short in configurations from before these lists; stale
+     * when stock VLC, which keeps list and times only, saved the list
+     * since: listForExtras is the list they were saved with */
+    QStringList list3, list4;
+    if( getSettings()->value( "RecentsMRL/listForExtras" ).toStringList() == list )
+    {
+        list3 = getSettings()->value( "RecentsMRL/lengths" ).toStringList();
+        list4 = getSettings()->value( "RecentsMRL/dates" ).toStringList();
+    }
 
     /* And filter the regexp on the list */
     for( int i = 0; i < list.count(); ++i )
@@ -185,6 +191,7 @@ void RecentsMRL::save()
     getSettings()->setValue( "RecentsMRL/times", times );
     getSettings()->setValue( "RecentsMRL/lengths", lengths );
     getSettings()->setValue( "RecentsMRL/dates", dates );
+    getSettings()->setValue( "RecentsMRL/listForExtras", recents );
 }
 
 void RecentsMRL::playMRL( const QString &mrl )

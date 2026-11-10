@@ -71,6 +71,15 @@ public:
     /* last played, invalid when unknown */
     QDateTime date( const QString &mrl );
     void removeRecent( const QString &mrl );
+    /* P4-4: the next input of mrl seeks to its saved time without asking
+     * (qt-continue); true once, for that input (InputManager::setInput) */
+    void resumeOnce( const QString &mrl ) { resumeMrl = mrl; }
+    bool takeResume( const QString &mrl )
+    {
+        const bool b = !resumeMrl.isEmpty() && resumeMrl == mrl;
+        resumeMrl.clear();
+        return b;
+    }
 
 signals:
     /* the list, an order, a time, a length or a date changed */
@@ -83,11 +92,13 @@ private:
     intf_thread_t *p_intf;
 
     /* parallel lists, saved under RecentsMRL/: list, times (ms), lengths
-     * (ms) and dates (ISO 8601, UTC); stock VLC ignores the last two */
+     * (ms) and dates (ISO 8601, UTC); stock VLC ignores the last two, and
+     * listForExtras, the list they belong to */
     QStringList   recents;
     QStringList   times;
     QStringList   lengths;
     QStringList   dates;
+    QString       resumeMrl;
     QRegularExpression *filter;
     bool          isActive;
 

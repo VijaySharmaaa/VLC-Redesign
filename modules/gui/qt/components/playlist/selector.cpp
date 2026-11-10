@@ -390,7 +390,9 @@ void PLSelector::setSource( QTreeWidgetItem *item )
         /* Podcasts */
         if( item->data( 0, SPECIAL_ROLE ).toInt() == IS_PODCAST )
         {
-            if( pl_item && !sd_loaded )
+            /* not "loaded now": the library's Network page may have
+             * loaded it first; this list is built once either way */
+            if( pl_item && podcastsParentId == -1 )
             {
                 podcastsParentId = pl_item->i_id;
                 for( int i=0; i < pl_item->i_children; i++ )

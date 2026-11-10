@@ -119,8 +119,16 @@ void InputManager::setInput( input_thread_t *_p_input )
         {
             char *uri = input_item_GetURI( p_item );
 
-            int i_time = RecentsMRL::getInstance( p_intf )->time( qfu(uri) );
-            if( i_time > 0 && qfu( uri ) != lastURI &&
+            RecentsMRL *recents = RecentsMRL::getInstance( p_intf );
+            int i_time = recents->time( qfu(uri) );
+            /* a Continue watching card: the seek of qt-continue "always"
+             * (MainInterface::resumePlayback), for this input only */
+            if( recents->takeResume( qfu( uri ) ) )
+            {
+                if( i_time > 0 )
+                    var_SetInteger( p_input, "time", (int64_t)i_time * 1000 );
+            }
+            else if( i_time > 0 && qfu( uri ) != lastURI &&
                     !var_GetFloat( p_input, "run-time" ) &&
                     !var_GetFloat( p_input, "start-time" ) &&
                     !var_GetFloat( p_input, "stop-time" ) )

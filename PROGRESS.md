@@ -188,3 +188,57 @@ Evidence: `D:\Projects\VLC\spike-results\p3-edge\` (audit on the build before th
 | 10,000-item playlist | **deferred** (pre-existing) | Loading freezes the interface for about 45 s; stock VLC freezes for about 40 s on the same load. The cause is in the shared playlist model's per-item updates, which predate the redesign. Scrolling and filtering the loaded list are fast. |
 
 **Decisions recorded (owner to confirm):** the DVD menu buttons leave the default deck; remaining time is shown by default; resume and the tracks popover's details come from stream info; the paused badge resumes on click; the docked playlist is a right-side panel; no status label in the deck centre (it's in the prototype, not the spec).
+
+## Phase 4: review fixes (2026-11-10)
+
+Evidence: `D:\Projects\VLC\spike-results\p4-fix\` (scripts in `scripts\`: `t1_quit.py`, `t_home.py`, `t_empty.py`, `t5_ini.py`, `t2_selector.py`, `t_pages.py`; screenshots and `*.txt` logs). Not committed.
+
+### Manual test steps
+1. Quit with an offline share in the recents: a recent `\192.0.2.1\share\a.mp4` (or any unreachable server), open Home, quit at once: VLC exits in under a second (was 19 s; `t1_quit.py`).
+2. Continue watching: play a file of 60 s or more to its middle, stop, click its card on Home: it resumes at the saved time without the resume question. Stop, then Play (or double-click it in the playlist): it starts at 0, or asks as `qt-continue` says.
+3. Network page > Podcasts first, then (playlist undocked) Ctrl+L and pick Podcasts in the playlist window's tree: the subscriptions are listed.
+4. Network page with a UPnP/DLNA server: open the server, switch the server off while its list is shown: the page goes back to the tiles, no crash. With the keyboard on the second server tile, a server appearing or leaving keeps the focus on the tile at that index.
+5. Use the same profile with stock VLC 3, play something there, then start this build: Home shows "—" for lengths and dates instead of another file's (they come back as files are played again).
+6. First run: Home, Videos, Music and Network show no deck and no now-playing bar; play anything and the bar shows on library pages. Ctrl+H, the hotkeys and Tools > Customize Interface still work there.
+7. Empty Home at 1018x519 and 1280x800: one dashed box (the library pages' empty state), no scroll bar, both buttons visible; hover them: "Add a folder to the playlist and play it (Ctrl+F)", "Open media (Ctrl+Shift+O)". With `--no-qt-recentplay` the note about the setting shows.
+8. Home search (top right): typing filters the cards and the table by name or path; no match shows "No results".
+9. Home at 1920/1280/1024/800 px with a recent played today on a 12-hour clock: the When column shows the whole "Today, 10:52 AM".
+10. Network page: Streams reads Open network stream, Icecast directory, Podcasts, and Tab follows that order.
+11. Videos grid at 1280 px: the right edge of the last card column lines up with the search field's right edge.
+12. Tab to a primary button (Add a folder): its border shows in both themes.
+13. Videos: open folder A, back, folder B, back, A again before A's listing came in: A's items are listed once.
+
+14. At 1600 px, Home, Videos, Home, Music, Network, Home: the window stays 1600 px and the sidebar stays full (`t_drift.py`; was 1400 px with a rail).
+15. Network > Icecast directory: the header says "Loading..." with an empty list until the stations come; an empty list says "No results" after about 10 s.
+
+### Deferred
+- Quit while the Icecast directory loads takes up to the download time (10-17 s in 4 of 5 runs, `ice-after.txt`, `ice-quit.log`): `modules/lua/services_discovery.c:287` runs the script's `main()` with cancellation off and `Close()` joins it (`:264-265`), so the core waits for the whole download and parse. Stock VLC does the same from its selector. Outside `modules/gui/qt`; the Qt interface has already finished at that point.
+
+### Deviations
+- Primary button focus uses `@tx@`, like the accent-filled play button, not `@focusRing@`: in the dark theme `@focusRing@` is the accent, the button's own fill, so the ring would not show.
+- The network tile glyph's `+ 1` became exact centring arithmetic (`(TileIcon - TileGlyph) / 2`), not a token: it only made up for `QRect::center()` rounding.
+- Home's search scrolls with the page (Home is one scroll area); on the other pages the header stays put.
+
+### Edge cases (`redesign/docs/EDGE_CASES.md`), Phase 4
+Evidence: `D:\Projects\VLC\spike-results\p4-edge\` (audit on `dc0c90c058`, before the fixes), `...\p4-fix\` (after the fixes), lane evidence `p4-1\`, `p4-2\`. Not committed.
+
+| Row | Result | Evidence or reason |
+|---|---|---|
+| Empty library (no folder, missing folder, permission denied) | **pass** / **fixed** | "Scanning…" then the empty state; both buttons work. Home's empty state was cut off in short windows and differed from the other pages; now one shared component that fits (`p4-fix` 8/9). |
+| A folder with 10,000+ files | **pass** | Worst UI stall 188 ms over 60 s; scrolling ≤ 211 ms; search 3 ms; quitting mid-scan exits cleanly. |
+| Recents pointing at deleted files or offline shares | **pass** / **fixed** | Deleted files dimmed with "not found". An offline share no longer blocks quitting (18.8 s → 0.2 s, one never-deleted worker pool). |
+| Unicode, emoji, very long paths | **pass** | Shown; a 343-character path elided in the middle; no crash. |
+| Old config without recents lengths/dates; stock VLC sharing the ini | **pass** / **fixed** | "—" shown. If stock VLC reorders the list, the extra lists are ignored instead of being misaligned (`listForExtras`). |
+| More than 30 recents, removal, `qt-recentplay` off, `qt-recentplay-filter` | **pass** | All four lists stay aligned; the off note shows; filtered entries hidden. |
+| Resume from Continue watching; replay from the playlist; `qt-continue` 0/1/2 | **pass** / **fixed** | The card resumes. Replay used to jump back to the old resume time (`:start-time` left on the item); now a one-shot resume, replay starts at 0. |
+| Folder browse/back, search, album → audio mode | **pass** | Search never changes the docked playlist; the album is appended and audio mode opens. |
+| Window width on page switch | **fixed** | 1600 → 1400 px drift on Home → Videos → Home; now stable over 12 switches. |
+| Network: discovery only on first visit; stream tiles; loading state | **pass** / **fixed** | UPnP/mDNS/SAP load on the first visit only. The Open network stream tile works. Lists now show "Loading…" until items arrive. |
+| Windows Firewall prompt on the Network page | **known** | Loading UPnP makes Windows ask whether VLC may use the network, as stock VLC does when its UPnP entry is opened. Test runs pressed Cancel (never Allow); the test package may now have a block rule. |
+| Quitting while the Icecast directory downloads | **deferred** (core) | 10–17 s quit in 4 of 5 runs: `modules/lua/services_discovery.c:287` runs the script with cancellation off and `Close()` waits for it (`:264-265`). Stock VLC behaves the same; the fix is outside `modules/gui/qt`. |
+| UPnP servers appearing and disappearing; removable drives and discs | **deferred** | No server or hardware here. The crash risk when a shown server leaves (proxy reset mid-removal) is fixed by a queued connection, and focus restore on tile changes is fixed; both have manual steps. |
+| Files added while the page is open | **stock limit** | VLC 3's media-folder discovery doesn't watch for changes. |
+| Old playlist window's selector beside the library | **pass** / **fixed** | The library doesn't re-root the docked playlist. The selector's Podcasts entry was empty after the Network page loaded podcasts; fixed. |
+| Rapid page switches and folder open/close (30–60×) | **pass** | GDI/USER handles stable; worst stall 26 ms. |
+
+**Decisions recorded (owner to confirm):** P4-1 recents keep lengths and dates; P4-2 "Add a folder" adds the folder to the playlist; P4-3 album cards append and play; P4-4 Continue watching always resumes; P4-5 no Windows-shares tile (libdsm not in this build); P4-6 network discovery starts on the first visit to Network. Not added: a "Folders" sidebar section (the design shows custom folders, which VLC 3's media folders can't hold).

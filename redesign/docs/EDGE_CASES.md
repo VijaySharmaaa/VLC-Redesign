@@ -60,6 +60,13 @@ Check every changed area against the relevant rows before a phase is closed. Rec
 - [ ] Playlist with 10,000 items: scrolling, filter, sort, remove, current-item tracking.
 - [ ] Recent media pointing at deleted files or offline network shares.
 - [ ] Removable drives and discs inserted or removed while browsing; UPnP servers appearing and disappearing.
+- [ ] Switching library pages (Home → Videos → Home) on an L-size window: the window width must not change (stack sizes remembered per page vs. the sidebar rail breakpoint).
+- [ ] A Continue-watching card resumes with `:start-time`; replaying the same playlist item later (Stop → Play, double-click in the playlist) must not jump back to that old position.
+- [ ] Recents config shared with stock VLC 3: stock rewrites `RecentsMRL/list`/`times` but not `lengths`/`dates`, so the parallel lists can shift against each other.
+- [ ] Quit while a slow internet discovery (Icecast directory, podcasts) is still loading: VLC must exit within a few seconds; the list shows a loading state, not a blank page.
+- [ ] Quit while the Home page's existence check is blocked on an offline share: Qt waits for the global thread pool at exit.
+- [ ] First visit to the Network page loads every LAN discovery (UPnP, mDNS, SAP) at once, so the Windows Firewall prompt appears then and never at startup; Home/Videos/Music must not load them.
+- [ ] Files added to a Videos/Music folder while VLC runs (VLC 3's media directories don't watch folders: shown only after a restart).
 
 ## Settings & robustness
 - [ ] Preferences: Save, Cancel, Reset; simple ↔ all settings; values written to the same config variables as before; old config files still load.

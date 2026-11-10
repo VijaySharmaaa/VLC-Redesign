@@ -868,6 +868,12 @@ int MainInterface::windowWidthFor( int stackWidth, int otherWidth, bool withSide
 {
     if( !withSidebar )
         return otherWidth + stackWidth;
+    /* the current breakpoint first: when two fit (a narrow sidebar with a
+     * wide stack, or the reverse), the window must not jump to the other */
+    const BreakpointWatcher::Size current = BreakpointWatcher::fromWidth( width() );
+    const int same = otherWidth + stackWidth + Sidebar::widthAt( current );
+    if( BreakpointWatcher::fromWidth( same ) == current )
+        return same;
     for( int bp = BreakpointWatcher::XS; bp <= BreakpointWatcher::L; bp++ )
     {
         const BreakpointWatcher::Size size = static_cast<BreakpointWatcher::Size>( bp );
@@ -1544,12 +1550,13 @@ void MainInterface::setMinimalView( bool b_minimal )
 
 void MainInterface::setDeckVisible( bool visible )
 {
-    const bool bar = visible && b_nowPlayingSeen
-                  && isLibraryPage( stackCentralW->currentWidget() );
-    nowPlayingBar->setVisible( bar );
+    /* a library page has the now-playing bar once something played, and
+     * no deck before (inventory 1.1.1): the hotkeys work without it */
+    const bool library = isLibraryPage( stackCentralW->currentWidget() );
+    nowPlayingBar->setVisible( visible && library && b_nowPlayingSeen );
     /* in the immersive layout the deck floats over the video instead */
-    controls->setVisible( visible && !bar && !deckFloats() );
-    inputC->setVisible( visible && !bar && !deckFloats() );
+    controls->setVisible( visible && !library && !deckFloats() );
+    inputC->setVisible( visible && !library && !deckFloats() );
 }
 
 bool MainInterface::isLibraryPage( QWidget *w ) const

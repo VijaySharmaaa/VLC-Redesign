@@ -91,7 +91,7 @@ private:
     QGridLayout *lanGrid, *streamGrid;
     QLabel *lanHint;
     QList<NetworkTile *> lanTiles, streamTiles;
-    QTimer *rebuild, *settle;
+    QTimer *rebuild, *settle, *loading;
     CardView *list;
     LibraryFilter *filter;
     PLModel *browsed;
@@ -99,6 +99,7 @@ private:
     QString topTitle;
     bool topIsItem;              /* a server or share, which can go away */
     int expandingId;
+    QSet<int> expandRequested;
     bool loaded;
 };
 

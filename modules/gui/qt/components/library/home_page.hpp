@@ -27,8 +27,9 @@
 #include <QSet>
 #include <QStringList>
 
+class LibraryEmptyState;
+class LibraryHeader;
 class QHBoxLayout;
-class QLabel;
 class QTreeWidget;
 class ResumeCard;
 
@@ -59,14 +60,14 @@ private:
     void popup( const QString mrl, const QPoint &globalPos );
 
     intf_thread_t *p_intf;
+    LibraryHeader *header;
     QWidget *lists;
-    QWidget *cardsSection;
+    QWidget *cardsSection, *recentSection;
     QScrollArea *cardsArea;
     QHBoxLayout *cardsLayout;
     QList<ResumeCard *> cards;
     QTreeWidget *table;
-    QWidget *empty;
-    QLabel *offNote;
+    LibraryEmptyState *empty;
     QSet<QString> missing;  /* mrls of local files that are not there */
     /* one check at a time: a blocked one must not pile up others */
     bool checking, recheck;

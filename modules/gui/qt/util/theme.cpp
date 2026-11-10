@@ -803,7 +803,8 @@ QTreeView[role="homeRecent"]::item:last { padding-right: @homeRowPad@px; }
 /* not :default, which also names the button "... Enter" to screen readers */
 QPushButton[role="primary"] { background: @accent@; color: @onAccent@; border-color: @accent@; font-weight: 600; }
 QPushButton[role="primary"]:hover { background: @accentHover@; }
-QPushButton[role="primary"]:focus { border-color: @onAccent@; }
+/* like role="play": @focusRing@ is the accent fill itself in the dark theme */
+QPushButton[role="primary"]:focus { border-color: @tx@; }
 /* Phase 4: library (components/library/) */
 QListView[role="library"], QScrollArea[role="library"] { background: transparent; border: none; outline: 0; }
 QScrollArea[role="library"] > QWidget > QWidget { background: transparent; }

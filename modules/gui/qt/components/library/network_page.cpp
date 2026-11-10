@@ -30,6 +30,7 @@
 
 #include <vlc_services_discovery.h>
 
+#include <QApplication>
 #include <QGridLayout>
 #include <QKeyEvent>
 #include <QLabel>
@@ -95,7 +96,7 @@ void NetworkTile::paintEvent( QPaintEvent * )
     const int devicePx = qRound( glyph * devicePixelRatioF() );
     t->icon( QLatin1String( icon ), t->isDark() ? Theme::Accent : Theme::AccentText,
              QSize( devicePx, devicePx ) )
-        .paint( &p, QRect( iconBox.center().x() - glyph / 2 + 1, iconBox.center().y() - glyph / 2 + 1,
+        .paint( &p, QRect( iconBox.x() + ( iconPx - glyph ) / 2, iconBox.y() + ( iconPx - glyph ) / 2,
                            glyph, glyph ) );
 
     const QFont nameFont = fontAt( Theme::Body, Type::Body, true );
@@ -182,6 +183,10 @@ NetworkPage::NetworkPage( intf_thread_t *_p_intf, QWidget *parent )
     settle->setSingleShot( true );
     settle->setInterval( Library::SettleMs );
     connect( settle, &QTimer::timeout, this, &NetworkPage::updateState );
+    loading = new QTimer( this );
+    loading->setSingleShot( true );
+    loading->setInterval( Library::NetSettleMs );
+    connect( loading, &QTimer::timeout, this, &NetworkPage::updateState );
 
     connect( header, &LibraryHeader::backRequested, this, &NetworkPage::goBack );
     connect( list, &CardView::backRequested, this, &NetworkPage::goBack );
@@ -195,6 +200,7 @@ NetworkPage::NetworkPage( intf_thread_t *_p_intf, QWidget *parent )
         updateState();
     } );
     connect( THEMIM, &MainInputManager::leafBecameParent, this, [this]( int id ) {
+        expandRequested.remove( id );   /* a node now: never expanded again */
         if( id != expandingId || !browsed )
             return;
         expandingId = -1;
@@ -268,7 +274,10 @@ void NetworkPage::load()
                 updateState();   /* the opened server may have gone */
             };
             connect( lan.model, &QAbstractItemModel::rowsInserted, this, topLevel );
-            connect( lan.model, &QAbstractItemModel::rowsRemoved, this, topLevel );
+            /* queued: connected before the filter, which must have dropped
+             * the rows before updateState() can reset it (showTiles) */
+            connect( lan.model, &QAbstractItemModel::rowsRemoved, this, topLevel,
+                     Qt::QueuedConnection );
             connect( lan.model, &QAbstractItemModel::modelReset, rebuild, QOverload<>::of( &QTimer::start ) );
             connect( lan.model, &QAbstractItemModel::dataChanged, this, [this]( const QModelIndex &i ) {
                 if( !i.parent().isValid() )
@@ -283,15 +292,21 @@ void NetworkPage::load()
                                                  name, icecast ? qtr( "Internet radio" ) : qtr( "Subscriptions" ),
                                                  content );
             connect( tile, &QAbstractButton::clicked, this, [this, sd, name]() { openSd( sd, name ); } );
-            streamTiles.append( tile );
+            /* Open network stream, Icecast, Podcasts, whatever order the
+             * modules come in */
+            streamTiles.insert( icecast ? 1 : streamTiles.count(), tile );
         }
     }
+    for( int i = 1; i < streamTiles.count(); i++ )
+        setTabOrder( streamTiles.at( i - 1 ), streamTiles.at( i ) );
     settle->start();
     rebuildLanTiles();
 }
 
 void NetworkPage::rebuildLanTiles()
 {
+    /* the keyboard stays where it was: on the tile now at that index */
+    const int focused = lanTiles.indexOf( qobject_cast<NetworkTile *>( QApplication::focusWidget() ) );
     qDeleteAll( lanTiles );
     lanTiles.clear();
     foreach( const Lan &lan, lans )
@@ -310,6 +325,13 @@ void NetworkPage::rebuildLanTiles()
         }
     layoutTiles();
     updateState();
+    if( focused >= 0 )
+    {
+        if( !lanTiles.isEmpty() )
+            lanTiles.at( qMin( focused, lanTiles.count() - 1 ) )->setFocus( Qt::OtherFocusReason );
+        else
+            tilesPage->setFocus( Qt::OtherFocusReason );
+    }
 }
 
 void NetworkPage::layoutTiles()
@@ -349,13 +371,17 @@ void NetworkPage::openSd( const LibraryData::Sd &sd, const QString &title )
             return;
         model = new PLModel( THEPL, p_intf, node, this );
         internet.insert( sd.name, model );
-        connect( model, &QAbstractItemModel::rowsRemoved, this, &NetworkPage::updateState );
+        connect( model, &QAbstractItemModel::rowsInserted, this, &NetworkPage::updateState );
+        /* queued: see load() */
+        connect( model, &QAbstractItemModel::rowsRemoved, this, &NetworkPage::updateState,
+                 Qt::QueuedConnection );
     }
     open( model, QModelIndex(), title );
 }
 
 void NetworkPage::open( PLModel *model, const QModelIndex &source, const QString &title )
 {
+    loading->start();   /* "Loading..." until items come or it settles */
     header->search()->clear();
     if( browsed != model )
         filter->setSourceModel( model );
@@ -368,7 +394,7 @@ void NetworkPage::open( PLModel *model, const QModelIndex &source, const QString
     list->setFocus();
     /* a server or share not listed yet */
     if( topIsItem && source.data( VLCModelSubInterface::LEAF_NODE_ROLE ).toBool() )
-        LibraryData::expand( p_intf, model, source, &expandingId );
+        LibraryData::expand( p_intf, model, source, &expandingId, &expandRequested );
 }
 
 void NetworkPage::activate( const QModelIndex &index )
@@ -383,7 +409,7 @@ void NetworkPage::activate( const QModelIndex &index )
     }
     if( LibraryData::isFolder( browsed, source ) )
     {
-        LibraryData::expand( p_intf, browsed, source, &expandingId );
+        LibraryData::expand( p_intf, browsed, source, &expandingId, &expandRequested );
         return;
     }
     input_item_t *input = browsed->getInputItem( source );
@@ -451,6 +477,11 @@ void NetworkPage::updateState()
     lanHint->setVisible( lanTiles.isEmpty() );
     lanHint->setText( settle->isActive() ? qtr( "Looking for media servers and shares..." )
                                          : qtr( "No media server or share found on your network" ) );
-    header->setStatus( listing && filter->rowCount( root ) == 0
-                       && !header->search()->text().trimmed().isEmpty() ? qtr( "No results" ) : QString() );
+    /* an empty list: maybe still coming (a discovery's download, a server
+     * being listed; VLC 3 says neither when it is done), else nothing there
+     * or nothing matches */
+    QString status;
+    if( listing && filter->rowCount( root ) == 0 )
+        status = loading->isActive() ? qtr( "Loading..." ) : qtr( "No results" );
+    header->setStatus( status );
 }

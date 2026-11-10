@@ -36,12 +36,9 @@ class QBoxLayout;
 class QGridLayout;
 class QElidingLabel;
 class QPropertyAnimation;
-class QPainter;
-class QRectF;
 
-/* Shared with the library pages (components/library) */
-/* "1:02:03" */
-QString timeString( int64_t secs );
+/* Shared with the library pages (components/library); timeString() is in
+ * util/customwidgets.hpp */
 /* The striped placeholder at 135 degrees in the theme's two tints */
 void paintStripes( QPainter &, const QRectF &, qreal period );
 /* A theme font at a token px size */
