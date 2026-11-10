@@ -104,7 +104,6 @@ SeekSlider::SeekSlider( intf_thread_t *p_intf, Qt::Orientation q, QWidget *_pare
 
     /* Init to 0 */
     setPosition( -1.0, 0, 0 );
-    secstotimestr( psz_length, 0 );
 
     QPropertyAnimation *animLoadingIn = new QPropertyAnimation( this, "loadingProperty", this );
     animLoadingIn->setDuration( 2000 );
@@ -384,8 +383,8 @@ void SeekSlider::mouseMoveEvent( QMouseEvent *event )
         QPoint target( pos.x() - ( event->x() - posX ),
                 QWidget::mapToGlobal( QPoint( 0, 0 ) ).y() );
         if( likely( size().width() > handleLength() ) ) {
-            secstotimestr( psz_length, getValuePercentageFromXPos( event->x() ) * inputLength );
-            mTimeTooltip->setTip( target, psz_length, chapterLabel );
+            mTimeTooltip->setTip( target, timeString( getValuePercentageFromXPos( event->x() ) * inputLength ),
+                                  chapterLabel );
         }
     }
     event->accept();
@@ -608,7 +607,15 @@ QBrush SoundSlider::fillBrush() const
     {
         if( b_isMuted )
             return theme->ink( RedesignTokens::InkAlpha::ToggleOff );
-        return theme->color( value() > 100 ? Theme::VolumeBoost : Theme::Accent );
+        if( value() <= 100 )
+            return theme->color( Theme::Accent );
+        /* DESIGN_SPEC 3: only the part above 100 % (the tick) is the boost */
+        const QRect track = trackRect();
+        QLinearGradient gradient( track.left(), 0, track.left() + track.width(), 0 );
+        const qreal tick = 100.0 / maximum();
+        gradient.setColorAt( tick, theme->color( Theme::Accent ) );
+        gradient.setColorAt( qMin( 1.0, tick + 1.0 / track.width() ), theme->color( Theme::VolumeBoost ) );
+        return gradient;
     }
 
     /* qt-slider-colours: four stops, the middle pair around 100 % */

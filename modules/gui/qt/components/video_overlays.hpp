@@ -96,11 +96,15 @@ protected:
     void paintEvent( QPaintEvent * ) Q_DECL_OVERRIDE;
     void customEvent( QEvent * ) Q_DECL_OVERRIDE;
     bool eventFilter( QObject *, QEvent * ) Q_DECL_OVERRIDE;
+    void keyPressEvent( QKeyEvent * ) Q_DECL_OVERRIDE;
+    bool nativeEvent( const QByteArray &, void *, long * ) Q_DECL_OVERRIDE;
 
 private:
     static int MouseMovedCB( vlc_object_t *, const char *,
                              vlc_value_t, vlc_value_t, void * );
     void setVoutList( vout_thread_t **, int );
+    bool takeFocus();
+    void giveFocusBack();
     void wake();
     void sleepIfIdle();
     void animate( bool in );
@@ -108,6 +112,7 @@ private:
     QRect restingRect() const;
 
     intf_thread_t *p_intf;
+    QWidget *area;
     OverlayHost *host;
     QVBoxLayout *layout;
     InputControlsWidget *inputC;

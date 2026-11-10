@@ -138,6 +138,7 @@ private:
     QLabel *formatChip, *yearChip, *title;
     QElidingLabel *meta;
     QListView *tracks;
+    QWidget *spectrum;
     BreakpointWatcher::Size breakpoint;
     int artMax;
 };

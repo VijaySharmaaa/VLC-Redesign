@@ -148,6 +148,8 @@ int qtKeyModifiersToVLC( const QInputEvent* e );
 int qtEventToVLCKey( const QKeyEvent *e );
 int qtWheelEventToVLCKey( const QWheelEvent *e );
 QString VLCKeyToString( unsigned val, bool );
+/* "9:36" under an hour, "1:02:03" above: no leading zero (DESIGN_SPEC 3) */
+QString timeString( int64_t secs );
 
 /**
  * @brief The WheelToVLCConverter class aggregates wheel events and

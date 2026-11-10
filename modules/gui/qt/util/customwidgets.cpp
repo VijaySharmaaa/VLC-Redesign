@@ -321,6 +321,15 @@ int qtWheelEventToVLCKey( const QWheelEvent *e )
     return i_vlck;
 }
 
+QString timeString( int64_t secs )
+{
+    secs = qMax<int64_t>( 0, secs );
+    const int s = secs % 60, m = secs / 60 % 60;
+    const int64_t h = secs / 3600;
+    return h ? QString( "%1:%2:%3" ).arg( h ).arg( m, 2, 10, QChar( '0' ) ).arg( s, 2, 10, QChar( '0' ) )
+             : QString( "%1:%2" ).arg( m ).arg( s, 2, 10, QChar( '0' ) );
+}
+
 QString VLCKeyToString( unsigned val, bool locale )
 {
     char *base = vlc_keycode2str (val, locale);

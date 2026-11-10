@@ -44,12 +44,14 @@
 #include "util/input_slider.hpp"                         /* SeekSlider */
 #include "util/customwidgets.hpp"                       /* qEventToKey */
 #include "util/theme.hpp"
+#include "util/breakpoints.hpp"                         /* BreakpointWatcher */
 
 #include "adapters/seekpoints.hpp"
 
 #include <vlc_actions.h>                    /* vlc_str2keycode */
 
 #include <QToolButton>
+#include <QStyle>
 #include <QToolTip>
 #include <QHelpEvent>
 #include <QIconEngine>
@@ -74,8 +76,9 @@ namespace
     class DeckIconEngine : public QIconEngine
     {
     public:
-        DeckIconEngine( const char *_name, bool _onAccent )
-            : name( QLatin1String( _name ) ), onAccent( _onAccent ) {}
+        /* fixedRole: one colour in every state (the record dot's red) */
+        DeckIconEngine( const char *_name, bool _onAccent, int _fixedRole = -1 )
+            : name( QLatin1String( _name ) ), onAccent( _onAccent ), fixedRole( _fixedRole ) {}
 
         QPixmap pixmap( const QSize &size, QIcon::Mode mode, QIcon::State state ) Q_DECL_OVERRIDE
         {
@@ -84,7 +87,8 @@ namespace
                 return QPixmap();
             /* on = accent glyph; the accent is 2.4:1 on light surfaces, so
              * the light theme takes the accent text colour (>= 3:1) */
-            const Theme::ColorRole role = onAccent ? Theme::OnAccent
+            const Theme::ColorRole role = fixedRole >= 0 ? static_cast<Theme::ColorRole>( fixedRole )
+                : onAccent ? Theme::OnAccent
                 : state == QIcon::On ? ( t->isDark() ? Theme::Accent : Theme::AccentText )
                 : Theme::Text2;
             /* square glyphs, centred in a wider box (the toolbar editor's list) */
@@ -116,6 +120,7 @@ namespace
     private:
         QString name;
         bool onAccent;
+        int fixedRole;
     };
 
     /* The text of a key-* hotkey (its first binding), or of a Qt sequence */
@@ -144,6 +149,28 @@ namespace
 QIcon deckIcon( const char *name, bool onAccent )
 {
     return QIcon( new DeckIconEngine( name, onAccent ) );
+}
+
+/* DESIGN_SPEC 3: open (accent glyph, ink 0.09 fill) while the panel or
+ * dialog the button toggles is shown. The click toggles that, so the
+ * button only mirrors it: connected after the action, sync undoes the
+ * click's own check. */
+static void followPanel( QAbstractButton *button, int action )
+{
+    button->setCheckable( true );
+    auto sync = [button, action]() {
+        const bool shown = THEDP->isPanelShown( action );
+        button->setChecked( shown );
+        if( button->property( "open" ).toBool() != shown )
+        {
+            button->setProperty( "open", shown );
+            button->style()->unpolish( button );
+            button->style()->polish( button );
+        }
+    };
+    QObject::connect( THEDP, &DialogsProvider::panelShown, button, sync );
+    QObject::connect( button, &QAbstractButton::clicked, button, sync );
+    sync();
 }
 
 /**********************************************************************
@@ -325,6 +352,18 @@ void AbstractController::createAndAddWidget( QBoxLayout *controlLayout_,
         QWidget *widg = createWidget( i_type, i_option );
         if( !widg ) return;
 
+        /* DESIGN_SPEC 3's "*" items, in the menus too: a narrow deck drops
+         * them (ControlsWidget::fitWidth) */
+        switch( i_type )
+        {
+        case STOP_BUTTON: case LOOP_BUTTON: case RANDOM_BUTTON: case SPEED_LABEL:
+        case MINIPLAYER_BUTTON: case FULLSCREEN_BUTTON:
+            widg->setProperty( "deckOptional", true );
+            break;
+        default:
+            break;
+        }
+
         /* Buttons */
         if( i_type < BUTTON_MAX )
         {
@@ -454,10 +493,12 @@ QWidget *AbstractController::createWidget( buttonType_e button, int options )
         break;
     case EXTENDED_BUTTON:{
         NORMAL_BUTTON( EXTENDED );
+        followPanel( EXTENDEDButton, EXTENDED_ACTION );
         }
         break;
     case PLAYLIST_BUTTON:{
         NORMAL_BUTTON( PLAYLIST );
+        followPanel( PLAYLISTButton, PLAYLIST_ACTION );
         }
         break;
     case SNAPSHOT_BUTTON:{
@@ -473,6 +514,9 @@ QWidget *AbstractController::createWidget( buttonType_e button, int options )
         toolbarActionsMapper->setMapping( recordButton, RECORD_ACTION );
         connect( THEMIM->getIM(), &InputManager::recordingStateChanged, recordButton, &QToolButton::setChecked );
         BUTTON_SET_BAR(  recordButton );
+        /* the design's red dot; recording fills the button (theme.cpp) */
+        recordButton->setIcon( QIcon( new DeckIconEngine( deckIconL[button], false, Theme::Error ) ) );
+        recordButton->setProperty( "record", true );
         ENABLE_ON_INPUT( recordButton );
         widget = recordButton;
         }
@@ -480,9 +524,14 @@ QWidget *AbstractController::createWidget( buttonType_e button, int options )
     case ATOB_BUTTON: {
         AtoB_Button *ABButton = new AtoB_Button;
         setupButton( ABButton );
-        ABButton->setShortcut( qtr("Shift+L") );
+        /* Shift+L is the main window's (MainInterface): it works with the
+         * deck hidden; hotkeyL keeps it in the tooltip */
         ABButton->setCheckable( true );
         BUTTON_SET_BAR( ABButton );
+        /* the design's text, accent while a point is set (checked) */
+        ABButton->setToolButtonStyle( Qt::ToolButtonTextOnly );
+        ABButton->setText( qtr( "A–B" ) );
+        ABButton->setFont( Theme::instance()->font( Theme::Meta ) );
         ENABLE_ON_INPUT( ABButton );
         connect( ABButton, &AtoB_Button::clicked, toolbarActionsMapper, QOverload<>::of(&QSignalMapper::map) );
         toolbarActionsMapper->setMapping( ABButton, ATOB_ACTION );
@@ -625,8 +674,10 @@ QWidget *AbstractController::createWidget( buttonType_e button, int options )
         }
         break;
     case ASPECT_RATIO_COMBOBOX:
-        widget = new AspectRatioComboBox( p_intf );
-        widget->setMinimumHeight( 26 );
+        widget = new AspectRatioBadge( p_intf );
+        widget->setFixedHeight( Theme::instance()->metric( Theme::IconButton ) );
+        widget->setFocusPolicy( Qt::TabFocus );
+        widget->installEventFilter( this );
         break;
     case SPEED_LABEL:
         {
@@ -924,13 +975,61 @@ ControlsWidget::ControlsWidget( intf_thread_t *_p_i,
                                         .toString();
     parseAndCreate( line2, controlLayout2 );
 
-    grip = new QSizeGrip( this );
-    controlLayout2->addWidget( grip, 0, Qt::AlignBottom|Qt::AlignRight );
-
     if( !b_advancedVisible && advControls ) advControls->hide();
 
     controlLayout->addLayout( controlLayout1 );
     controlLayout->addLayout( controlLayout2 );
+}
+
+QList<QWidget *> ControlsWidget::optionalItems() const
+{
+    QList<QWidget *> items;
+    foreach( QWidget *w, findChildren<QWidget *>( QString(), Qt::FindDirectChildrenOnly ) )
+        if( w->property( "deckOptional" ).toBool() )
+            items << w;
+    return items;
+}
+
+int ControlsWidget::compactWidth() const
+{
+    /* the hint, not the minimum: below it the volume squeezes its label */
+    int width = layout()->sizeHint().width();
+    foreach( QWidget *w, optionalItems() )
+        if( !w->isHidden() )
+            width -= w->sizeHint().width() + Theme::instance()->px( Deck::Gap );
+    return width;
+}
+
+/* The optional items go at the XS breakpoint (of the main window, also for
+ * the immersive bar's deck) and whenever the deck would not fit with them,
+ * e.g. the expert row at S or M: nothing clips. */
+void ControlsWidget::fitWidth()
+{
+    const QList<QWidget *> items = optionalItems();
+    int hidden = 0;
+    foreach( QWidget *w, items )
+        if( w->isHidden() )
+            hidden += w->sizeHint().width() + Theme::instance()->px( Deck::Gap );
+    QWidget *main = p_intf->p_sys->p_mi ? static_cast<QWidget *>( p_intf->p_sys->p_mi ) : window();
+    const bool fits = BreakpointWatcher::fromWidth( main->width() ) != BreakpointWatcher::XS
+                   && layout()->sizeHint().width() + hidden <= width();
+    foreach( QWidget *w, items )
+        if( w->isHidden() == fits )
+            w->setVisible( fits );
+}
+
+void ControlsWidget::resizeEvent( QResizeEvent *e )
+{
+    AbstractController::resizeEvent( e );
+    fitWidth();
+}
+
+/* and when its content changes width (the expert row, the aspect badge) */
+bool ControlsWidget::event( QEvent *e )
+{
+    if( e->type() == QEvent::LayoutRequest )
+        fitWidth();
+    return AbstractController::event( e );
 }
 
 bool ControlsWidget::advancedAvailable()

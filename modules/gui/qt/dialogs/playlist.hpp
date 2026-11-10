@@ -42,6 +42,7 @@ public:
     bool hasPlaylistWidget();
 
 protected:
+    void showEvent( QShowEvent * ) Q_DECL_OVERRIDE;
     void hideEvent( QHideEvent * ) Q_DECL_OVERRIDE;
 
 private:

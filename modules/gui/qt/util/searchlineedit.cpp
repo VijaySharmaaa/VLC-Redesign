@@ -41,7 +41,8 @@
 
 #include <vlc_intf_strings.h>
 
-SearchLineEdit::SearchLineEdit( QWidget *parent ) : QLineEdit( parent )
+SearchLineEdit::SearchLineEdit( QWidget *parent ) : QLineEdit( parent ),
+    messageText( qtr( I_PL_SEARCH ) )
 {
     clearButton = new QFramelessButton( this );
     clearButton->setIcon( QIcon( ":/search_clear.svg" ) );
@@ -139,7 +140,7 @@ void SearchLineEdit::paintEvent( QPaintEvent *event )
         .adjusted( 3, 0, clearButton->width() + 1, 0 );
     QPainter painter( this );
     painter.setPen( palette().color( QPalette::Disabled, QPalette::Text ) );
-    painter.drawText( rect, Qt::AlignLeft | Qt::AlignVCenter, qtr( I_PL_SEARCH ) );
+    painter.drawText( rect, Qt::AlignLeft | Qt::AlignVCenter, messageText );
 }
 
 void SearchLineEdit::searchEditingFinished()

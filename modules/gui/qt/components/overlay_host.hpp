@@ -42,9 +42,9 @@ class OverlayWindow : public QWidget
 public:
     enum InputMode { PassInput, TakeInput };
     explicit OverlayWindow( QWidget *owner, InputMode = PassInput );
+    static QEasingCurve enterCurve();   /* the tokens' enter easing */
 protected:
     bool event( QEvent * ) Q_DECL_OVERRIDE;
-    static QEasingCurve enterCurve();   /* the tokens' enter easing */
 };
 
 /* Follows a widget of the main window: emits changed() once per burst of

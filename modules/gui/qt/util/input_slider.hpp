@@ -91,7 +91,6 @@ private:
     bool isSliding;        /* Whether we are currently sliding by user action */
     bool isJumping;              /* if we requested a jump to another chapter */
     int inputLength;                           /* InputLength that can change */
-    char psz_length[MSTRTIME_MAX_SIZE];               /* Used for the ToolTip */
     QTimer *seekLimitTimer;
     TimeTooltip *mTimeTooltip;
     float f_buffering;

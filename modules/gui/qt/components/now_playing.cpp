@@ -64,13 +64,6 @@ QString withKey( intf_thread_t *p_intf, const QString &label, const char *hotkey
     return key.isEmpty() ? label : qtr( "%1 (%2)" ).arg( label, key );
 }
 
-QString timeString( int64_t secs )
-{
-    char psz[MSTRTIME_MAX_SIZE];
-    secstotimestr( psz, secs );
-    return qfu( psz );
-}
-
 /* Stripes at 135 degrees in the theme's two placeholder tints */
 void paintStripes( QPainter &p, const QRectF &r, qreal period )
 {
@@ -602,7 +595,8 @@ AudioModePage::AudioModePage( intf_thread_t *_p_i, NowPlayingInfo *_info, QWidge
     outer->setSpacing( 0 );
     columns = new QHBoxLayout;
     outer->addLayout( columns, 1 );
-    outer->addWidget( new SpectrumWidget( p_intf, this ) );
+    spectrum = new SpectrumWidget( p_intf, this );
+    outer->addWidget( spectrum );
 
     /* left: back to the library, art, chips */
     leftColumn = new QWidget( this );
@@ -709,8 +703,11 @@ void AudioModePage::fitArt()
 {
     using namespace NowPlaying;
     const Theme *t = Theme::instance();
+    /* short pages: the track list keeps its rows, the spectrum goes first */
+    const int listMin = TrackMinRows * t->metric( Theme::PlaylistRowH );
+    spectrum->setVisible( height() - tracks->y() - t->px( SpectrumH ) >= listMin );
     const int top = columns->contentsMargins().top();
-    const int room = height() - top - t->px( SpectrumH ) - t->px( PillH )
+    const int room = height() - top - ( spectrum->isHidden() ? 0 : t->px( SpectrumH ) ) - t->px( PillH )
                    - formatChip->sizeHint().height() - 2 * t->px( ColumnInnerGap );
     const int side = qMax( 0, qMin( artMax, room ) );
     art->setFixedSize( side, side );

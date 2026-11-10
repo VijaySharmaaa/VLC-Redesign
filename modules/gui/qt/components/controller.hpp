@@ -35,7 +35,6 @@
 #include <QFrame>
 #include <QIcon>
 #include <QString>
-#include <QSizeGrip>
 
 /* The redesign's deck (DESIGN_SPEC 3); read only when the key is unset, so
  * saved layouts stay as they are. The DVD menu buttons (37) left the deck:
@@ -239,18 +238,20 @@ public:
     /* p_intf, advanced control visible or not, blingbling or not */
     ControlsWidget( intf_thread_t *_p_i, bool b_advControls,
                     QWidget *_parent = 0 );
-
-    void setGripVisible( bool b_visible )
-    { grip->setVisible( b_visible ); }
+    /* the width with the optional items dropped: the window's minimum */
+    int compactWidth() const;
 
 protected:
     friend class MainInterface;
+    void resizeEvent( QResizeEvent * ) Q_DECL_OVERRIDE;
+    bool event( QEvent * ) Q_DECL_OVERRIDE;
 
     bool advancedAvailable();
     bool b_advancedVisible;
 
 private:
-    QSizeGrip *grip;
+    QList<QWidget *> optionalItems() const;
+    void fitWidth();
 
 protected slots:
     void toggleAdvanced();

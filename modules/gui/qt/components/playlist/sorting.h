@@ -89,7 +89,9 @@ static inline char * psz_column_meta( input_item_t *p_item, uint32_t i_column )
         i_duration = input_item_GetDuration( p_item ) / 1000000;
         if( i_duration == 0 ) return NULL;
         secstotimestr( psz_duration, i_duration );
-        return strdup( psz_duration );
+        /* "9:36", not "09:36" (DESIGN_SPEC 3, timeString) */
+        return strdup( psz_duration[0] == '0' && psz_duration[2] == ':' ? psz_duration + 1
+                                                                       : psz_duration );
     case COLUMN_ARTIST:
         return input_item_GetArtist( p_item );
     case COLUMN_GENRE:

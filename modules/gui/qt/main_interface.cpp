@@ -71,6 +71,7 @@
 #include <QLabel>
 #include <QStackedWidget>
 #include <QScreen>
+#include <QShortcut>
 #include <QDesktopWidget>
 #ifdef _WIN32
 #include <QFileInfo>
@@ -307,6 +308,11 @@ MainInterface::MainInterface( intf_thread_t *_p_intf, bool customFrame ) : QVLCM
     connect( this, &MainInterface::askBoss, this, &MainInterface::setBoss );
     connect( this, &MainInterface::askRaise, this, &MainInterface::setRaise );
 
+    /* A->B loop: one shortcut for the window, not one per deck button (the
+     * deck, the immersive bar and the FSC each have one, often hidden) */
+    QShortcut *atob = new QShortcut( QKeySequence( qtr( "Shift+L" ) ), this );
+    connect( atob, &QShortcut::activated, THEMIM->getIM(), &InputManager::setAtoB );
+
 
     connect( THEDP, &DialogsProvider::releaseMouseEvents, this, &MainInterface::voutReleaseMouseEvents ) ;
     /** END of CONNECTS**/
@@ -409,7 +415,7 @@ void MainInterface::computeMinimumSize( bool b_minimal )
     const QSize work = QApplication::desktop()->availableGeometry( this ).size();
     /* at most half the work area high, so a quarter snap fits */
     setMinimumSize( qMin( work.width(), qMax( t->px( RedesignTokens::Breakpoint::XSMinW ),
-                                              80 + controls->sizeHint().width() ) ),
+                                              80 + controls->compactWidth() ) ),
                     qMin( work.height() / 2, t->px( RedesignTokens::Breakpoint::XSMinH ) ) );
 }
 
@@ -1080,6 +1086,9 @@ void MainInterface::videoSizeChanged( int w, int h )
 
 void MainInterface::setVideoFullScreen( bool fs )
 {
+    /* the video lives in the main window, hidden behind the mini player */
+    if( fs && isMiniPlayerVisible() )
+        toggleMiniPlayer();
     b_videoFullScreen = fs;
     if( fs )
     {
@@ -1381,6 +1390,7 @@ void MainInterface::showPlaylistPanel( bool b_show )
                  this, &MainInterface::togglePlaylist );
     }
     playlistPanel->setOpen( b_show );
+    THEDP->setPanelShown( PLAYLIST_ACTION, b_show );
 }
 
 /*
@@ -1391,8 +1401,7 @@ void MainInterface::showPlaylistPanel( bool b_show )
 void MainInterface::displayNormalView()
 {
     sidebar->setVisible( false );
-    if( playlistPanel )
-        playlistPanel->setOpen( false );   /* setMinimalView() brings it back */
+    showPlaylistPanel( false );   /* setMinimalView() brings it back */
     controls->setVisible( false );
 #ifndef QT_NO_STATUSBAR
     statusBar()->setVisible( false );
@@ -1583,6 +1592,9 @@ void MainInterface::toggleMinimalView( bool b_minimal )
 void MainInterface::toggleAdvancedButtons()
 {
     controls->toggleAdvanced();
+    /* the expert row widens the deck: the window's minimum follows */
+    if( !b_minimalView )
+        computeMinimumSize( false );
     if( immersiveBar )
         immersiveBar->rebuild( controls->b_advancedVisible );
 //    if( fullscreenControls ) fullscreenControls->toggleAdvanced();
@@ -1592,7 +1604,9 @@ void MainInterface::toggleAdvancedButtons()
 int MainInterface::getControlsVisibilityStatus()
 {
     if( !controls ) return 0;
-    return( (controls->isVisible() || deckFloats() ? CONTROLS_VISIBLE : CONTROLS_HIDDEN )
+    /* the minimal view, not the deck's visibility: the now-playing bar, the
+     * immersive bar and full screen hide the deck too */
+    return( ( b_minimalView ? CONTROLS_HIDDEN : CONTROLS_VISIBLE )
             + CONTROLS_ADVANCED * controls->b_advancedVisible );
 }
 
@@ -1616,7 +1630,6 @@ void MainInterface::setStatusBarVisibility( bool b_visible )
 #ifndef QT_NO_STATUSBAR
     statusBar()->setVisible( b_visible );
     b_statusbarVisible = b_visible;
-    if( controls ) controls->setGripVisible( !b_statusbarVisible );
 #endif
 }
 
@@ -2095,6 +2108,13 @@ bool MainInterface::eventFilter( QObject *obj, QEvent *event )
     /* Alt+Tab: the Alt press was ours, its release is not */
     if( event->type() == QEvent::WindowDeactivate )
         b_altAlone = false;
+    /* any other way back (tray, video on top) leaves the mini player too,
+     * so View > Mini Player stays right */
+    if( obj == this && event->type() == QEvent::Show && isMiniPlayerVisible() )
+    {
+        miniPlayer->hide();
+        emit miniPlayerToggled( false );
+    }
     if ( event->type() == MainInterface::ToolbarsNeedRebuild ) {
         event->accept();
         recreateToolbars();
@@ -2154,6 +2174,15 @@ void MainInterface::emitRaise()
 }
 void MainInterface::setRaise()
 {
+    /* the mini player stands in for the hidden window (qt-auto-raise on the
+     * next video, intf-show): raise it, do not bring the window back */
+    if( isMiniPlayerVisible() )
+    {
+        miniPlayer->raise();
+        miniPlayer->activateWindow();
+        return;
+    }
+
     /* If hidden, show it */
     if( isHidden() )
     {

@@ -35,6 +35,7 @@
 
 #include "dialogs/open.hpp"
 #include <QObject>
+#include <QSet>
 #include <QStringList>
 
 #define TITLE_EXTENSIONS_MEDIA qtr( "Media Files" )
@@ -90,6 +91,10 @@ public:
                                 EXT_FILTER_PLAYLIST,
                                 const QUrl& path = QUrl() );
     bool isDying() { return b_isDying; }
+    /* DESIGN_SPEC 3: deck buttons show open while the panel or dialog they
+     * toggle is shown, by its actionType_e (PLAYLIST_ACTION, EXTENDED_ACTION) */
+    void setPanelShown( int action, bool shown );
+    bool isPanelShown( int action ) const { return shownPanels.contains( action ); }
     static QString getDirectoryDialog( intf_thread_t *p_intf);
     static QStringList getOpenURL(QWidget *parent = NULL,
                                   const QString &caption = QString(),
@@ -121,6 +126,7 @@ private:
 
     QWidget* root;
     bool b_isDying;
+    QSet<int> shownPanels;
 
     void openDialog( int );
     void addFromSimple( bool, bool );
@@ -184,6 +190,7 @@ private slots:
     void menuUpdateAction( QObject * );
 signals:
     void  toolBarConfUpdated();
+    void panelShown( int action, bool shown );
     void releaseMouseEvents();
 };
 

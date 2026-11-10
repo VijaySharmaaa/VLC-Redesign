@@ -29,6 +29,8 @@
 #include "components/playlist/playlist.hpp"
 
 #include "util/qt_dirs.hpp"
+#include "dialogs_provider.hpp"
+#include "actions_manager.hpp"   /* PLAYLIST_ACTION */
 
 #include <QMimeData>
 #include <QHBoxLayout>
@@ -68,9 +70,16 @@ bool PlaylistDialog::hasPlaylistWidget()
     return ( !! playlistWidget );
 }
 
+void PlaylistDialog::showEvent( QShowEvent * event )
+{
+    QWidget::showEvent( event );
+    THEDP->setPanelShown( PLAYLIST_ACTION, true );
+}
+
 void PlaylistDialog::hideEvent( QHideEvent * event )
 {
     QWidget::hideEvent( event );
+    THEDP->setPanelShown( PLAYLIST_ACTION, false );
     emit visibilityChanged( false );
 }
 
