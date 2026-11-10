@@ -242,3 +242,33 @@ Evidence: `D:\Projects\VLC\spike-results\p4-edge\` (audit on `dc0c90c058`, befor
 | Rapid page switches and folder open/close (30–60×) | **pass** | GDI/USER handles stable; worst stall 26 ms. |
 
 **Decisions recorded (owner to confirm):** P4-1 recents keep lengths and dates; P4-2 "Add a folder" adds the folder to the playlist; P4-3 album cards append and play; P4-4 Continue watching always resumes; P4-5 no Windows-shares tile (libdsm not in this build); P4-6 network discovery starts on the first visit to Network. Not added: a "Folders" sidebar section (the design shows custom folders, which VLC 3's media folders can't hold).
+
+## Phase 5: review fixes, Preferences page and switch (2026-11-10)
+
+Evidence: `D:\Projects\VLC\spike-results\p5-fixA\` (`verify.py`, `shots.py`, screenshots, `verify-1.json`, `verify-2.json`). Not committed.
+
+### Manual test steps
+1. Ctrl+P at 1600 px, dark and light: every section is cards of rows (name, one-line description from the option's long text, control on the right). Group boxes are cards with their titles; nothing of the old forms is missing except the interface preview images and separator lines.
+2. Interface: "Look and feel" row with "Use native style" / "Use custom skin"; pick custom skin: the skin file row shows with its Browse button and the skins site link under it.
+3. Switches: click one, the knob slides (150 ms; at once with Windows animations off) and "On"/"Off" beside it follows. Tab to one: an accent ring around the pill. Space toggles it. Untick "Integrate video in interface": "Resize interface to video size" greys out, name included.
+4. Audio: tick "Always reset audio start level to": the slider is the accent slider (track and round knob).
+5. Audio: change Output module: the Device and passthrough rows show and hide with the module.
+6. Change one switch in each section, Save: `vlcrc` gets the same variable names as before (`qt-pause-minimized`, `audio-time-stretch`, `video-deco`, `video-title-show`, `input-fast-seek`, `qt-disable-volume-keys`).
+7. Change a switch, press Esc on the page: it is discarded, as with Cancel.
+8. View the Interface section, play a video full screen, Ctrl+P: the Preferences dialog opens; change "Pause playback when minimized", Save. Leave full screen, Ctrl+P: the page shows the new value; change an Audio option and Save on the page: `vlcrc` keeps the dialog's value.
+8b. The same with the dialog's Reset: the page shows the reset values (Window decorations back on) and a page Save keeps them. Any other writer of `vlcrc` (Effects > Save) takes the same path.
+8c. Mini player (deck button), Ctrl+P: the Preferences dialog opens (the main window is hidden). Other menu shortcuts (Ctrl+O, Ctrl+E...) also work from the mini player now.
+9. Window under the M breakpoint, then wide again: the section list shows its labels one under the other (it overlapped before).
+
+### Deferred
+- Preferences > Audio, volume slider while "Always reset audio start level" is off (slider disabled): the knob is still an 18 px square in the toggleOff colour. Restating the groove and handle rules for `:disabled` (with and without `:horizontal`) changed only its colour, not its size or radius: Qt 5.6's stylesheet style seems to fall back to the base style's handle rect there. Needs Qt's `qstylesheetstyle.cpp` to trace; the enabled slider is themed.
+- Effects > Save after ticking "Enable equalizer" did not rewrite `vlcrc` in this lane's build (time unchanged, `audio-filter` default), so the page rebuild after an Effects save could not be shown end to end. The watcher reacts to any rewrite of `vlcrc` (shown with the dialog's Save and Reset).
+
+### Deviations
+- Built panels are rebuilt whenever `vlcrc` is saved by anything else (watched folder, file time compared): edits pending on the page are dropped then (marked `shortcut:` in `prefs_page.cpp`).
+- P5-5: edits on the page apply on Save (or are dropped by Cancel/Esc), not immediately as the reference's "Changes apply immediately" says: the panels keep the dialog's apply-all model, so a half-typed path or proxy is never written.
+- The switch's knob is OnAccent (on) and Text2 (off), as in the prototype, not white.
+- Group box titles stay above their cards (the design has one untitled card per section; VLC's forms have several groups).
+- Rows keep the forms' order; two-column check boxes became one row each.
+- Hotkeys keep the action table (search, list, double-click to assign) as one block; the wheel and volume-key options are rows. No keycap control.
+- Selects and fields alone in a row are at least 240 px at every width (the prototype narrows them to 180 at XS).
