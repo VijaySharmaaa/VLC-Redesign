@@ -50,7 +50,7 @@
 
 #include <vlc_modules.h>
 
-PrefsDialog::PrefsDialog( QWidget *parent, intf_thread_t *_p_intf )
+PrefsDialog::PrefsDialog( QWidget *parent, intf_thread_t *_p_intf, bool advanced )
             : QVLCDialog( parent, _p_intf )
 {
     QGridLayout *main_layout = new QGridLayout( this );
@@ -132,7 +132,7 @@ PrefsDialog::PrefsDialog( QWidget *parent, intf_thread_t *_p_intf )
 
     for( int i = 0; i < SPrefsMax ; i++ ) simple_panels[i] = NULL;
 
-    if( var_InheritBool( p_intf, "qt-advanced-pref" )
+    if( advanced || var_InheritBool( p_intf, "qt-advanced-pref" )
      || var_InheritBool( p_intf, "advanced" ) )
         setAdvanced();
     else
@@ -306,6 +306,15 @@ void PrefsDialog::save()
         advanced_tree->applyAll();
     }
 
+    saveConfig( p_intf );
+    accept();
+
+    QVLCTools::saveWidgetPosition( p_intf, "Preferences", this );
+
+}
+
+void PrefsDialog::saveConfig( intf_thread_t *p_intf )
+{
     /* Save to file */
     if( config_SaveConfigFile( p_intf ) != 0 )
     {
@@ -316,10 +325,6 @@ void PrefsDialog::save()
     if( p_intf->p_sys->p_mi )
         p_intf->p_sys->p_mi->reloadPrefs();
     Theme::instance()->reload();
-    accept();
-
-    QVLCTools::saveWidgetPosition( p_intf, "Preferences", this );
-
 }
 
 /* Clean the preferences, dunno if it does something really */
@@ -333,25 +338,31 @@ void PrefsDialog::cancel()
 /* Reset all the preferences, when you click the button */
 void PrefsDialog::reset()
 {
+    if( resetConfig( this, p_intf ) )
+        accept();
+}
+
+bool PrefsDialog::resetConfig( QWidget *parent, intf_thread_t *p_intf )
+{
     int ret = QMessageBox::question(
-                 this,
+                 parent,
                  qtr( "Reset Preferences" ),
                  qtr( "Are you sure you want to reset your VLC media player preferences?" ),
                  QMessageBox::Ok | QMessageBox::Cancel,
                  QMessageBox::Ok);
 
-    if( ret == QMessageBox::Ok )
-    {
-        config_ResetAll( p_intf );
-        config_SaveConfigFile( p_intf );
-        getSettings()->clear();
+    if( ret != QMessageBox::Ok )
+        return false;
+
+    config_ResetAll( p_intf );
+    config_SaveConfigFile( p_intf );
+    getSettings()->clear();
 
 #ifdef _WIN32
-        simple_panels[0]->cleanLang();
+    /* static: the Interface panel may never have been built */
+    SPrefsPanel::cleanLang();
 #endif
-
-        accept();
-    }
+    return true;
 }
 
 void PrefsDialog::advancedTreeFilterChanged( const QString & text )

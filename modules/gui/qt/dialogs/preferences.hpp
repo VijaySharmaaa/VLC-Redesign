@@ -43,8 +43,14 @@ class PrefsDialog : public QVLCDialog
 {
     Q_OBJECT
 public:
-    PrefsDialog( QWidget *, intf_thread_t * );
+    /* advanced: open on the complete tree whatever the options say */
+    PrefsDialog( QWidget *, intf_thread_t *, bool advanced = false );
     virtual ~PrefsDialog();
+    /* Save and Reset, shared with the Preferences page: write the applied
+     * configuration and reload what depends on it; ask, then reset
+     * everything (true when done) */
+    static void saveConfig( intf_thread_t * );
+    static bool resetConfig( QWidget *, intf_thread_t * );
 #if 0
     /*Called from extended settings, is not used anymore, but could be useful one day*/
     void showModulePrefs( char* );

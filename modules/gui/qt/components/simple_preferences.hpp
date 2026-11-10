@@ -93,7 +93,8 @@ public:
     void apply();
     void clean();
 #ifdef _WIN32
-    void cleanLang();
+    /* the UI language is in the registry, not in a panel */
+    static void cleanLang();
 #endif
 
 private:
