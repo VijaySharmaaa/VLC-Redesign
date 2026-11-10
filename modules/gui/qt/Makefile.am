@@ -96,6 +96,9 @@ libqt_plugin_la_SOURCES = \
 	gui/qt/components/interface_widgets.cpp \
 	gui/qt/components/interface_widgets.hpp \
 	gui/qt/components/controller.cpp gui/qt/components/controller.hpp \
+	gui/qt/components/overlay_host.cpp gui/qt/components/overlay_host.hpp \
+	gui/qt/components/toast.cpp gui/qt/components/toast.hpp \
+	gui/qt/components/drop_overlay.cpp gui/qt/components/drop_overlay.hpp \
 	gui/qt/components/controller_widget.cpp \
 	gui/qt/components/controller_widget.hpp \
 	gui/qt/components/epg/EPGChannels.cpp \
@@ -212,6 +215,8 @@ nodist_libqt_plugin_la_SOURCES = \
 	gui/qt/components/open_panels.moc.cpp \
 	gui/qt/components/interface_widgets.moc.cpp \
 	gui/qt/components/controller.moc.cpp \
+	gui/qt/components/overlay_host.moc.cpp \
+	gui/qt/components/toast.moc.cpp \
 	gui/qt/components/controller_widget.moc.cpp \
 	gui/qt/components/epg/EPGChannels.moc.cpp \
 	gui/qt/components/epg/EPGProgram.moc.cpp \

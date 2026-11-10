@@ -39,6 +39,8 @@
 #include "util/theme.hpp"
 
 #include "components/interface_widgets.hpp"     // bgWidget, videoWidget
+#include "components/toast.hpp"
+#include "components/drop_overlay.hpp"
 #include "components/controller.hpp"            // controllers
 #include "components/playlist/playlist.hpp"     // plWidget
 #include "dialogs/firstrun.hpp"                 // First Run
@@ -54,6 +56,7 @@
 #include <QSize>
 #include <QDate>
 #include <QMimeData>
+#include <QFileInfo>
 
 #include <QWindow>
 #include <QMenu>
@@ -230,6 +233,9 @@ MainInterface::MainInterface( intf_thread_t *_p_intf ) : QVLCMW( _p_intf )
 
     connect( THEDP, &DialogsProvider::toolBarConfUpdated, this, &MainInterface::toolBarConfUpdated );
     installEventFilter( this );
+
+    toast = new Toast( p_intf, this, stackCentralW );
+    dropOverlay = new DropOverlay( this );
 
     connect( this, &MainInterface::askToQuit, THEDP, &DialogsProvider::quit );
 
@@ -1560,7 +1566,14 @@ void MainInterface::changeEvent(QEvent *event)
  ************************************************************************/
 void MainInterface::dropEvent(QDropEvent *event)
 {
+    /* before the drop starts playback, and on every early return */
+    dropOverlay->setActive( false );
     dropEventPlay( event, true );
+}
+
+void MainInterface::showToast( const QString &message )
+{
+    toast->showMessage( message );
 }
 
 /**
@@ -1587,6 +1600,8 @@ void MainInterface::dropEventPlay( QDropEvent *event, bool b_play, bool b_playli
         if( !input_AddSlave( THEMIM->getInput(), SLAVE_TYPE_SPU,
                  qtu( mimeData->urls()[0].toString() ), true, true, true ) )
         {
+            showToast( qtr( "Loaded subtitle: %1" )
+                       .arg( QFileInfo( mimeData->urls()[0].path() ).fileName() ) );
             event->accept();
             return;
         }
@@ -1636,6 +1651,7 @@ void MainInterface::dropEventPlay( QDropEvent *event, bool b_play, bool b_playli
 }
 void MainInterface::dragEnterEvent(QDragEnterEvent *event)
 {
+     dropOverlay->setActive( event->mimeData()->hasUrls() );
      event->acceptProposedAction();
 }
 void MainInterface::dragMoveEvent(QDragMoveEvent *event)
@@ -1644,6 +1660,7 @@ void MainInterface::dragMoveEvent(QDragMoveEvent *event)
 }
 void MainInterface::dragLeaveEvent(QDragLeaveEvent *event)
 {
+     dropOverlay->setActive( false );
      event->accept();
 }
 
