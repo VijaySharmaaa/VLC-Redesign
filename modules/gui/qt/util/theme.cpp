@@ -423,16 +423,46 @@ const Palette &Theme::palette() const
 
 QColor Theme::color(ColorRole role) const
 {
+    QColor c;
     if (role < paletteCount)
-        return QColor::fromRgba(palette().*paletteFields[role]);
-    if (role < ColorRoleCount)
-        return QColor::fromRgba(fixedColors[role - paletteCount]);
-    return QColor();
+        c = QColor::fromRgba(palette().*paletteFields[role]);
+    else if (role < ColorRoleCount)
+        c = QColor::fromRgba(fixedColors[role - paletteCount]);
+    if (!highContrast || !c.isValid())
+        return c;
+
+    /* high contrast: painted widgets take the system colours, at the token's alpha */
+    QPalette::ColorGroup group = QPalette::Active;
+    QPalette::ColorRole sys;
+    switch (role)
+    {
+    case Text: case Text2: case Ink:
+        sys = QPalette::WindowText; break;
+    case Mute: case Dim:
+        group = QPalette::Disabled; sys = QPalette::Text; break;
+    case Surface:
+        sys = QPalette::Base; break;
+    case AccentText: case Accent: case AccentHover: case AccentTint12: case AccentTint14:
+    case AccentBorder50: case AccentFocusRing: case AccentKnobHalo:
+    case VolumeBoost:
+        sys = QPalette::Highlight; break;
+    case OnAccent: case SeekKnobFill:  /* both sit on the accent */
+        sys = QPalette::HighlightedText; break;
+    case Error: case ErrorTint: case DestructiveText: case WindowCloseHover:
+    case VideoSurface: case PausedBadgeBg: case SubtitleBox:
+        return c;  /* status and video colours keep their meaning */
+    default:       /* the backgrounds: Page .. Hover2, Glass, FxBg, stripes */
+        sys = QPalette::Window; break;
+    }
+    QColor s = QApplication::palette().color(group, sys);
+    s.setAlpha(c.alpha());
+    return s;
 }
 
 QColor Theme::ink(int alpha) const
 {
-    QColor c = QColor::fromRgb(palette().ink);
+    QColor c = highContrast ? QApplication::palette().color(QPalette::WindowText)
+                            : QColor::fromRgb(palette().ink);
     c.setAlpha(alpha);
     return c;
 }
