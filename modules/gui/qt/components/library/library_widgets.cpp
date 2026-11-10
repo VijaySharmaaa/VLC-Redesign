@@ -529,46 +529,47 @@ QString CardDelegate::metaLine( input_item_t *input, const QModelIndex &source )
         return QString::fromUtf8( vlc_ngettext( "%1 item", "%1 items", n ) ).arg( n );
     }
 
+    const QString line = kind == AlbumCard ? takeString( input_item_GetArtist( input ) )
+                                           : mediaMetaLine( input );
+    return line.isEmpty() ? QString::fromUtf8( "—" ) : line;
+}
+
+QString mediaMetaLine( input_item_t *input )
+{
     QStringList parts;
-    if( kind == AlbumCard )
-        parts << takeString( input_item_GetArtist( input ) );
-    else
+    const QString date = takeString( input_item_GetDate( input ) );
+    parts << ( date.left( 4 ).toInt() > 0 ? date.left( 4 ) : QString() );
+    int height = 0, channels = 0;
+    vlc_fourcc_t codec = 0;
+    vlc_mutex_lock( &input->lock );
+    for( int i = 0; i < input->i_es; i++ )
     {
-        /* "2010 · 1080p · H.264 · 5.1": what preparsing found so far */
-        const QString date = takeString( input_item_GetDate( input ) );
-        parts << ( date.left( 4 ).toInt() > 0 ? date.left( 4 ) : QString() );
-        int height = 0, channels = 0;
-        vlc_fourcc_t codec = 0;
-        vlc_mutex_lock( &input->lock );
-        for( int i = 0; i < input->i_es; i++ )
+        const es_format_t *es = input->es[i];
+        if( es->i_cat == VIDEO_ES && codec == 0 )
         {
-            const es_format_t *es = input->es[i];
-            if( es->i_cat == VIDEO_ES && codec == 0 )
-            {
-                codec = es->i_codec;
-                height = es->video.i_visible_height ? es->video.i_visible_height : es->video.i_height;
-            }
-            else if( es->i_cat == AUDIO_ES && channels == 0 )
-                channels = es->audio.i_channels;
+            codec = es->i_codec;
+            height = es->video.i_visible_height ? es->video.i_visible_height : es->video.i_height;
         }
-        vlc_mutex_unlock( &input->lock );
-        if( height >= 2160 )
-            parts << qtr( "4K" );
-        else if( height > 0 )
-            parts << QString( "%1p" ).arg( height );
-        if( codec )
-        {
-            char fourcc[5] = { 0 };
-            vlc_fourcc_to_char( codec, fourcc );
-            parts << codecName( QString::fromLatin1( fourcc ) );
-        }
-        if( channels == 6 )
-            parts << QString( "5.1" );
-        else if( channels == 8 )
-            parts << QString( "7.1" );
+        else if( es->i_cat == AUDIO_ES && channels == 0 )
+            channels = es->audio.i_channels;
     }
+    vlc_mutex_unlock( &input->lock );
+    if( height >= 2160 )
+        parts << qtr( "4K" );
+    else if( height > 0 )
+        parts << QString( "%1p" ).arg( height );
+    if( codec )
+    {
+        char fourcc[5] = { 0 };
+        vlc_fourcc_to_char( codec, fourcc );
+        parts << codecName( QString::fromLatin1( fourcc ) );
+    }
+    if( channels == 6 )
+        parts << QString( "5.1" );
+    else if( channels == 8 )
+        parts << QString( "7.1" );
     parts.removeAll( QString() );
-    return parts.isEmpty() ? QString::fromUtf8( "—" ) : parts.join( QString::fromUtf8( " · " ) );
+    return parts.join( QString::fromUtf8( " · " ) );
 }
 
 /**********************************************************************

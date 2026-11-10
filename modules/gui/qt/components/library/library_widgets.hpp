@@ -227,4 +227,8 @@ private:
     QLabel *noteLabel;
 };
 
+/* "2010 · 1080p · H.264 · 5.1": what preparsing found so far of an item's
+ * year, picture height, video codec and surround channels; empty if none */
+QString mediaMetaLine( input_item_t * );
+
 #endif
