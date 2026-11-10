@@ -879,12 +879,22 @@ void PlayerHeader::raiseDrawers()
     }
 }
 
-/* In the main window: first, where Tab from the window itself goes, when it
- * is a deck control (the back button comes before it); last, where
- * Shift+Tab wraps to from the back button */
+/* The deck in use is the immersive bar while it shows (a window of its own),
+ * else the main window's. first: where Tab from the window goes, when it is
+ * a deck control (the back button comes before it); last: where Shift+Tab
+ * wraps to from the back button */
 QWidget *PlayerHeader::deckStop( bool first ) const
 {
     QWidget *root = parentWidget();
+    foreach( QObject *c, root->children() )
+    {
+        ImmersiveBar *bar = dynamic_cast<ImmersiveBar *>( c );
+        if( bar && bar->isVisible() )
+        {
+            root = bar;
+            break;
+        }
+    }
     for( QWidget *w = first ? root->nextInFocusChain() : root->previousInFocusChain(); w != root;
          w = first ? w->nextInFocusChain() : w->previousInFocusChain() )
     {
