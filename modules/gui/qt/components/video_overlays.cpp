@@ -37,6 +37,7 @@
 
 #include <QAbstractButton>
 #include <QApplication>
+#include <QCursor>
 #include <QKeyEvent>
 #include <QLinearGradient>
 #include <QPainter>
@@ -51,6 +52,9 @@ namespace V = RedesignTokens::VideoOverlay;
 
 namespace
 {
+    /* a poll rate, not a motion: about a frame after the cursor moves */
+    const int MoveCheckMs = 50;
+
     /* The badge itself: a real button, for the click and screen readers */
     class BadgeButton : public QAbstractButton
     {
@@ -727,6 +731,16 @@ PlayerHeader::PlayerHeader( intf_thread_t *_p_intf, QWidget *owner, QWidget *_vi
         if( cursorHidden )
             followCursor();
     } );
+    /* VLC thinks the cursor is shown until it hides it again: a real move
+     * meanwhile sends nothing, so look for one.
+     * shortcut: polls QCursor::pos() (Qt sees no moves over the native video)
+     * until the cursor moves or VLC hides it again; upgrade if the vout ever
+     * reports real moves only */
+    moveCheck.setInterval( MoveCheckMs );
+    connect( &moveCheck, &QTimer::timeout, this, [this]() {
+        if( QCursor::pos() != hiddenAt )
+            forgetCursor();
+    } );
     refresh();
 }
 
@@ -774,7 +788,26 @@ void PlayerHeader::setAsleep( bool s )
 
 void PlayerHeader::setCursorHidden( bool h )
 {
-    cursorHidden = h;
+    if( h )
+    {
+        moveCheck.stop();
+        hiddenAt = QCursor::pos();
+        cursorHidden = true;
+        followCursor();
+    }
+    /* Windows sends the video a mouse move at the same place when the header
+     * hides under a resting cursor, and VLC takes it for activity: not the
+     * user's, so the header sleeps on until the cursor really moves */
+    else if( cursorHidden && asleep && QCursor::pos() == hiddenAt )
+        moveCheck.start();
+    else
+        forgetCursor();
+}
+
+void PlayerHeader::forgetCursor()
+{
+    moveCheck.stop();
+    cursorHidden = false;
     followCursor();
 }
 
