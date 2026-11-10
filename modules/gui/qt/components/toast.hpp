@@ -39,6 +39,8 @@ public:
     virtual ~Toast();
 
     void showMessage( const QString & );
+    /* Over a video the toast rises above the subtitles' lines */
+    void setOverVideo( bool );
 
 signals:
     void snapshotSaved( const QString & );  /* emitted from the vout thread */
@@ -58,6 +60,7 @@ private:
     QParallelAnimationGroup *enter;
     QPropertyAnimation *fade, *rise;
     QTimer hold;
+    bool overVideo;
 };
 
 #endif

@@ -22,6 +22,7 @@
 
 #include "components/drop_overlay.hpp"
 #include "util/theme.hpp"
+#include "util/redesign_icons.hpp"
 
 #include <QPainter>
 #include <QPropertyAnimation>
@@ -86,30 +87,31 @@ void DropOverlay::paintEvent( QPaintEvent * )
     QColor wash = theme->color( Theme::Accent );
     wash.setAlpha( O::DropFillAlpha );
     const int frameRadius = theme->metric( Theme::RadiusXl );
-    const qreal half = O::DropBorder / 2.;
+    const qreal inset = theme->px( O::DropInset ) + O::DropBorder / 2.; /* a line width: not scaled */
     p.setPen( QPen( theme->color( Theme::Accent ), O::DropBorder, Qt::DashLine ) );
     p.setBrush( wash );
-    p.drawRoundedRect( QRectF( rect() ).adjusted( O::DropInset + half, O::DropInset + half,
-                                                  -O::DropInset - half, -O::DropInset - half ),
+    p.drawRoundedRect( QRectF( rect() ).adjusted( inset, inset, -inset, -inset ),
                        frameRadius, frameRadius );
 
     /* centred card: icon over the label */
     const QString label = qtr( "Drop to play" );
     const QFontMetrics fm = fontMetrics();
-    const QSize card( qMax( O::DropIcon, fm.width( label ) ) + 2 * O::DropCardPadX,
-                      O::DropIcon + O::DropGap + fm.height() + 2 * O::DropCardPadY );
+    const int iconPx = theme->px( O::DropIcon ), gap = theme->px( O::DropGap );
+    const int padX = theme->px( O::DropCardPadX ), padY = theme->px( O::DropCardPadY );
+    const QSize card( qMax( iconPx, fm.width( label ) ) + 2 * padX,
+                      iconPx + gap + fm.height() + 2 * padY );
     const QRect cardRect( rect().center() - QPoint( card.width() / 2, card.height() / 2 ), card );
     const int cardRadius = theme->metric( Theme::RadiusTile );
     p.setPen( Qt::NoPen );
     p.setBrush( theme->color( Theme::Surface ) );
     p.drawRoundedRect( cardRect, cardRadius, cardRadius );
 
-    const QSize icon( O::DropIcon, O::DropIcon );
-    theme->icon( "file_open", Theme::Accent, icon )
-        .paint( &p, QRect( QPoint( cardRect.center().x() - O::DropIcon / 2,
-                                   cardRect.top() + O::DropCardPadY ), icon ) );
+    const QSize icon( iconPx, iconPx );
+    theme->icon( RedesignIcons::IconOpen, Theme::Accent, icon )
+        .paint( &p, QRect( QPoint( cardRect.center().x() - iconPx / 2,
+                                   cardRect.top() + padY ), icon ) );
     p.setPen( theme->color( Theme::Text ) );
-    p.drawText( QRect( cardRect.left(), cardRect.top() + O::DropCardPadY + O::DropIcon + O::DropGap,
+    p.drawText( QRect( cardRect.left(), cardRect.top() + padY + iconPx + gap,
                        cardRect.width(), fm.height() ),
                 Qt::AlignCenter, label );
 }

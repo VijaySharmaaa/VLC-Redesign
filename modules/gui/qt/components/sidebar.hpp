@@ -41,6 +41,8 @@ public:
     /* Parentless until added to a stack, which then owns it. Phase 4
      * replaces these placeholders with the library views. */
     QWidget *page( Page p ) const { return pages[p]; }
+    /* Its width at a breakpoint, device-independent px */
+    static int widthAt( BreakpointWatcher::Size );
 
 public slots:
     /* As if the user picked it, e.g. for "go to library" */

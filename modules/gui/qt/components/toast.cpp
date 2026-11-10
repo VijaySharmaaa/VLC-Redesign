@@ -22,6 +22,7 @@
 
 #include "components/toast.hpp"
 #include "util/theme.hpp"
+#include "util/redesign_icons.hpp"
 
 #include <vlc_variables.h>
 
@@ -42,7 +43,7 @@ static int SnapshotCB( vlc_object_t *, const char *,
 }
 
 Toast::Toast( intf_thread_t *_p_intf, QWidget *owner, QWidget *content )
-    : OverlayWindow( owner ), p_intf( _p_intf )
+    : OverlayWindow( owner ), p_intf( _p_intf ), overVideo( false )
 {
     setFont( Theme::instance()->font( Theme::Body ) );
     host = new OverlayHost( content, this );
@@ -94,7 +95,7 @@ void Toast::showMessage( const QString &message )
     else
     {
         const QPoint to = restingPos();
-        rise->setStartValue( to + QPoint( 0, RedesignTokens::Motion::ToastOffset ) );
+        rise->setStartValue( to + QPoint( 0, Theme::instance()->px( RedesignTokens::Motion::ToastOffset ) ) );
         rise->setEndValue( to );
         fade->setDuration( ms );
         rise->setDuration( ms );
@@ -108,6 +109,12 @@ void Toast::showMessage( const QString &message )
     QAccessibleEvent alert( this, QAccessible::Alert );
     QAccessible::updateAccessibility( &alert );
 #endif
+}
+
+void Toast::setOverVideo( bool b )
+{
+    overVideo = b;
+    place();
 }
 
 void Toast::place()
@@ -128,17 +135,20 @@ void Toast::place()
 
 void Toast::fitText()
 {
-    const int chrome = 2 * O::ToastPadX + O::ToastIcon + O::ToastGap;
-    const int room = host->targetRect().width() - 2 * O::ToastMargin;
+    const Theme *t = Theme::instance();
+    const int chrome = t->px( 2 * O::ToastPadX + O::ToastIcon + O::ToastGap );
+    const int room = host->targetRect().width() - 2 * t->px( O::ToastMargin );
     resize( qMax( chrome, qMin( room, chrome + fontMetrics().width( text ) ) ),
-            qMax( O::ToastIcon, fontMetrics().height() ) + 2 * O::ToastPadY );
+            qMax( t->px( O::ToastIcon ), fontMetrics().height() ) + 2 * t->px( O::ToastPadY ) );
 }
 
 QPoint Toast::restingPos() const
 {
     const QRect r = host->targetRect();
-    return QPoint( r.center().x() - width() / 2,
-                   r.bottom() + 1 - O::ToastMargin - height() );
+    int margin = Theme::instance()->px( O::ToastMargin );
+    if( overVideo )
+        margin = qMax( margin, r.height() * O::ToastOverVideoPercent / 100 );
+    return QPoint( r.center().x() - width() / 2, r.bottom() + 1 - margin - height() );
 }
 
 void Toast::paintEvent( QPaintEvent * )
@@ -151,12 +161,13 @@ void Toast::paintEvent( QPaintEvent * )
     p.setBrush( theme->color( Theme::Hover ) );
     p.drawRoundedRect( QRectF( rect() ).adjusted( .5, .5, -.5, -.5 ), radius, radius );
 
-    const QSize icon( O::ToastIcon, O::ToastIcon );
-    theme->icon( "info", Theme::Accent, icon )
-        .paint( &p, QRect( QPoint( O::ToastPadX, ( height() - O::ToastIcon ) / 2 ), icon ) );
+    const int iconPx = theme->px( O::ToastIcon ), padX = theme->px( O::ToastPadX );
+    const QSize icon( iconPx, iconPx );
+    theme->icon( RedesignIcons::IconInfo, Theme::Accent, icon )
+        .paint( &p, QRect( QPoint( padX, ( height() - iconPx ) / 2 ), icon ) );
 
-    const QRect textRect = rect().adjusted( O::ToastPadX + O::ToastIcon + O::ToastGap, 0,
-                                            -O::ToastPadX, 0 );
+    const QRect textRect = rect().adjusted( padX + iconPx + theme->px( O::ToastGap ), 0,
+                                            -padX, 0 );
     p.setPen( theme->color( Theme::Text ) );
     p.drawText( textRect, Qt::AlignVCenter | Qt::AlignLeft,
                 fontMetrics().elidedText( text, Qt::ElideMiddle, textRect.width() ) );

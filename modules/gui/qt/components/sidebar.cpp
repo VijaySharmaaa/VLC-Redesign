@@ -59,7 +59,8 @@ public:
 
     QSize sizeHint() const Q_DECL_OVERRIDE
     {
-        const int h = primary ? Size::SidebarOpenBtnH : Size::SidebarItemH;
+        const int h = Theme::instance()->metric( primary ? Theme::SidebarOpenBtnH
+                                                         : Theme::SidebarItemH );
         return QSize( h, h );
     }
 
@@ -77,7 +78,7 @@ void SidebarButton::paintEvent( QPaintEvent * )
     Theme *t = Theme::instance();
     QPainter p( this );
     p.setRenderHint( QPainter::Antialiasing );
-    const int radius = primary ? Size::SidebarOpenRadius : Size::RadiusMd;
+    const int radius = primary ? t->px( Size::SidebarOpenRadius ) : t->metric( Theme::RadiusMd );
 
     QColor fill( Qt::transparent );
     if( primary )
@@ -97,9 +98,11 @@ void SidebarButton::paintEvent( QPaintEvent * )
         /* the accent is 2.4:1 on light surfaces and invisible on the accent */
         const Theme::ColorRole ring = primary ? Theme::OnAccent
                                     : t->isDark() ? Theme::Accent : Theme::AccentText;
-        p.setPen( QPen( t->color( ring ), 2 ) );
+        const qreal inset = Size::FocusRing / 2.;
+        p.setPen( QPen( t->color( ring ), Size::FocusRing ) );
         p.setBrush( Qt::NoBrush );
-        p.drawRoundedRect( QRectF( rect() ).adjusted( 1, 1, -1, -1 ), radius - 1, radius - 1 );
+        p.drawRoundedRect( QRectF( rect() ).adjusted( inset, inset, -inset, -inset ),
+                           radius - inset, radius - inset );
     }
 
     const Theme::ColorRole ink = primary ? Theme::OnAccent
@@ -111,15 +114,16 @@ void SidebarButton::paintEvent( QPaintEvent * )
 
     /* rail: the icon alone, centred; primary: icon and label centred as a
      * group; nav item: icon and label from the left */
-    const int iconPx = Size::SidebarIcon;
-    const int gap = primary ? Size::SidebarOpenIconGap : Size::SidebarIconGap;
+    const int iconPx = t->px( Size::SidebarIcon );
+    const int gap = t->px( primary ? Size::SidebarOpenIconGap : Size::SidebarIconGap );
+    const int padX = t->px( Size::SidebarItemPadX );
     int x;
     if( rail )
         x = ( width() - iconPx ) / 2;
     else if( primary )
         x = ( width() - iconPx - gap - fm.width( text() ) ) / 2;
     else
-        x = Size::SidebarItemPadX;
+        x = padX;
     const QRect iconRect( x, ( height() - iconPx ) / 2, iconPx, iconPx );
     /* QIcon::paint picks the device-pixel size: render the tint at that size */
     const int devicePx = qRound( iconPx * devicePixelRatioF() );
@@ -129,7 +133,7 @@ void SidebarButton::paintEvent( QPaintEvent * )
         return;
 
     const QRect textRect( iconRect.right() + 1 + gap, 0,
-                          width() - iconRect.right() - 1 - gap - Size::SidebarItemPadX, height() );
+                          width() - iconRect.right() - 1 - gap - padX, height() );
     p.setFont( font );
     p.setPen( t->color( ink ) );
     p.drawText( QStyle::visualRect( layoutDirection(), rect(), textRect ),
@@ -143,9 +147,11 @@ static QWidget *createPage( const QString &title )
     QWidget *page = new QWidget;
     page->setAccessibleName( title );
     QVBoxLayout *layout = new QVBoxLayout( page );
-    layout->setContentsMargins( Size::PagePadX, Size::PagePadTop, Size::PagePadX, Size::PagePadX );
+    const Theme *t = Theme::instance();
+    layout->setContentsMargins( t->px( Size::PagePadX ), t->px( Size::PagePadTop ),
+                                t->px( Size::PagePadX ), t->px( Size::PagePadX ) );
     QLabel *label = new QLabel( title, page );
-    label->setFont( Theme::instance()->font( Theme::PageTitle ) );
+    label->setFont( t->font( Theme::PageTitle ) );
     layout->addWidget( label );
     layout->addStretch( 1 );
     return page;
@@ -162,9 +168,10 @@ Sidebar::Sidebar( QWidget *parent ) : QWidget( parent )
 {
     setAccessibleName( qtr( "Library" ) );
     QVBoxLayout *layout = new QVBoxLayout( this );
-    layout->setContentsMargins( Size::SidebarPadX, Size::SidebarPadY,
-                                Size::SidebarPadX, Size::SidebarPadY );
-    layout->setSpacing( Size::SidebarItemGap );
+    const Theme *t = Theme::instance();
+    layout->setContentsMargins( t->px( Size::SidebarPadX ), t->px( Size::SidebarPadY ),
+                                t->px( Size::SidebarPadX ), t->px( Size::SidebarPadY ) );
+    layout->setSpacing( t->px( Size::SidebarItemGap ) );
 
     /* shortcut: the keys are copied from menus.cpp (Open Multiple Files,
      * Preferences), read them from the menu actions once lane A exposes them */
@@ -173,7 +180,7 @@ Sidebar::Sidebar( QWidget *parent ) : QWidget( parent )
     open->setToolTip( tip( qtr( "Open media" ), "Ctrl+Shift+O" ) );
     connect( open, &QAbstractButton::clicked, this, []() { THEDP->openDialog(); } );
     layout->addWidget( open );
-    layout->addSpacing( Size::SidebarOpenBelow );
+    layout->addSpacing( t->px( Size::SidebarOpenBelow ) );
     buttons.append( open );
 
     static const struct { const char *label; const char *icon; } nav[PageCount] = {
@@ -233,10 +240,15 @@ void Sidebar::setCurrentWidget( QWidget *w )
     }
 }
 
-void Sidebar::setBreakpoint( BreakpointWatcher::Size bp )
+int Sidebar::widthAt( BreakpointWatcher::Size bp )
 {
     static const int widths[] = { Size::SidebarXS, Size::SidebarS, Size::SidebarM, Size::SidebarL };
-    setFixedWidth( widths[bp] );
+    return Theme::instance()->px( widths[bp] );
+}
+
+void Sidebar::setBreakpoint( BreakpointWatcher::Size bp )
+{
+    setFixedWidth( widthAt( bp ) );
     for( SidebarButton *b : buttons )
         b->setRail( bp < BreakpointWatcher::M );
 }
@@ -247,6 +259,6 @@ void Sidebar::paintEvent( QPaintEvent * )
     QPainter p( this );
     p.fillRect( rect(), t->color( Theme::Chrome ) );
     /* the hairline towards the content */
-    p.fillRect( QRect( isRightToLeft() ? 0 : width() - 1, 0, 1, height() ),
+    p.fillRect( QRect( isRightToLeft() ? 0 : width() - Size::Hairline, 0, Size::Hairline, height() ),
                 t->ink( InkAlpha::Divider ) );
 }
