@@ -35,10 +35,13 @@
 
 #include <vlc_input_item.h>
 
+#include <QAccessible>
+#include <QAccessibleWidget>
 #include <QApplication>
 #include <QDesktopWidget>
 #include <QGridLayout>
 #include <QHBoxLayout>
+#include <QIconEngine>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QListView>
@@ -53,16 +56,60 @@
 using namespace RedesignTokens;
 
 namespace {
-/* "Play/Pause (Space)": the label and the first key bound to the hotkey */
+/* "Play/Pause (Space)": the label and the first key bound to the hotkey
+ * (a key-* name) or a Qt key such as "Esc", in this language */
 QString withKey( intf_thread_t *p_intf, const QString &label, const char *hotkey )
 {
-    if( hotkey == NULL )
-        return label;
-    char *psz = var_InheritString( p_intf, hotkey );
-    const QString key = qfu( psz ).section( '\t', 0, 0 );
-    free( psz );
+    const QString key = hotkeyText( p_intf, hotkey );
     return key.isEmpty() ? label : qtr( "%1 (%2)" ).arg( label, key );
 }
+
+/* Name-separating dot of the meta lines: not a translatable string */
+QString dot() { return QString::fromUtf8( " · " ); }
+
+/* Draws an icon flipped left to right */
+class MirroredIconEngine : public QIconEngine
+{
+public:
+    explicit MirroredIconEngine( const QIcon &_icon ) : icon( _icon ) {}
+    void paint( QPainter *p, const QRect &r, QIcon::Mode mode, QIcon::State state ) Q_DECL_OVERRIDE
+    {
+        p->save();
+        p->translate( 2 * r.x() + r.width(), 0 );
+        p->scale( -1, 1 );
+        icon.paint( p, r, Qt::AlignCenter, mode, state );
+        p->restore();
+    }
+    QIconEngine *clone() const Q_DECL_OVERRIDE { return new MirroredIconEngine( icon ); }
+private:
+    QIcon icon;
+};
+}
+
+QIcon backIcon( Theme::ColorRole role )
+{
+    const QIcon icon = Theme::themedIcon( RedesignIcons::IconBack, role );
+    return QApplication::isRightToLeft() ? QIcon( new MirroredIconEngine( icon ) ) : icon;
+}
+
+/* The thin seek bar's value as a time, not its 0..1000 position */
+class ThinSeekAccessible : public QAccessibleWidget
+{
+public:
+    explicit ThinSeekAccessible( QWidget *w ) : QAccessibleWidget( w, QAccessible::Slider ) {}
+    QString text( QAccessible::Text t ) const Q_DECL_OVERRIDE
+    {
+        if( t == QAccessible::Value )
+            return static_cast<ThinSeekBar *>( widget() )->timeText;
+        return QAccessibleWidget::text( t );
+    }
+};
+
+static QAccessibleInterface *thinSeekFactory( const QString &className, QObject *o )
+{
+    if( className == QLatin1String( "ThinSeekBar" ) && o && o->isWidgetType() )
+        return new ThinSeekAccessible( static_cast<QWidget *>( o ) );
+    return NULL;
 }
 
 /* Stripes at 135 degrees in the theme's two placeholder tints */
@@ -155,6 +202,12 @@ ThinSeekBar::ThinSeekBar( intf_thread_t *_p_i, QWidget *parent )
     : QSlider( Qt::Horizontal, parent ), p_intf( _p_i )
 {
     enum { RANGE = 1000 };
+    static bool factory = false;
+    if( !factory )
+        QAccessible::installFactory( thinSeekFactory );
+    factory = true;
+    /* the time runs left to right in every language, as on the deck */
+    RTL_UNAFFECTED_WIDGET
     setRange( 0, RANGE );
     setSingleStep( RANGE / 100 );
     setPageStep( RANGE / 10 );
@@ -168,7 +221,11 @@ ThinSeekBar::ThinSeekBar( intf_thread_t *_p_i, QWidget *parent )
     setCursor( Qt::PointingHandCursor );
 
     connect( THEMIM->getIM(), &InputManager::positionUpdated, this,
-             [this]( float pos, int64_t, int ) {
+             [this]( float pos, int64_t time, int len ) {
+                 timeText = pos < 0.f ? QString()
+                          : len > 0 ? qtr( "%1 of %2" ).arg( timeString( time / CLOCK_FREQ ),
+                                                             timeString( len ) )
+                          : timeString( time / CLOCK_FREQ );
                  if( !isSliderDown() )
                      setValue( pos < 0.f ? 0 : qRound( pos * maximum() ) );
              } );
@@ -317,9 +374,9 @@ void NowPlayingInfo::readItem( input_item_t *p_item )
         const double khz = rate.toDouble() / 1000.;
         const QString k = QString::number( khz, 'g', 3 );
         if( khz > 0 && bits.toInt() > 0 )
-            format += qtr( " · %1/%2" ).arg( bits, k );
+            format += dot() + QString( "%1/%2" ).arg( bits, k );
         else if( khz > 0 )
-            format += qtr( " · %1 kHz" ).arg( k );
+            format += dot() + qtr( "%1 kHz" ).arg( k );
     }
     emit changed();
 }
@@ -331,7 +388,7 @@ QString NowPlayingInfo::metaLine() const
         parts << artist;
     if( !album.isEmpty() )
         parts << album;
-    return parts.isEmpty() ? format : parts.join( qtr( " · " ) );
+    return parts.isEmpty() ? format : parts.join( dot() );
 }
 
 /**********************************************************************
@@ -375,6 +432,8 @@ QToolButton *makePlayButton( intf_thread_t *p_intf, int size, QWidget *parent )
 static QWidget *makeTransport( intf_thread_t *p_intf, int gap, QWidget *parent )
 {
     QWidget *w = new QWidget( parent );
+    /* previous stays left of next in every language, as on the deck */
+    w->RTL_UNAFFECTED_WIDGET
     QHBoxLayout *l = new QHBoxLayout( w );
     l->setContentsMargins( 0, 0, 0, 0 );
     l->setSpacing( Theme::instance()->px( gap ) );
@@ -430,6 +489,7 @@ NowPlayingBar::NowPlayingBar( intf_thread_t *_p_i, NowPlayingInfo *_info, QWidge
 
     /* centre: transport above the seek line, times on its sides */
     QWidget *centre = new QWidget( this );
+    centre->RTL_UNAFFECTED_WIDGET   /* elapsed left of the seek line, as on the deck */
     centre->setMinimumWidth( t->px( NowPlaying::CentreMinW ) );
     centre->setMaximumWidth( t->px( NowPlaying::CentreMaxW ) );
     QVBoxLayout *cl = new QVBoxLayout( centre );
@@ -550,7 +610,8 @@ public:
         }
 
         const int padX = t->px( NowPlaying::TrackPadX ), gap = t->px( NowPlaying::TrackGap );
-        const QRect num( r.x() + padX, r.y(), t->px( NowPlaying::TrackNumW ), r.height() );
+        const QRect num = QStyle::visualRect( opt.direction, r,
+            QRect( r.x() + padX, r.y(), t->px( NowPlaying::TrackNumW ), r.height() ) );
         if( current )
         {
             const int icon = t->px( NowPlaying::TrackIcon );
@@ -570,12 +631,14 @@ public:
         const QString duration = VLCModel::getMeta( index, COLUMN_DURATION );
         p->setFont( t->font( Theme::Body ) );
         const int durW = p->fontMetrics().width( duration );
-        const QRect durRect( r.right() - padX - durW, r.y(), durW, r.height() );
+        const QRect durRect = QStyle::visualRect( opt.direction, r,
+            QRect( r.right() - padX - durW, r.y(), durW, r.height() ) );
         p->setPen( t->color( Theme::Mute ) );
         p->drawText( durRect, Qt::AlignVCenter | Qt::AlignRight, duration );
 
-        const QRect titleRect( num.right() + 1 + gap, r.y(),
-                               durRect.left() - gap - num.right() - 1 - gap, r.height() );
+        /* between the two, on either side; the alignments follow the painter */
+        const QRect titleRect( qMin( num.right(), durRect.right() ) + 1 + gap, r.y(),
+                               r.width() - num.width() - durW - 2 * padX - 2 * gap, r.height() );
         p->setFont( fontAt( Theme::Body, NowPlaying::TrackTitle, false ) );
         p->setPen( t->color( current ? Theme::AccentText : Theme::Text ) );
         p->drawText( titleRect, Qt::AlignVCenter | Qt::AlignLeft,
@@ -609,7 +672,7 @@ AudioModePage::AudioModePage( intf_thread_t *_p_i, NowPlayingInfo *_info, QWidge
     ll->setSpacing( t->px( NowPlaying::ColumnInnerGap ) );
     QToolButton *back = new QToolButton( leftColumn );
     back->setToolButtonStyle( Qt::ToolButtonTextBesideIcon );
-    back->setIcon( Theme::themedIcon( RedesignIcons::IconBack, Theme::Text2 ) );
+    back->setIcon( backIcon( Theme::Text2 ) );
     back->setIconSize( QSize( t->px( NowPlaying::TrackIcon ), t->px( NowPlaying::TrackIcon ) ) );
     back->setText( qtr( "Library" ) );
     back->setAccessibleName( qtr( "Go to library" ) );
@@ -736,7 +799,7 @@ void AudioModePage::refresh()
         parts << info->artist;
     if( !info->album.isEmpty() )
         parts << info->album;
-    meta->setText( parts.join( qtr( " · " ) ) );
+    meta->setText( parts.join( dot() ) );
     meta->setVisible( !parts.isEmpty() );
     formatChip->setText( info->format );
     formatChip->setVisible( !info->format.isEmpty() );
@@ -769,10 +832,9 @@ MiniPlayer::MiniPlayer( intf_thread_t *_p_i, NowPlayingInfo *_info, QWidget *par
     const int inset = t->px( MiniRestoreInset );
     overlay->setContentsMargins( inset, inset, inset, inset );
     QToolButton *restore = makeIconButton( p_intf, RedesignIcons::IconExpand, qtr( "Restore" ),
-                                           NULL, MiniRestore, art );
+                                           "Esc", MiniRestore, art );
     /* white on the dark scrim, in both themes */
     restore->setIcon( Theme::themedIcon( RedesignIcons::IconExpand, Theme::WindowCloseGlyph ) );
-    restore->setToolTip( qtr( "Restore (Esc)" ) );
     restore->setProperty( "np", "overlay" );
     connect( restore, &QToolButton::clicked, this, &MiniPlayer::restoreRequested );
     overlay->addWidget( restore, 0, 0, Qt::AlignTop | Qt::AlignRight );
