@@ -413,7 +413,7 @@ WidgetListing::WidgetListing( intf_thread_t *p_intf, QWidget *_parent )
         widgetItem->setText( qtr( nameL[i] ) );
         widgetItem->setSizeHint( QSize( widgetItem->sizeHint().width(), 32 ) );
 
-        widgetItem->setIcon( QIcon( iconL[i] ) );
+        widgetItem->setIcon( deckIcon( deckIconL[i] ) );
         widgetItem->setData( Qt::UserRole, QVariant( i ) );
         widgetItem->setToolTip( widgetItem->text() );
         addItem( widgetItem );

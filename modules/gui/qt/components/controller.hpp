@@ -30,15 +30,21 @@
 
 #include "qt.hpp"
 
+#include "util/redesign_icons.hpp"
+
 #include <QFrame>
+#include <QIcon>
 #include <QString>
 #include <QSizeGrip>
 
-#define MAIN_TB1_DEFAULT "64;39;64;38;65"
-#define MAIN_TB2_DEFAULT "0-2;64;3;1;4;64;7;9;64;10;20;19;64-4;37;65;35-4"
-#define ADV_TB_DEFAULT "12;11;13;14"
+/* The redesign's deck (DESIGN_SPEC 3); read only when the key is unset, so
+ * saved layouts stay as they are. The DVD menu buttons (37) left the deck:
+ * they are in the Playback menu and the toolbar editor. */
+#define MAIN_TB1_DEFAULT "38;65"
+#define MAIN_TB2_DEFAULT "0-2;3;1;4;32;20;19;39;65;26;42;9;10;27;7;32;35-4"
+#define ADV_TB_DEFAULT "32;13;14;11;12;41"
 #define INPT_TB_DEFAULT "43;33-4;44"
-#define FSC_TB_DEFAULT "0-2;64;3;1;4;64;37;64;38;64;8;65;25;35-4;34"
+#define FSC_TB_DEFAULT "0-2;3;1;4;32;20;19;65;26;42;9;10;8;25;32;35-4"
 
 #define I_PLAY_TOOLTIP N_("Play\nIf the playlist is empty, open a medium")
 
@@ -81,6 +87,8 @@ typedef enum buttonType_e
     NEXT_BUTTON,
     OPEN_SUB_BUTTON,
     FULLWIDTH_BUTTON,
+    TRACKS_BUTTON,
+    MINIPLAYER_BUTTON,
     BUTTON_MAX,
 
     SPLITTER = 0x20,
@@ -110,7 +118,8 @@ static const char* const nameL[BUTTON_MAX] = { N_("Play"), N_("Stop"), N_("Open"
     N_("Record"), N_("A→B Loop"), N_("Frame By Frame"), N_("Trickplay Reverse"),
     N_("Step backward" ), N_("Step forward"), N_("Quit"), N_("Random"),
     N_("Loop / Repeat"), N_("Information"), N_("Previous"), N_("Next"),
-    N_("Open subtitles"), N_("Dock fullscreen controller")
+    N_("Open subtitles"), N_("Dock fullscreen controller"),
+    N_("Audio and subtitle tracks"), N_("Mini player")
 };
 static const char* const tooltipL[BUTTON_MAX] = { I_PLAY_TOOLTIP,
     N_("Stop playback"), N_("Open a medium"),
@@ -125,17 +134,34 @@ static const char* const tooltipL[BUTTON_MAX] = { I_PLAY_TOOLTIP,
     N_("Previous media in the playlist"), N_("Next media in the playlist"),
     N_("Open subtitle file"),
     N_("Dock/undock fullscreen controller to/from bottom of screen"),
+    N_("Audio and subtitle tracks"), N_("Mini player"),
 };
-static const QString iconL[BUTTON_MAX] ={ ":/toolbar/play_b.svg", ":/toolbar/stop_b.svg",
-    ":/toolbar/eject.svg", ":/toolbar/previous_b.svg", ":/toolbar/next_b.svg",
-    ":/toolbar/slower.svg", ":/toolbar/faster.svg", ":/toolbar/fullscreen.svg",
-    ":/toolbar/defullscreen.svg", ":/toolbar/extended.svg", ":/toolbar/playlist.svg",
-    ":/toolbar/snapshot.svg", ":/toolbar/record.svg", ":/toolbar/atob_nob.svg",
-    ":/toolbar/frame.svg", ":/toolbar/reverse.svg", ":/toolbar/skip_back.svg",
-    ":/toolbar/skip_fw.svg", ":/toolbar/clear.svg", ":/buttons/playlist/shuffle_on.svg",
-    ":/buttons/playlist/repeat_all.svg", ":/menu/info.svg",
-    ":/toolbar/previous_b.svg", ":/toolbar/next_b.svg", ":/toolbar/eject.svg", ":/toolbar/space.svg"
+/* The icons (RedesignIcons names), same order: the deck and the toolbar editor */
+static const char* const deckIconL[BUTTON_MAX] = {
+    RedesignIcons::IconPlay, RedesignIcons::IconStop, RedesignIcons::IconOpen,
+    RedesignIcons::IconPrevious, RedesignIcons::IconNext, RedesignIcons::IconSlower,
+    RedesignIcons::IconFaster, RedesignIcons::IconFullscreen, RedesignIcons::IconDefullscreen,
+    RedesignIcons::IconEffects, RedesignIcons::IconPlaylist, RedesignIcons::IconSnapshot,
+    RedesignIcons::IconRecord, RedesignIcons::IconAtoB, RedesignIcons::IconFrame,
+    RedesignIcons::IconReverse, RedesignIcons::IconJumpBackward, RedesignIcons::IconJumpForward,
+    RedesignIcons::IconQuit, RedesignIcons::IconShuffle, RedesignIcons::IconRepeat,
+    RedesignIcons::IconInfo, RedesignIcons::IconPrevious, RedesignIcons::IconNext,
+    RedesignIcons::IconAddSubtitle, RedesignIcons::IconDockController,
+    RedesignIcons::IconTracks, RedesignIcons::IconMiniPlayer
 };
+/* The shortcut a button's tooltip shows: a key-* hotkey variable, or the
+ * Qt sequence of the menu entry it mirrors (menus.cpp); NULL for none */
+static const char* const hotkeyL[BUTTON_MAX] = {
+    "key-play-pause", "key-stop", "Ctrl+O", "key-prev", "key-next", "key-slower",
+    "key-faster", "key-toggle-fullscreen", "key-leave-fullscreen", "Ctrl+E", "Ctrl+L",
+    "key-snapshot", "key-record", "Shift+L", "key-frame-next", NULL, "key-jump-short",
+    "key-jump+short", "key-quit", "key-random", "key-loop", "Ctrl+I", "key-prev", "key-next",
+    NULL, NULL, NULL, NULL
+};
+
+/* A deck icon: tx2 at rest, accent when checked (on), 35 % when disabled;
+ * the on-accent glyph of the play circle with onAccent. Follows the theme. */
+QIcon deckIcon( const char *name, bool onAccent = false );
 
 enum
 {
@@ -169,8 +195,11 @@ protected:
                                      buttonType_e i_type, int i_option );
 
     QWidget *createWidget( buttonType_e, int options = WIDGET_NORMAL );
+    /* deck buttons: Space goes on to the hotkeys, Enter clicks, the
+     * tooltip gets the button's shortcut (hotkey property) */
+    bool eventFilter( QObject *, QEvent * ) Q_DECL_OVERRIDE;
 private:
-    static void setupButton( QAbstractButton * );
+    void setupButton( QAbstractButton * );
     QFrame *discFrame();
     QFrame *telexFrame();
     void applyAttributes( QToolButton *, bool b_flat, bool b_big );

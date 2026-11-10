@@ -36,7 +36,6 @@
 #include <QToolButton>
 #include <QComboBox>
 
-class QLabel;
 class QFrame;
 class QAbstractSlider;
 
@@ -51,8 +50,14 @@ class QAbstractSlider;
 class PlayButton : public QToolButton
 {
     Q_OBJECT
+public:
+    PlayButton() : b_round( false ), b_playing( false ) {}
+    /* the deck's accent circle (DESIGN_SPEC 3), for a big play button */
+    void setRound( bool );
 public slots:
     void updateButtonIcons( bool );
+private:
+    bool b_round, b_playing;
 };
 
 class LoopButton : public QToolButton
@@ -99,12 +104,9 @@ public:
                  bool b_special = false );
     void setMuted( bool );
 
-protected:
-    bool eventFilter( QObject *obj, QEvent *e ) Q_DECL_OVERRIDE;
-
 private:
     intf_thread_t       *p_intf;
-    QLabel              *volMuteLabel;
+    QToolButton         *volMuteButton;
     QAbstractSlider     *volumeSlider;
     QFrame              *volumeControlWidget;
     QMenu               *volumeMenu;
@@ -117,7 +119,7 @@ protected slots:
     void libUpdateVolume( float );
     void updateMuteStatus( bool );
     void refreshLabels( void );
-    void showVolumeMenu( QPoint pos );
+    void muteClicked();
     void valueChangedFilter( int );
 
 signals:

@@ -650,7 +650,6 @@ inline void MainInterface::createStatusBar()
 
     /* Styling those labels */
     timeLabel->setFrameStyle( QFrame::Sunken | QFrame::Panel );
-    speedLabel->setFrameStyle( QFrame::Sunken | QFrame::Panel );
     nameLabel->setFrameStyle( QFrame::Sunken | QFrame::StyledPanel);
     auto updateStyle = [=]() {
         const Theme *theme = Theme::instance();
@@ -659,7 +658,6 @@ inline void MainInterface::createStatusBar()
             .arg( theme->color( Theme::Text ).name() )
             .arg( fill.red() ).arg( fill.green() ).arg( fill.blue() ).arg( fill.alpha() );
         timeLabel->setStyleSheet( hover );
-        speedLabel->setStyleSheet( hover );
         /* pad both label and its tooltip */
         nameLabel->setStyleSheet( "padding-left: 5px; padding-right: 5px;" );
 

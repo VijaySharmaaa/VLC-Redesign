@@ -32,19 +32,28 @@
 #include "components/controller.hpp"
 #include "components/controller_widget.hpp"
 #include "components/interface_widgets.hpp"
+#include "components/deck_popover.hpp"
 #include "util/buttons/DeckButtonsLayout.hpp"
 #include "util/buttons/BrowseButton.hpp"
 #include "util/buttons/RoundButton.hpp"
 
 #include "dialogs_provider.hpp"                     /* Opening Dialogs */
+#include "main_interface.hpp"                       /* the mini player */
 #include "actions_manager.hpp"                             /* *_ACTION */
 
 #include "util/input_slider.hpp"                         /* SeekSlider */
 #include "util/customwidgets.hpp"                       /* qEventToKey */
+#include "util/theme.hpp"
 
 #include "adapters/seekpoints.hpp"
 
+#include <vlc_actions.h>                    /* vlc_str2keycode */
+
 #include <QToolButton>
+#include <QToolTip>
+#include <QHelpEvent>
+#include <QIconEngine>
+#include <QKeySequence>
 #include <QHBoxLayout>
 #include <QRegion>
 #include <QSignalMapper>
@@ -57,6 +66,82 @@
 #endif
 
 //#define DEBUG_LAYOUT 1
+
+using namespace RedesignTokens;
+
+namespace
+{
+    class DeckIconEngine : public QIconEngine
+    {
+    public:
+        DeckIconEngine( const char *_name, bool _onAccent )
+            : name( QLatin1String( _name ) ), onAccent( _onAccent ) {}
+
+        QPixmap pixmap( const QSize &size, QIcon::Mode mode, QIcon::State state ) Q_DECL_OVERRIDE
+        {
+            Theme *t = Theme::instance();
+            if( !t )
+                return QPixmap();
+            /* on = accent glyph; the accent is 2.4:1 on light surfaces, so
+             * the light theme takes the accent text colour (>= 3:1) */
+            const Theme::ColorRole role = onAccent ? Theme::OnAccent
+                : state == QIcon::On ? ( t->isDark() ? Theme::Accent : Theme::AccentText )
+                : Theme::Text2;
+            const QPixmap pix = t->icon( name, role, size ).pixmap( size );
+            if( mode != QIcon::Disabled )
+                return pix;
+            QPixmap faded( pix.size() );
+            faded.setDevicePixelRatio( pix.devicePixelRatio() );
+            faded.fill( Qt::transparent );
+            QPainter painter( &faded );
+            painter.setOpacity( Deck::DisabledOpacityPercent / 100. );
+            painter.drawPixmap( 0, 0, pix );
+            return faded;
+        }
+        void paint( QPainter *p, const QRect &rect, QIcon::Mode mode, QIcon::State state ) Q_DECL_OVERRIDE
+        {
+            const qreal dpr = p->device()->devicePixelRatioF();
+            QPixmap pix = pixmap( rect.size() * dpr, mode, state );
+            pix.setDevicePixelRatio( dpr );
+            p->drawPixmap( rect, pix );
+        }
+        QIconEngine *clone() const Q_DECL_OVERRIDE
+        {
+            return new DeckIconEngine( *this );
+        }
+
+    private:
+        QString name;
+        bool onAccent;
+    };
+
+    /* The text of a key-* hotkey (its first binding), or of a Qt sequence */
+    QString shortcutText( intf_thread_t *p_intf, const QByteArray &id )
+    {
+        if( id.isEmpty() )
+            return QString();
+        if( !id.startsWith( "key-" ) )
+            return QKeySequence( QString::fromLatin1( id ) ).toString( QKeySequence::NativeText );
+        QString text;
+        char *psz = var_InheritString( p_intf, id.constData() );
+        if( psz )
+        {
+            char *tab = strchr( psz, '\t' );
+            if( tab )
+                *tab = '\0';
+            const uint_fast32_t key = vlc_str2keycode( psz );
+            if( key != KEY_UNSET )
+                text = VLCKeyToString( key, true );
+            free( psz );
+        }
+        return text;
+    }
+}
+
+QIcon deckIcon( const char *name, bool onAccent )
+{
+    return QIcon( new DeckIconEngine( name, onAccent ) );
+}
 
 /**********************************************************************
  * TEH controls
@@ -99,17 +184,63 @@ void AbstractController::setStatus( int status )
                             var_GetBool( THEMIM->getInput(), "can-rewind" ) );
 }
 
-/* Generic button setup */
+/* Generic button setup: a deck icon button (DESIGN_SPEC 3) */
 void AbstractController::setupButton( QAbstractButton *aButton )
 {
     static QSizePolicy sizePolicy( QSizePolicy::Fixed, QSizePolicy::Fixed );
     sizePolicy.setHorizontalStretch( 0 );
     sizePolicy.setVerticalStretch( 0 );
 
+    const Theme *t = Theme::instance();
     aButton->setSizePolicy( sizePolicy );
-    aButton->setFixedSize( QSize( 26, 26 ) );
-    aButton->setIconSize( QSize( 20, 20 ) );
-    aButton->setFocusPolicy( Qt::NoFocus );
+    aButton->setFixedSize( QSize( t->metric( Theme::IconButton ), t->metric( Theme::IconButton ) ) );
+    aButton->setIconSize( QSize( t->metric( Theme::IconGlyph ), t->metric( Theme::IconGlyph ) ) );
+    /* Tab reaches it; eventFilter keeps Space for the play/pause hotkey */
+    aButton->setFocusPolicy( Qt::TabFocus );
+    aButton->setProperty( "role", "deck" );
+    aButton->installEventFilter( this );
+}
+
+bool AbstractController::eventFilter( QObject *obj, QEvent *e )
+{
+    QAbstractButton *button = qobject_cast<QAbstractButton *>( obj );
+    if( !button || button->property( "role" ).isNull() )
+        return QFrame::eventFilter( obj, e );
+
+    switch( e->type() )
+    {
+    case QEvent::KeyPress:
+    case QEvent::KeyRelease:
+    {
+        QKeyEvent *ke = static_cast<QKeyEvent *>( e );
+        if( ke->key() == Qt::Key_Space && ke->modifiers() == Qt::NoModifier )
+        {
+            /* ignored, it goes on to the window, whose hotkeys get it */
+            e->ignore();
+            return true;
+        }
+        if( ke->key() == Qt::Key_Return || ke->key() == Qt::Key_Enter )
+        {
+            if( e->type() == QEvent::KeyPress && !ke->isAutoRepeat() )
+                button->click();
+            return true;
+        }
+        break;
+    }
+    case QEvent::ToolTip:
+    {
+        /* read when shown, so a changed hotkey shows at once */
+        const QString key = shortcutText( p_intf, button->property( "hotkey" ).toByteArray() );
+        if( key.isEmpty() || button->toolTip().isEmpty() )
+            break;
+        QToolTip::showText( static_cast<QHelpEvent *>( e )->globalPos(),
+                            QString( "%1 (%2)" ).arg( button->toolTip(), key ), button );
+        return true;
+    }
+    default:
+        break;
+    }
+    return QFrame::eventFilter( obj, e );
 }
 
 /* Open the generic config line for the toolbar, parse it
@@ -197,7 +328,7 @@ void AbstractController::createAndAddWidget( QBoxLayout *controlLayout_,
             if( !buttonGroupLayout )
             {
                 buttonGroupLayout = new QHBoxLayout;
-
+                buttonGroupLayout->setSpacing( Theme::instance()->px( Deck::Gap ) );
             }
             buttonGroupLayout->addWidget( widg );
         }
@@ -210,7 +341,9 @@ void AbstractController::createAndAddWidget( QBoxLayout *controlLayout_,
 
 #define BUTTON_SET_BAR( a_button ) \
     a_button->setToolTip( qtr( tooltipL[button] ) ); \
-    a_button->setIcon( QIcon( iconL[button] ) );
+    a_button->setAccessibleName( qtr( nameL[button] ) ); \
+    a_button->setProperty( "hotkey", QByteArray( hotkeyL[button] ) ); \
+    a_button->setIcon( deckIcon( deckIconL[button] ) );
 #define BUTTON_SET_BAR2( button, image, tooltip ) \
     button->setToolTip( tooltip );          \
     button->setIcon( QIcon( ":/"#image ".svg" ) );
@@ -345,6 +478,7 @@ QWidget *AbstractController::createWidget( buttonType_e button, int options )
         AtoB_Button *ABButton = new AtoB_Button;
         setupButton( ABButton );
         ABButton->setShortcut( qtr("Shift+L") );
+        ABButton->setCheckable( true );
         BUTTON_SET_BAR( ABButton );
         ENABLE_ON_INPUT( ABButton );
         connect( ABButton, &AtoB_Button::clicked, toolbarActionsMapper, QOverload<>::of(&QSignalMapper::map) );
@@ -385,6 +519,8 @@ QWidget *AbstractController::createWidget( buttonType_e button, int options )
     case VOLUME:
         {
             SoundWidget *snd = new SoundWidget( this, p_intf, b_shiny, b_special );
+            foreach( QToolButton *mute, snd->findChildren<QToolButton *>() )
+                setupButton( mute );
             widget = snd;
         }
         break;
@@ -396,11 +532,11 @@ QWidget *AbstractController::createWidget( buttonType_e button, int options )
         break;
     case SPLITTER:
         {
+            const Theme *t = Theme::instance();
             QFrame *line = new QFrame;
-            line->setFrameShape( QFrame::VLine );
-            line->setFrameShadow( QFrame::Raised );
-            line->setLineWidth( 0 );
-            line->setMidLineWidth( 1 );
+            line->setProperty( "role", "deckSeparator" );
+            line->setFixedSize( Size::Hairline + 2 * t->px( Deck::SeparatorMargin ),
+                                t->px( Deck::SeparatorH ) );
             widget = line;
         }
         break;
@@ -449,6 +585,8 @@ QWidget *AbstractController::createWidget( buttonType_e button, int options )
         LoopButton *loopButton = new LoopButton;
         setupButton( loopButton );
         loopButton->setToolTip( qtr( "Click to toggle between loop all, loop one and no loop") );
+        loopButton->setAccessibleName( qtr( nameL[button] ) );
+        loopButton->setProperty( "hotkey", QByteArray( hotkeyL[button] ) );
         loopButton->setCheckable( true );
         {
             int i_state = NORMAL;
@@ -488,13 +626,64 @@ QWidget *AbstractController::createWidget( buttonType_e button, int options )
         widget->setMinimumHeight( 26 );
         break;
     case SPEED_LABEL:
-        widget = new SpeedLabel( p_intf, this );
+        {
+            SpeedLabel *speedLabel = new SpeedLabel( p_intf, this );
+            speedLabel->setFixedHeight( Theme::instance()->metric( Theme::IconButton ) );
+            speedLabel->setFocusPolicy( Qt::TabFocus );
+            speedLabel->installEventFilter( this );
+            widget = speedLabel;
+        }
         break;
     case TIME_LABEL_ELAPSED:
-        widget = new TimeLabel( p_intf, TimeLabel::Elapsed );
-        break;
     case TIME_LABEL_REMAINING:
-        widget = new TimeLabel( p_intf, TimeLabel::Remaining );
+        {
+            TimeLabel *timeLabel = new TimeLabel( p_intf, button == TIME_LABEL_ELAPSED
+                                                  ? TimeLabel::Elapsed : TimeLabel::Remaining );
+            timeLabel->setProperty( "role", "deckTime" );
+            timeLabel->setFont( Theme::instance()->font( Theme::Meta ) );
+            if( button == TIME_LABEL_ELAPSED )
+                timeLabel->setAlignment( Qt::AlignLeft | Qt::AlignVCenter );
+            widget = timeLabel;
+        }
+        break;
+    case TRACKS_BUTTON: {
+        QToolButton *tracksButton = new QToolButton;
+        setupButton( tracksButton );
+        BUTTON_SET_BAR( tracksButton );
+        /* on while a subtitle track shows (SCREEN_INVENTORY 1.3.3) */
+        tracksButton->setCheckable( true );
+        ENABLE_ON_INPUT( tracksButton );
+        intf_thread_t *intf = p_intf;
+        auto sync = [intf, tracksButton]() {
+            input_thread_t *p_input = MainInputManager::getInstance( intf )->getInput();
+            tracksButton->setChecked( p_input && var_GetInteger( p_input, "spu-es" ) >= 0 );
+        };
+        connect( THEMIM->getIM(), &InputManager::esChanged, tracksButton, sync );
+        connect( THEMIM, &MainInputManager::inputChanged, tracksButton, sync );
+        sync();
+        connect( tracksButton, &QToolButton::clicked, tracksButton, [intf, tracksButton, sync]() {
+            tracksButton->setChecked( true );  /* open: accent glyph */
+            QWidget *popover = showTracksPopover( intf, tracksButton );
+            if( popover )
+                connect( popover, &QObject::destroyed, tracksButton, sync );
+            else
+                sync();
+        } );
+        widget = tracksButton;
+        }
+        break;
+    case MINIPLAYER_BUTTON: {
+        QToolButton *miniButton = new QToolButton;
+        setupButton( miniButton );
+        BUTTON_SET_BAR( miniButton );
+        /* the main window owns the mini player (not an ActionsManager action) */
+        intf_thread_t *intf = p_intf;
+        connect( miniButton, &QToolButton::clicked, miniButton, [intf]() {
+            if( intf->p_sys->p_mi )
+                QMetaObject::invokeMethod( intf->p_sys->p_mi, "toggleMiniPlayer" );
+        } );
+        widget = miniButton;
+        }
         break;
     default:
         msg_Warn( p_intf, "This should not happen %i", button );
@@ -530,8 +719,15 @@ void AbstractController::applyAttributes( QToolButton *tmpButton, bool b_flat, b
             tmpButton->setAutoRaise( b_flat );
         if( b_big )
         {
-            tmpButton->setFixedSize( QSize( 32, 32 ) );
-            tmpButton->setIconSize( QSize( 26, 26 ) );
+            const Theme *t = Theme::instance();
+            const int size = t->metric( Theme::PlayDeck ), glyph = t->px( Deck::PlayGlyph );
+            tmpButton->setFixedSize( QSize( size, size ) );
+            tmpButton->setIconSize( QSize( glyph, glyph ) );
+            /* shortcut: no press scale (.92 / 100 ms), a stylesheet cannot
+               transform; paint PlayButton itself if the design insists */
+            PlayButton *play = qobject_cast<PlayButton *>( tmpButton );
+            if( play )
+                play->setRound( true );
         }
     }
 }
@@ -706,8 +902,10 @@ ControlsWidget::ControlsWidget( intf_thread_t *_p_i,
 #ifdef DEBUG_LAYOUT
     setStyleSheet( "background: red ");
 #endif
+    const Theme *t = Theme::instance();
     controlLayout = new QVBoxLayout( this );
-    controlLayout->setContentsMargins( 3, 1, 0, 1 );
+    controlLayout->setContentsMargins( t->px( Deck::PadX ), t->px( Deck::RowGap ),
+                                       t->px( Deck::PadX ), t->px( Deck::PadBottom ) );
     controlLayout->setSpacing( 0 );
     QHBoxLayout *controlLayout1 = new QHBoxLayout;
     controlLayout1->setSpacing( 0 ); controlLayout1->setContentsMargins( 0, 0, 0, 0 );
@@ -717,7 +915,8 @@ ControlsWidget::ControlsWidget( intf_thread_t *_p_i,
     parseAndCreate( line1, controlLayout1 );
 
     QHBoxLayout *controlLayout2 = new QHBoxLayout;
-    controlLayout2->setSpacing( 0 ); controlLayout2->setContentsMargins( 0, 0, 0, 0 );
+    controlLayout2->setSpacing( t->px( Deck::Gap ) );
+    controlLayout2->setContentsMargins( 0, 0, 0, 0 );
     QString line2 = getSettings()->value( "MainWindow/MainToolbar2", MAIN_TB2_DEFAULT )
                                         .toString();
     parseAndCreate( line2, controlLayout2 );
@@ -772,6 +971,11 @@ InputControlsWidget::InputControlsWidget( intf_thread_t *_p_i, QWidget *_parent 
 #ifdef DEBUG_LAYOUT
     setStyleSheet( "background: green ");
 #endif
+
+    /* the seek row: elapsed, slider, remaining (DESIGN_SPEC 3) */
+    const Theme *t = Theme::instance();
+    controlLayout->setContentsMargins( t->px( Deck::PadX ), t->px( Deck::PadTop ), t->px( Deck::PadX ), 0 );
+    controlLayout->setSpacing( t->px( Deck::SeekRowGap ) );
 
     QString line = getSettings()->value( "MainWindow/InputToolbar", INPT_TB_DEFAULT ).toString();
     parseAndCreate( line, controlLayout );
