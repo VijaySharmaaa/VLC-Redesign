@@ -1127,9 +1127,10 @@ void SPrefsPanel::apply()
         else
         //if( qobject_cast<QRadioButton *>(optionWidgets[qtRB])->isChecked() )
             config_PutPsz( p_intf, "intf", "" );
-        if( qobject_cast<QComboBox *>(optionWidgets["styleCB"]) )
+        if( QComboBox *styleCB = qobject_cast<QComboBox *>(optionWidgets["styleCB"]) )
+            /* item 0, "System's default", is stored empty: the theme's Fusion */
             getSettings()->setValue( "MainWindow/QtStyle",
-                qobject_cast<QComboBox *>(optionWidgets["styleCB"])->currentText() );
+                styleCB->currentIndex() == 0 ? QString() : styleCB->currentText() );
         /* the Theme combo supersedes the old dark palette option */
         config_PutInt( p_intf, "qt-dark-palette", 0 );
 #ifdef _WIN32

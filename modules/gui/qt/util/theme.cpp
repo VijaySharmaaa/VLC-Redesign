@@ -384,10 +384,13 @@ void Theme::setBaseStyle(const QString &name)
             QApplication::setStyle(name);
         return;
     }
-    /* an unknown name (e.g. "System's default") gives NULL: the proxy then
-     * uses the platform style */
-    QApplication::setStyle(new ThemeStyle(
-        QStyleFactory::create(name.isEmpty() ? QString("Fusion") : name)));
+    /* Empty, or a name the factory does not know (the translated "System's
+     * default" older versions stored), means Fusion: with NULL the proxy
+     * would take the platform style, which ignores the token palette. */
+    QStyle *base = name.isEmpty() ? NULL : QStyleFactory::create(name);
+    if (!base)
+        base = QStyleFactory::create(QStringLiteral("Fusion"));
+    QApplication::setStyle(new ThemeStyle(base));
     applyPalette();
     qApp->setStyleSheet(styleSheet());
 }
