@@ -28,6 +28,7 @@
 #include "components/prefs_page.hpp"
 #include "dialogs_provider.hpp"
 #include "util/theme.hpp"
+#include "util/customwidgets.hpp"     /* hotkeyText */
 #include "util/redesign_icons.hpp"
 
 #include <QAbstractButton>
@@ -36,6 +37,7 @@
 #include <QKeySequence>
 #include <QLabel>
 #include <QPainter>
+#include <QSignalBlocker>
 #include <QStackedWidget>
 #include <QStyle>
 #include <QVBoxLayout>
@@ -109,6 +111,9 @@ void SidebarButton::paintEvent( QPaintEvent * )
     const bool primary = kind == Open;
     const int radius = primary ? t->px( Size::SidebarOpenRadius ) : t->metric( Theme::RadiusMd );
 
+    /* the accent button's ring goes outside its fill, a gap of the
+     * sidebar between: a ring on the accent itself is too faint */
+    const qreal ringOut = primary && hasFocus() ? 2 * Size::FocusRing : 0;
     QColor fill( Qt::transparent );
     if( primary )
         fill = t->color( underMouse() ? Theme::AccentHover : Theme::Accent );
@@ -120,7 +125,8 @@ void SidebarButton::paintEvent( QPaintEvent * )
         fill = t->ink( InkAlpha::HoverFill );
     p.setPen( Qt::NoPen );
     p.setBrush( fill );
-    p.drawRoundedRect( rect(), radius, radius );
+    p.drawRoundedRect( QRectF( rect() ).adjusted( ringOut, ringOut, -ringOut, -ringOut ),
+                       radius - ringOut, radius - ringOut );
 
     if( kind == Section && isChecked() )
     {
@@ -136,9 +142,8 @@ void SidebarButton::paintEvent( QPaintEvent * )
 
     if( hasFocus() )
     {
-        /* the accent is 2.4:1 on light surfaces and invisible on the accent */
-        const Theme::ColorRole ring = primary ? Theme::OnAccent
-                                    : t->isDark() ? Theme::Accent : Theme::AccentText;
+        /* the accent is 2.4:1 on light surfaces */
+        const Theme::ColorRole ring = t->isDark() ? Theme::Accent : Theme::AccentText;
         const qreal inset = Size::FocusRing / 2.;
         p.setPen( QPen( t->color( ring ), Size::FocusRing ) );
         p.setBrush( Qt::NoBrush );
@@ -205,11 +210,10 @@ static QWidget *createPage( const QString &title )
     return page;
 }
 
-/* "Label (shortcut)", the shortcut as menus.cpp binds it */
-static QString tip( const QString &label, const char *shortcut )
+/* "Label (shortcut)" */
+static QString tip( const QString &label, const QString &key )
 {
-    return QString( "%1 (%2)" ).arg( label,
-        QKeySequence( QLatin1String( shortcut ) ).toString( QKeySequence::NativeText ) );
+    return qtr( "%1 (%2)" ).arg( label, key );
 }
 
 /* A page of the sidebar's stack, with the sidebar's padding */
@@ -240,7 +244,7 @@ Sidebar::Sidebar( intf_thread_t *p_intf, QWidget *parent )
      * Preferences), read them from the menu actions once lane A exposes them */
     SidebarButton *open = new SidebarButton( qtr( "Open media" ), RedesignIcons::IconOpenMedia,
                                              SidebarButton::Open, this );
-    open->setToolTip( tip( qtr( "Open media" ), "Ctrl+Shift+O" ) );
+    open->setToolTip( tip( qtr( "Open media" ), hotkeyText( p_intf, "Ctrl+Shift+O" ) ) );
     connect( open, &QAbstractButton::clicked, this, []() { THEDP->openDialog(); } );
     layout->addWidget( open );
     layout->addSpacing( t->px( Size::SidebarOpenBelow ) );
@@ -269,8 +273,9 @@ Sidebar::Sidebar( intf_thread_t *p_intf, QWidget *parent )
         b->setAutoExclusive( true ); /* screen readers: a radio button; the group rules */
         b->setToolTip( label );
         group->addButton( b, i );
-        connect( b, &QAbstractButton::clicked, this,
-                 [this, i]() { emit pageRequested( pages[i] ); } );
+        /* toggled, not clicked: screen readers' activation toggles */
+        connect( b, &QAbstractButton::toggled, this,
+                 [this, i]( bool on ) { if( on ) emit pageRequested( pages[i] ); } );
         layout->addWidget( b );
         buttons.append( b );
     }
@@ -278,13 +283,15 @@ Sidebar::Sidebar( intf_thread_t *p_intf, QWidget *parent )
     layout->addStretch( 1 );
     SidebarButton *prefs = new SidebarButton( qtr( "Preferences" ), RedesignIcons::IconSettings,
                                               SidebarButton::Nav, this );
-    prefs->setToolTip( tip( qtr( "Preferences" ), "Ctrl+P" ) );
+    prefs->setToolTip( tip( qtr( "Preferences" ), hotkeyText( p_intf, "Ctrl+P" ) ) );
     prefs->setCheckable( true );
     prefs->setAutoExclusive( true );
     group->addButton( prefs, Preferences );
     /* the menu's way, which opens the complete tree in a dialog when it is
      * asked for: then the item the click checked goes back */
-    connect( prefs, &QAbstractButton::clicked, this, [this]() {
+    connect( prefs, &QAbstractButton::toggled, this, [this]( bool on ) {
+        if( !on )
+            return;
         THEDP->prefsDialog();
         setCurrentWidget( currentPage );
     } );
@@ -320,8 +327,8 @@ Sidebar::Sidebar( intf_thread_t *p_intf, QWidget *parent )
         section->setChecked( i == SPrefsDefaultCat );
         section->setToolTip( label );
         sections->addButton( section, i );
-        connect( section, &QAbstractButton::clicked, this,
-                 [this, i]() { prefsPage->showSection( i ); } );
+        connect( section, &QAbstractButton::toggled, this,
+                 [this, i]( bool on ) { if( on ) prefsPage->showSection( i ); } );
         prefsNav->addWidget( section );
         buttons.append( section );
     }
@@ -351,6 +358,8 @@ void Sidebar::setCurrentWidget( QWidget *w )
     for( int i = 0; i < PageCount; i++ )
         if( pages[i] == w )
         {
+            /* following the stack, not asking it */
+            const QSignalBlocker blocker( group->button( i ) );
             group->button( i )->setChecked( true );
             return;
         }
@@ -378,7 +387,7 @@ void Sidebar::setBackLabel( bool library )
     const QString label = library ? qtr( "Back to library" ) : qtr( "Back to player" );
     back->setText( label );
     back->setAccessibleName( label );
-    back->setToolTip( tip( label, "Esc" ) );
+    back->setToolTip( tip( label, QKeySequence( Qt::Key_Escape ).toString( QKeySequence::NativeText ) ) );
 }
 
 int Sidebar::widthAt( BreakpointWatcher::Size bp )

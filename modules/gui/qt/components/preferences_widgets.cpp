@@ -1123,6 +1123,21 @@ void FloatRangeConfigControl::finish()
 /**********************************************************************
  * Key selector widget
  **********************************************************************/
+/* Screen readers: a hotkey cell names its column ("Desktop level hotkey"),
+ * and an empty one says so */
+class HotkeyItem : public QTreeWidgetItem
+{
+public:
+    QVariant data( int column, int role ) const Q_DECL_OVERRIDE
+    {
+        if( role != Qt::AccessibleTextRole || column == 0 /* the action */ || !treeWidget() )
+            return QTreeWidgetItem::data( column, role );
+        const QString keys = text( column );
+        return qtr( "%1: %2" ).arg( treeWidget()->headerItem()->toolTip( column ),
+                                    keys.isEmpty() ? qtr( "None" ) : keys );
+    }
+};
+
 KeySelectorControl::KeySelectorControl( vlc_object_t *_p_this,
                                       module_config_t *_p_item, QWidget *p ) :
                                 ConfigControl( _p_this, _p_item )
@@ -1225,7 +1240,7 @@ void KeySelectorControl::finish()
                 - QString name in data of column 0
                 - KeyValue in String in column 1
              */
-            QTreeWidgetItem *treeItem = new QTreeWidgetItem();
+            QTreeWidgetItem *treeItem = new HotkeyItem();
             treeItem->setText( ACTION_COL, qtr( p_config_item->psz_text ) );
             treeItem->setData( ACTION_COL, Qt::UserRole,
                                QVariant( qfu( p_config_item->psz_name ) ) );
