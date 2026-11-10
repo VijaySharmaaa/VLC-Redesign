@@ -28,12 +28,12 @@
 
 #include "input_manager.hpp"
 #include "util/theme.hpp"
+#include "util/customwidgets.hpp"     /* timeString */
 
 #include <QLabel>
 #include <QTimeEdit>
-#include <QDialogButtonBox>
 #include <QPushButton>
-#include <QGridLayout>
+#include <QBoxLayout>
 #include <QFocusEvent>
 #include <QLineEdit>
 
@@ -62,49 +62,49 @@ GotoTimeDialog::GotoTimeDialog( intf_thread_t *_p_intf)
     setWindowTitle( qtr( "Go to Time" ) );
     setWindowRole( "vlc-goto-time" );
 
-    QGridLayout *mainLayout = new QGridLayout( this );
+    /* DESIGN_SPEC 7 (2.1.6): the title, an h:mm:ss field, a hint naming
+     * the media length, then Cancel and the accent Go */
+    QVBoxLayout *mainLayout = new QVBoxLayout( this );
     mainLayout->setSizeConstraint( QLayout::SetFixedSize );
 
-    QPushButton *gotoButton = new QPushButton( qtr( "&Go" ) );
-    QPushButton *cancelButton = new QPushButton( qtr( "&Cancel" ) );
-    QDialogButtonBox *buttonBox = new QDialogButtonBox;
-
-    gotoButton->setDefault( true );
-    buttonBox->addButton( gotoButton, QDialogButtonBox::AcceptRole );
-    buttonBox->addButton( cancelButton, QDialogButtonBox::RejectRole );
-
-    QLabel *timeIntro = new QLabel( qtr( "Go to time" ) + ":" );
-    timeIntro->setWordWrap( true );
-    timeIntro->setAlignment( Qt::AlignCenter );
+    Theme *t = Theme::instance();
+    QLabel *title = new QLabel( qtr( "Go to time" ) );
+    title->setFont( t->font( Theme::PanelTitle ) );
 
     timeEdit = new TimeEdit();
-    timeEdit->setDisplayFormat( "HH'H':mm'm':ss's'" );
-    timeEdit->setAlignment( Qt::AlignRight );
-    timeEdit->setSizePolicy( QSizePolicy::Expanding, QSizePolicy::Minimum );
+    timeEdit->setDisplayFormat( "H:mm:ss" );
+    timeEdit->setButtonSymbols( QAbstractSpinBox::NoButtons );
     timeEdit->setAccessibleName( qtr( "Go to time" ) );
-    /* DESIGN_SPEC 7: a large mono timecode, scaled from Theme's mono font
-     * so it follows the Windows text scale as Theme's fonts do */
-    Theme *t = Theme::instance();
+    /* a large mono timecode, scaled from Theme's mono font so it follows
+     * the Windows text scale as Theme's fonts do */
     QFont mono = t->font( Theme::Mono );
     mono.setPointSizeF( mono.pointSizeF() * RedesignTokens::Dialogs::JumpFont
                                           / RedesignTokens::Type::Mono );
     timeEdit->setFont( mono );
     timeEdit->setMinimumHeight( t->px( RedesignTokens::Dialogs::JumpInputH ) );
+    title->setBuddy( timeEdit );
 
-    QPushButton *resetButton = new QPushButton( QIcon(":/update.svg"), "" );
-    resetButton->setToolTip( qtr("Reset") );
-    resetButton->setAccessibleName( qtr("Reset") );
-    resetButton->setAutoDefault( false ); /* Go stays the default button */
+    hint = new QLabel;
+    hint->setFont( t->font( Theme::Meta ) );
+    hint->setProperty( "role", "hint" );
 
-    mainLayout->addWidget( timeIntro, 0, 0, 1, 1 );
-    mainLayout->addWidget( timeEdit, 0, 1, 1, 1 );
-    mainLayout->addWidget( resetButton, 0, 2, 1, 1 );
+    QPushButton *gotoButton = new QPushButton( qtr( "&Go" ) );
+    gotoButton->setProperty( "role", "primary" );
+    gotoButton->setDefault( true );
+    QPushButton *cancelButton = new QPushButton( qtr( "&Cancel" ) );
+    cancelButton->setAutoDefault( false ); /* Go stays the default button */
+    QHBoxLayout *foot = new QHBoxLayout;
+    foot->addStretch( 1 );
+    foot->addWidget( cancelButton );
+    foot->addWidget( gotoButton );
 
-    mainLayout->addWidget( buttonBox, 1, 0, 1, 3 );
+    mainLayout->addWidget( title );
+    mainLayout->addWidget( timeEdit );
+    mainLayout->addWidget( hint );
+    mainLayout->addLayout( foot );
 
     BUTTONACT( gotoButton, close );
     BUTTONACT( cancelButton, cancel );
-    BUTTONACT( resetButton, reset );
 
     QVLCTools::restoreWidgetPosition( p_intf, "gototimedialog", this );
 }
@@ -117,11 +117,16 @@ GotoTimeDialog::~GotoTimeDialog()
 void GotoTimeDialog::toggleVisible()
 {
     reset();
+    int64_t i_length = 0;
     if ( !isVisible() && THEMIM->getIM()->hasInput() )
     {
         int64_t i_time = var_GetInteger( THEMIM->getInput(), "time" );
         timeEdit->setTime( timeEdit->time().addSecs( i_time / CLOCK_FREQ ) );
+        i_length = var_GetInteger( THEMIM->getInput(), "length" ) / CLOCK_FREQ;
     }
+    hint->setText( i_length > 0
+        ? qtr( "Format h:mm:ss — media length %1" ).arg( timeString( i_length ) )
+        : qtr( "Format h:mm:ss" ) );
     QVLCDialog::toggleVisible();
     if(isVisible())
         activateWindow();

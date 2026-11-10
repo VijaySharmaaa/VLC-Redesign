@@ -28,6 +28,7 @@
 #include "util/singleton.hpp"
 
 class QTimeEdit;
+class QLabel;
 
 class GotoTimeDialog : public QVLCDialog, public Singleton<GotoTimeDialog>
 {
@@ -36,6 +37,7 @@ private:
     GotoTimeDialog( intf_thread_t * );
     virtual ~GotoTimeDialog();
     QTimeEdit *timeEdit;
+    QLabel *hint;
 private slots:
     void close() override;
     void cancel() override;
