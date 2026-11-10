@@ -55,8 +55,9 @@ MediaInfoDialog::MediaInfoDialog( intf_thread_t *_p_intf,
         setWindowTitle( qtr( "Media Information" ) );
     setWindowRole( "vlc-media-info" );
 
-    setWindowFlags( Qt::Window | Qt::CustomizeWindowHint |
-                    Qt::WindowCloseButtonHint | Qt::WindowMinimizeButtonHint );
+    /* a sheet: Close only (2.1.3) */
+    setWindowFlags( Qt::Window | Qt::CustomizeWindowHint | Qt::WindowTitleHint |
+                    Qt::WindowSystemMenuHint | Qt::WindowCloseButtonHint );
 
     /* TabWidgets and Tabs creation */
     infoTabW = new QTabWidget;
@@ -214,4 +215,5 @@ void MediaInfoDialog::updateURI( const QString& uri )
         location = uri;
 
     uriLine->setText( location );
+    uriLine->setCursorPosition( 0 ); /* the drive or host first, not the end */
 }

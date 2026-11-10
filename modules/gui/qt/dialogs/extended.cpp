@@ -139,7 +139,7 @@ ExtendedDialog::ExtendedDialog( intf_thread_t *_p_intf )
     close->setFixedSize( t->px( Effects::CloseButton ), t->px( Effects::CloseButton ) );
     close->setAccessibleName( qtr( "Close effects" ) );
     /* the deck's Effects button names the same shortcut */
-    close->setToolTip( QString( "%1 (%2)" ).arg( qtr( "Close effects" ),
+    close->setToolTip( qtr( "%1 (%2)" ).arg( qtr( "Close effects" ),
         hotkeyText( p_intf, hotkeyL[EXTENDED_BUTTON] ) ) );
     connect( close, &QToolButton::clicked, this, &QWidget::hide );
     head->addWidget( close );
@@ -202,6 +202,10 @@ ExtendedDialog::ExtendedDialog( intf_thread_t *_p_intf )
         ExtV4l2 *v4l2 = new ExtV4l2( p_intf, NULL );
         mainTabW->insertTab( V4L2_TAB, scrolled( v4l2 ), qtr( "v4l2 controls" ) );
     }
+
+    /* a tab shortened in the narrow drawer still names itself */
+    for( int i = 0; i < mainTabW->count(); i++ )
+        mainTabW->setTabToolTip( i, mainTabW->tabText( i ) );
 
     /* "More": every other existing panel */
     moreButton = new QToolButton( mainTabW );
@@ -276,7 +280,10 @@ ExtendedDialog::ExtendedDialog( intf_thread_t *_p_intf )
 
     if( !dock )
     {
-        /* a window of its own */
+        /* a window of its own (no main interface, e.g. -I skins2): a
+         * sheet with Close only, as the dialogs */
+        setWindowFlags( Qt::Dialog | Qt::WindowTitleHint | Qt::WindowSystemMenuHint |
+                        Qt::WindowCloseButtonHint );
         QVBoxLayout *frame = new QVBoxLayout( this );
         frame->setContentsMargins( 0, 0, 0, 0 );
         frame->addWidget( content );

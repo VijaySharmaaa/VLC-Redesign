@@ -50,6 +50,9 @@ ErrorsDialog::ErrorsDialog( intf_thread_t *_p_intf )
 {
     setWindowTitle( qtr( "Errors" ) );
     setWindowRole( "vlc-errors" );
+    /* a modal sheet in the design (1.6.5): Close only, no min/max */
+    setWindowFlags( Qt::Dialog | Qt::WindowTitleHint | Qt::WindowSystemMenuHint |
+                    Qt::WindowCloseButtonHint );
 
     Theme *t = Theme::instance();
     resize( t->px( Dialogs::ErrorW ), t->px( Dialogs::ErrorH ) );
@@ -85,6 +88,8 @@ ErrorsDialog::ErrorsDialog( intf_thread_t *_p_intf )
     scroll->setWidgetResizable( true );
     scroll->setHorizontalScrollBarPolicy( Qt::ScrollBarAlwaysOff );
     scroll->setWidget( body );
+    /* the named details are the Tab stop, not the unnamed area around them */
+    scroll->setFocusPolicy( Qt::NoFocus );
 
     stopShowing = new QCheckBox( qtr( "Hide future errors" ) );
     /* checked means hidden: the option says whether errors show */
