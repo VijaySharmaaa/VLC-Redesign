@@ -489,9 +489,10 @@ void MainInterface::computeMinimumSize( bool b_minimal )
     }
     const Theme *t = Theme::instance();
     const QSize work = QApplication::desktop()->availableGeometry( this ).size();
-    /* at most half the work area high, so a quarter snap fits */
+    /* at most half the work area high, so a quarter snap fits; the deck
+     * spans the window, stock's 80 px beside it are gone */
     setMinimumSize( qMin( work.width(), qMax( t->px( RedesignTokens::Breakpoint::XSMinW ),
-                                              80 + controls->compactWidth() ) ),
+                                              controls->compactWidth() ) ),
                     qMin( work.height() / 2, t->px( RedesignTokens::Breakpoint::XSMinH ) ) );
 }
 
