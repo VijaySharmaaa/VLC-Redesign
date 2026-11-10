@@ -1385,6 +1385,10 @@ void MainInterface::setImmersive( bool on )
     {
         delete immersiveBar;
         immersiveBar = NULL;
+        /* what the bar published: the toast and the audio page get the
+         * space back (not in its destructor: at close the stack goes first) */
+        stackCentralW->setProperty( "subtitleLift", 0 );
+        stackCentralW->setProperty( "immersiveInset", 0 );
     }
     updateDeckPlacement();
 }

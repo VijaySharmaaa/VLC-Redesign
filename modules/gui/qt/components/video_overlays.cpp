@@ -471,7 +471,10 @@ void ImmersiveBar::setVoutList( vout_thread_t **pp_vout, int i_vout )
  * renders show: "sub-margin" on each vout, from the bottom of the picture.
  * Its unit is a px of the picture the vout blends subtitles into: the
  * video's own px, or the window's when the video is smaller than the
- * window (vout ThreadDisplayRenderPicture). */
+ * window (vout ThreadDisplayRenderPicture).
+ * shortcut: every vout is lifted, also a clone's or a second video track's
+ * own window, which the bar does not cover; upgrade by lifting only the vout
+ * whose window is the video widget's (its vout_window_t is not public) */
 void ImmersiveBar::liftSubtitles()
 {
     int units = 0, px = 0;
