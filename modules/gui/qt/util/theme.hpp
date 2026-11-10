@@ -28,6 +28,7 @@
 #include <QHash>
 #include <QIcon>
 
+class QAction;
 class QApplication;
 class QWidget;
 
@@ -109,6 +110,8 @@ public:
     /* The same icon at any size, tinted with the colour the role has when
      * it is drawn: for menus and actions that outlive a theme change. */
     static QIcon themedIcon(const char *name, ColorRole);
+    /* A menu entry that removes or clears: drawn in DestructiveText */
+    static void setDestructive(QAction *);
 
 signals:
     void changed();

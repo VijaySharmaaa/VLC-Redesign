@@ -96,7 +96,8 @@ public:
         ACTION_ENQUEUEDIR,
         ACTION_ENQUEUEGENERIC,
         ACTION_SAVETOPLAYLIST,
-        ACTION_SHUFFLE
+        ACTION_SHUFFLE,
+        ACTION_COPYPATH
     };
     struct actionsContainerType
     {

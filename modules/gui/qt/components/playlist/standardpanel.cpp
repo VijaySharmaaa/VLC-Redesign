@@ -41,6 +41,8 @@
 #include "dialogs/mediainfo.hpp"                  /* MediaInfoDialog */
 #include "util/qt_dirs.hpp"
 #include "util/imagehelper.hpp"
+#include "util/theme.hpp"                       /* Theme::setDestructive */
+#include "util/redesign_icons.hpp"
 
 #include <vlc_services_discovery.h>               /* SD_CMD_SEARCH */
 #include <vlc_intf_strings.h>                     /* POP_ */
@@ -71,6 +73,8 @@
 #include <QUrl>
 #include <QFont>
 #include <QActionGroup>
+#include <QApplication>
+#include <QClipboard>
 
 #include <assert.h>
 
@@ -176,17 +180,38 @@ bool StandardPLPanel::popup( const QPoint &point )
     QModelIndex index = popupIndex( currentView ); /* index for menu logic only. Do not store.*/
     VLCModel *model = qobject_cast<VLCModel *>(currentView->model());
 
+    QMenu menu;
+    addModelActions( &menu, model, index );
+
+    /* Zoom */
+    QMenu *zoomMenu = new QMenu( qtr( "Display size" ), &menu );
+    zoomMenu->addAction( qtr( "Increase" ), this, SLOT( increaseZoom() ) );
+    zoomMenu->addAction( qtr( "Decrease" ), this, SLOT( decreaseZoom() ) );
+    menu.addMenu( zoomMenu );
+
+    connect( &menu, &QMenu::triggered, this, &StandardPLPanel::popupAction );
+
+    menu.addMenu( StandardPLPanel::viewSelectionMenu( this ) );
+
+    /* Display and forward the result */
+    if( !menu.isEmpty() )
+    {
+        menu.exec( point ); return true;
+    }
+    else return false;
+}
+
+void StandardPLPanel::addModelActions( QMenu *menu, VLCModel *model, const QModelIndex &index )
+{
 #define ADD_MENU_ENTRY( icon, title, act ) \
     if ( model->isSupportedAction( act, index ) )\
     {\
-    action = menu.addAction( icon, title ); \
+    action = menu->addAction( icon, title ); \
     container.action = act; \
     action->setData( QVariant::fromValue( container ) );\
     }
 
-    /* */
-    QMenu menu;
-    QAction *action;
+    QAction *action = NULL;
     VLCModelSubInterface::actionsContainerType container;
 
     /* Play/Stream/Info static actions */
@@ -206,10 +231,13 @@ bool StandardPLPanel::popup( const QPoint &point )
     ADD_MENU_ENTRY( QIcon( ":/menu/info.svg" ), qtr(I_POP_INFO),
                     VLCModelSubInterface::ACTION_INFO );
 
-    menu.addSeparator();
+    menu->addSeparator();
 
     ADD_MENU_ENTRY( QIcon( ":/type/folder-grey.svg" ), qtr(I_POP_EXPLORE),
                     VLCModelSubInterface::ACTION_EXPLORE );
+
+    ADD_MENU_ENTRY( Theme::themedIcon( RedesignIcons::IconCopy, Theme::Text ), qtr("Copy path"),
+                    VLCModelSubInterface::ACTION_COPYPATH );
 
     QIcon addIcon( ":/buttons/playlist/playlist_add.svg" );
 
@@ -219,7 +247,7 @@ bool StandardPLPanel::popup( const QPoint &point )
     ADD_MENU_ENTRY( QIcon(), qtr(I_POP_RENAMEFOLDER),
                     VLCModelSubInterface::ACTION_RENAMENODE )
 
-    menu.addSeparator();
+    menu->addSeparator();
     /* In PL or ML, allow to add a file/folder */
     ADD_MENU_ENTRY( addIcon, qtr(I_PL_ADDF),
                     VLCModelSubInterface::ACTION_ENQUEUEFILE )
@@ -233,26 +261,30 @@ bool StandardPLPanel::popup( const QPoint &point )
     ADD_MENU_ENTRY( QIcon(), qtr(I_PL_ADDPL),
                     VLCModelSubInterface::ACTION_ADDTOPLAYLIST );
 
-    menu.addSeparator();
+    menu->addSeparator();
     ADD_MENU_ENTRY( QIcon(), qtr( I_PL_SAVE ),
                     VLCModelSubInterface::ACTION_SAVETOPLAYLIST );
 
-    menu.addSeparator();
+    menu->addSeparator();
 
     /* Item removal */
 
-    ADD_MENU_ENTRY( QIcon( ":/buttons/playlist/playlist_remove.svg" ), qtr(I_POP_DEL),
-                    VLCModelSubInterface::ACTION_REMOVE );
+    if ( model->isSupportedAction( VLCModelSubInterface::ACTION_REMOVE, index ) )
+    {
+        ADD_MENU_ENTRY( QIcon( ":/buttons/playlist/playlist_remove.svg" ), qtr(I_POP_DEL),
+                        VLCModelSubInterface::ACTION_REMOVE );
+        Theme::setDestructive( action );
+    }
 
     ADD_MENU_ENTRY( QIcon( ":/toolbar/clear.svg" ), qtr("Clear the playlist"),
                     VLCModelSubInterface::ACTION_CLEAR );
 
-    menu.addSeparator();
+    menu->addSeparator();
 
     /* Playlist sorting */
     if ( model->isSupportedAction( VLCModelSubInterface::ACTION_SORT, index ) )
     {
-        QMenu *sortingMenu = new QMenu( qtr( "Sort by" ), &menu );
+        QMenu *sortingMenu = new QMenu( qtr( "Sort by" ), menu );
         /* Choose what columns to show in sorting menu, not sure if this should be configurable*/
         QList<int> sortingColumns;
         sortingColumns << COLUMN_TITLE << COLUMN_ARTIST << COLUMN_ALBUM << COLUMN_TRACK_NUMBER << COLUMN_URI << COLUMN_DISC_NUMBER;
@@ -267,7 +299,7 @@ bool StandardPLPanel::popup( const QPoint &point )
             container.column = -1 * (model->columnFromMeta(Column)+1);
             action->setData( QVariant::fromValue( container ) );
         }
-        menu.addMenu( sortingMenu );
+        menu->addMenu( sortingMenu );
     }
     if ( model->isSupportedAction( VLCModelSubInterface::ACTION_SHUFFLE, index ) )
     {
@@ -275,33 +307,24 @@ bool StandardPLPanel::popup( const QPoint &point )
                     VLCModelSubInterface::ACTION_SHUFFLE );
     }
 
-    /* Zoom */
-    QMenu *zoomMenu = new QMenu( qtr( "Display size" ), &menu );
-    zoomMenu->addAction( qtr( "Increase" ), this, SLOT( increaseZoom() ) );
-    zoomMenu->addAction( qtr( "Decrease" ), this, SLOT( decreaseZoom() ) );
-    menu.addMenu( zoomMenu );
-
-    connect( &menu, &QMenu::triggered, this, &StandardPLPanel::popupAction );
-
-    menu.addMenu( StandardPLPanel::viewSelectionMenu( this ) );
-
-    /* Display and forward the result */
-    if( !menu.isEmpty() )
-    {
-        menu.exec( point ); return true;
-    }
-    else return false;
-
 #undef ADD_MENU_ENTRY
 }
 
 void StandardPLPanel::popupAction( QAction *action )
 {
-    VLCModel *model = qobject_cast<VLCModel *>(currentView->model());
+    runModelAction( p_intf, this, qobject_cast<VLCModel *>(currentView->model()), action,
+                    currentView->selectionModel()->selectedRows(), popupIndex( currentView ) );
+}
+
+void StandardPLPanel::runModelAction( intf_thread_t *p_intf, QWidget *parent, VLCModel *model,
+                                      QAction *action, const QModelIndexList &list,
+                                      const QModelIndex &index )
+{
+    /* the menu's other entries (zoom, view mode) carry no container */
+    if( !action->data().canConvert<VLCModelSubInterface::actionsContainerType>() )
+        return;
     VLCModelSubInterface::actionsContainerType a =
             action->data().value<VLCModelSubInterface::actionsContainerType>();
-    QModelIndexList list = currentView->selectionModel()->selectedRows();
-    QModelIndex index = popupIndex( currentView );
     char *path = NULL;
     OpenDialog *dialog;
     QString temp;
@@ -333,6 +356,17 @@ void StandardPLPanel::popupAction( QAction *action )
         QDesktopServices::openUrl(
                     QUrl::fromLocalFile( temp ) );
         free( path );
+        break;
+
+    case VLCModelSubInterface::ACTION_COPYPATH:
+        /* locally handled only: a local file's path, else the URI */
+        temp = model->getURI( index );
+        if( temp.isEmpty() ) return;
+        path = vlc_uri2path( qtu( temp ) );
+        if( path != NULL )
+            temp = toNativeSeparators( qfu( path ) );
+        free( path );
+        QApplication::clipboard()->setText( temp );
         break;
 
     case VLCModelSubInterface::ACTION_STREAM:
@@ -391,7 +425,7 @@ void StandardPLPanel::popupAction( QAction *action )
         break;
 
     case VLCModelSubInterface::ACTION_ENQUEUEGENERIC:
-        dialog = OpenDialog::getInstance( this, p_intf, false, SELECT, true, true );
+        dialog = OpenDialog::getInstance( parent, p_intf, false, SELECT, true, true );
         dialog->showTab( OPEN_FILE_TAB );
         dialog->exec(); /* make it modal */
         a.uris = dialog->getMRLs( false );

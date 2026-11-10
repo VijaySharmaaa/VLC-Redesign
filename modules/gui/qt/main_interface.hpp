@@ -45,6 +45,7 @@ class QEvent;
 class VideoWidget;
 class BackgroundWidget;
 class PlaylistWidget;
+class PlaylistPanel;
 class VisualSelector;
 class ControlsWidget;
 class InputControlsWidget;
@@ -138,6 +139,7 @@ protected:
     void createMainWidget( QSettings* );
     void createStatusBar();
     void createPlaylist();
+    void showPlaylistPanel( bool );
     void createResumePanel( QWidget *w );
 
     /* Systray */
@@ -183,6 +185,7 @@ protected:
     VideoWidget         *videoWidget;
     BackgroundWidget    *bgWidget;
     PlaylistWidget      *playlistWidget;
+    PlaylistPanel       *playlistPanel;         ///< docked playlist, created on first show
     Sidebar             *sidebar;
     BreakpointWatcher   *breakpoints;
     //VisualSelector      *visualSelector;
