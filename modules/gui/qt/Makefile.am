@@ -150,6 +150,7 @@ libqt_plugin_la_SOURCES = \
 	gui/qt/util/singleton.hpp \
 	gui/qt/util/imagehelper.cpp gui/qt/util/imagehelper.hpp \
 	gui/qt/util/theme.cpp gui/qt/util/theme.hpp gui/qt/util/theme_tokens.hpp \
+	gui/qt/util/breakpoints.cpp gui/qt/util/breakpoints.hpp \
 	gui/qt/styles/seekstyle.cpp gui/qt/styles/seekstyle.hpp
 if HAVE_WIN32
 libqt_plugin_la_SOURCES += \
@@ -234,6 +235,7 @@ nodist_libqt_plugin_la_SOURCES = \
 	gui/qt/util/qmenuview.moc.cpp \
 	gui/qt/util/qvlcapp.moc.cpp \
 	gui/qt/util/theme.moc.cpp \
+	gui/qt/util/breakpoints.moc.cpp \
 	gui/qt/util/pictureflow.moc.cpp \
 	gui/qt/util/validators.moc.cpp \
 	gui/qt/util/buttons/RoundButton.moc.cpp \
