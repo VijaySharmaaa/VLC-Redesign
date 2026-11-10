@@ -157,14 +157,16 @@ class Vlc:
         r = self.main.rectangle()
         return r.width(), r.height()
 
-    def toggle_playlist(self):
-        # Stock VLC resizes the window for the playlist; the redesign opens a
-        # panel inside it. Either way the window's pixels change.
+    def press_in_window(self, keys, what):
+        """Press keys that change the main window itself (a panel, sheet or
+        page in the redesign) and wait until its pixels change."""
         before = self.main.capture_as_image().tobytes()
-        self.keys('^l')                   # Ctrl+L is hard-coded in 3.0.x
-        self.wait_for(lambda: self.main.capture_as_image().tobytes() != before,
-                      'playlist to toggle')
-        time.sleep(0.3)                   # the panel slides in
+        self.keys(keys)
+        self.wait_for(lambda: self.main.capture_as_image().tobytes() != before, what)
+        time.sleep(0.3)                   # panels slide in
+
+    def toggle_playlist(self):
+        self.press_in_window('^l', 'playlist to toggle')   # Ctrl+L is hard-coded in 3.0.x
 
     def shot(self, out, title=''):
         cmd = ['powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
@@ -202,15 +204,14 @@ def baseline(args):
         v.toggle_playlist()
         v.shot(p('03-playlist.png'))
         v.toggle_playlist()
-        h = v.dialog('^e', 'Adjustments and Effects')
-        v.shot(p('04-effects.png'), 'Adjustments and Effects')
-        v.close(h)
+        v.press_in_window('^e', 'effects to open')        # a sheet beside the video
+        v.shot(p('04-effects.png'))
+        v.press_in_window('^e', 'effects to close')
         h = v.dialog('^+o', 'Open Media')       # Ctrl+O is the native file picker
         v.shot(p('05-open.png'), 'Open Media')
         v.close(h)
-        h = v.dialog('^p', 'Preferences')
-        v.shot(p('06-prefs.png'), 'Preferences')
-        v.close(h)
+        v.press_in_window('^p', 'preferences to open')    # a page in the window
+        v.shot(p('06-prefs.png'))
         v.rc('pause')                     # resume: rc refuses playlist commands while paused
         v.rc('clear')
         v.rc('add ' + media('test-tone.mp3'), wait=2)
