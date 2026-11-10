@@ -50,6 +50,8 @@ class SearchLineEdit : public QLineEdit
     Q_OBJECT
 public:
     SearchLineEdit( QWidget *parent = NULL );
+    /* the grey hint while empty, "Search" by default */
+    void setMessage( const QString &text ) { messageText = text; update(); }
 
 private:
     void resizeEvent ( QResizeEvent * event );
@@ -59,6 +61,7 @@ private:
     void setMessageVisible( bool on );
     QFramelessButton   *clearButton;
     bool message;
+    QString messageText;
 
 public slots:
     void clear();

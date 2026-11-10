@@ -254,6 +254,17 @@ void DialogsProvider::prefsDialog()
     p->toggleVisible();
 }
 
+void DialogsProvider::setPanelShown( int action, bool shown )
+{
+    if( shown == shownPanels.contains( action ) )
+        return;
+    if( shown )
+        shownPanels.insert( action );
+    else
+        shownPanels.remove( action );
+    emit panelShown( action, shown );
+}
+
 void DialogsProvider::extendedDialog()
 {
     ExtendedDialog *extDialog = ExtendedDialog::getInstance(p_intf );

@@ -29,10 +29,12 @@
 #include "input_manager.hpp"
 #include "dialogs_provider.hpp"
 #include "util/searchlineedit.hpp"
+#include "util/customwidgets.hpp"                   /* timeString */
 #include "util/theme.hpp"
 #include "util/redesign_icons.hpp"
 
 #include <vlc_intf_strings.h>                       /* I_PL_ADDF */
+#include <vlc_input_item.h>                         /* input_item_GetDuration */
 
 #include <QApplication>
 #include <QBoxLayout>
@@ -237,6 +239,7 @@ PlaylistPanel::PlaylistPanel( intf_thread_t *_p_intf, QBoxLayout *_dock, QWidget
     /* Filter: filters the shared model, so the separate window's views too */
     SearchLineEdit *filter = new SearchLineEdit( content );
     filter->setAccessibleName( qtr( "Filter playlist" ) );
+    filter->setMessage( qtr( "Filter playlist" ) );
     filter->setToolTip( qtr( "Filter playlist" ) );
     filter->setFixedHeight( t->metric( Theme::SelectH ) );
     connect( filter, &SearchLineEdit::textChanged, this,
@@ -279,20 +282,32 @@ PlaylistPanel::PlaylistPanel( intf_thread_t *_p_intf, QBoxLayout *_dock, QWidget
     countTimer.setInterval( 0 );
     connect( &countTimer, &QTimer::timeout, this, [this]() {
         const int n = model->rowCount();
-        count->setText( QString::fromUtf8( vlc_ngettext( "%1 item", "%1 items", n ) ).arg( n ) );
+        QString text = QString::fromUtf8( vlc_ngettext( "%1 item", "%1 items", n ) ).arg( n );
+        /* the known durations' sum; unknown ones (streams) count nothing */
+        mtime_t total = 0;
+        for( int i = 0; i < n; i++ )
+        {
+            input_item_t *item = model->getInputItem( model->index( i, 0, QModelIndex() ) );
+            const mtime_t duration = item ? input_item_GetDuration( item ) : 0;
+            if( duration > 0 )
+                total += duration;
+        }
+        if( total > 0 )
+            text += QString::fromUtf8( " · " ) + timeString( total / CLOCK_FREQ );
+        count->setText( text );
     } );
     connect( model, &QAbstractItemModel::rowsInserted, this, [this]() { countTimer.start(); } );
     connect( model, &QAbstractItemModel::rowsRemoved, this, [this]() { countTimer.start(); } );
     connect( model, &QAbstractItemModel::modelReset, this, [this]() { countTimer.start(); } );
+    /* durations arrive with preparsing */
+    connect( model, &QAbstractItemModel::dataChanged, this, [this]() { countTimer.start(); } );
     countTimer.start();
 
     host = new OverlayHost( over, this );
     connect( host, &OverlayHost::changed, this, &PlaylistPanel::place );
 
     slide = new QVariantAnimation( this );
-    QEasingCurve enter( QEasingCurve::BezierSpline );   /* the tokens' enter easing */
-    enter.addCubicBezierSegment( QPointF( .2, .8 ), QPointF( .2, 1. ), QPointF( 1., 1. ) );
-    slide->setEasingCurve( enter );
+    slide->setEasingCurve( OverlayWindow::enterCurve() );
     connect( slide, &QVariantAnimation::valueChanged, this,
              [this]( const QVariant &v ) { setShownWidth( v.toInt() ); } );
 

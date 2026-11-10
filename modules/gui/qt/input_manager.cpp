@@ -196,6 +196,7 @@ void InputManager::delInput()
     emit nameChanged( "" );
     emit chapterChanged( 0 );
     emit titleChanged( 0 );
+    emit inputCanSeek( false );
     emit playingStatusChanged( END_S );
 
     emit teletextPossible( false );
@@ -484,6 +485,9 @@ void InputManager::UpdateStatus()
     if( i_old_playing_status != state )
     {
         i_old_playing_status = state;
+        /* the demuxer sets can-seek after the input is set (its default is
+         * true): the state change to playing comes after it */
+        emit inputCanSeek( var_GetBool( p_input, "can-seek" ) );
         emit playingStatusChanged( state );
     }
 }

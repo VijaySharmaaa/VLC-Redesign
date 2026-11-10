@@ -46,6 +46,7 @@
 #include <QAbstractNativeEventFilter>
 
 class QMenu;
+class QSlider;
 struct vout_window_t;
 
 /******************** Video Widget ****************/
@@ -206,8 +207,6 @@ private:
     int cachedLength;
     TimeLabel::Display displayType;
 
-    char psz_length[MSTRTIME_MAX_SIZE];
-    char psz_time[MSTRTIME_MAX_SIZE];
     void toggleTimeDisplay();
     void refresh();
 private slots:
@@ -229,6 +228,27 @@ private slots:
     void setRate( float );
 private:
     intf_thread_t *p_intf;
+};
+
+/******************** Speed Control Widgets ****************/
+/* The fine control under the speed popover's presets: any rate VLC takes */
+class SpeedControlWidget : public QFrame
+{
+    Q_OBJECT
+public:
+    SpeedControlWidget( intf_thread_t *, QWidget * );
+    void updateControls( float );
+private:
+    intf_thread_t* p_intf;
+    QSlider* speedSlider;
+    int lastValue;
+
+public slots:
+    void activateOnState();
+
+private slots:
+    void updateRate( int );
+    void resetRate();
 };
 
 class CoverArtLabel : public QLabel

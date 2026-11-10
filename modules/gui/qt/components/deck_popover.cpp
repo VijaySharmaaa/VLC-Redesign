@@ -21,6 +21,8 @@
 #endif
 
 #include "components/deck_popover.hpp"
+#include "components/interface_widgets.hpp" /* SpeedControlWidget */
+#include "components/overlay_host.hpp"      /* OverlayWindow::enterCurve */
 #include "dialogs_provider.hpp"
 #include "input_manager.hpp"
 #include "menus.hpp"
@@ -33,7 +35,6 @@
 #include <QApplication>
 #include <QBoxLayout>
 #include <QDesktopWidget>
-#include <QEasingCurve>
 #include <QHash>
 #include <QLabel>
 #include <QListWidget>
@@ -125,7 +126,11 @@ namespace
             setAttribute( Qt::WA_NoMouseReplay );
             setProperty( "role", "popover" );
             setOpen( true );
-            connect( anchor, &QObject::destroyed, this, &QWidget::close );
+            /* a toolbar rebuild deletes the button: forget it, then close */
+            connect( anchor, &QObject::destroyed, this, [this]() {
+                anchor = NULL;
+                close();
+            } );
         }
 
         /* above the button (below when there is no room), rising into place */
@@ -153,10 +158,7 @@ namespace
                 anim->setDuration( ms );
                 anim->setStartValue( pos + QPoint( 0, rise ) );
                 anim->setEndValue( pos );
-                /* the tokens' enter easing, as OverlayWindow::enterCurve */
-                QEasingCurve curve( QEasingCurve::BezierSpline );
-                curve.addCubicBezierSegment( QPointF( .2, .8 ), QPointF( .2, 1. ), QPointF( 1., 1. ) );
-                anim->setEasingCurve( curve );
+                anim->setEasingCurve( OverlayWindow::enterCurve() );
                 anim->start( QAbstractAnimation::DeleteWhenStopped );
             }
         }
@@ -376,6 +378,17 @@ QWidget *showSpeedPopover( intf_thread_t *p_intf, QAbstractButton *anchor )
                 qAbs( rates[i] - rate ) < .001f );
     fitRows( list );
     layout->addWidget( list );
+
+    /* any other rate: VLC's fine control; no preset is checked then */
+    QFrame *divider = new QFrame( pop );
+    divider->setProperty( "role", "popoverDivider" );
+    divider->setFixedHeight( Size::Hairline );
+    layout->addWidget( divider );
+    layout->addWidget( new SpeedControlWidget( p_intf, pop ) );
+    QObject::connect( THEMIM->getIM(), &InputManager::rateChanged, list, [list]( float r ) {
+        for( int i = 0; i < list->count(); i++ )
+            list->item( i )->setData( CheckedRole, qAbs( rates[i] - r ) < .001f );
+    } );
 
     auto choose = [p_intf, list, pop]( QListWidgetItem *item ) {
         var_SetFloat( THEPL, "rate", rates[list->row( item )] );

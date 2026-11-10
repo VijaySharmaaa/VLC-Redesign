@@ -28,9 +28,15 @@
 
 #include <vlc_vout.h>
 
+#ifdef _WIN32
+# include <windows.h>
+#endif
+
 #include <QAbstractButton>
 #include <QApplication>
+#include <QKeyEvent>
 #include <QPainter>
+#include <QWindow>
 #include <QVariantAnimation>
 #include <QPropertyAnimation>
 #include <QParallelAnimationGroup>
@@ -264,12 +270,16 @@ void BufferingOverlay::paintEvent( QPaintEvent * )
 /**********************************************************************
  * Immersive bar
  **********************************************************************/
-ImmersiveBar::ImmersiveBar( intf_thread_t *_p_intf, QWidget *owner, QWidget *area,
+ImmersiveBar::ImmersiveBar( intf_thread_t *_p_intf, QWidget *owner, QWidget *_area,
                             bool advanced )
-    : OverlayWindow( owner, TakeInput ), p_intf( _p_intf ),
+    : OverlayWindow( owner, TakeInput ), p_intf( _p_intf ), area( _area ),
       inputC( NULL ), controls( NULL ), wakePosted( 0 ), active( false ), asleep( false )
 {
     setAccessibleName( qtr( "Playback controls" ) );
+    /* Tab moves the keys into it (takeFocus); a click still does not take
+     * them from the window (nativeEvent), nor does a show (the overlay's
+     * WA_ShowWithoutActivating) */
+    setWindowFlags( windowFlags() & ~Qt::WindowDoesNotAcceptFocus );
     const Theme *t = Theme::instance();
     layout = new QVBoxLayout( this );
     layout->setSpacing( 0 );
@@ -279,6 +289,9 @@ ImmersiveBar::ImmersiveBar( intf_thread_t *_p_intf, QWidget *owner, QWidget *are
 
     host = new OverlayHost( area, this );
     connect( host, &OverlayHost::changed, this, &ImmersiveBar::place );
+    /* every key of its window, before its buttons take them: they wake it */
+    create();
+    windowHandle()->installEventFilter( this );
 
     fade = new QPropertyAnimation( this, "windowOpacity", this );
     slide = new QPropertyAnimation( this, "pos", this );
@@ -319,7 +332,6 @@ void ImmersiveBar::rebuild( bool advanced )
     delete controls;
     inputC = new InputControlsWidget( p_intf, this );
     controls = new ControlsWidget( p_intf, advanced, this );
-    controls->setGripVisible( false );
     layout->addWidget( inputC );
     layout->addWidget( controls );
     if( active )
@@ -367,11 +379,73 @@ void ImmersiveBar::customEvent( QEvent *e )
     wake();
 }
 
-bool ImmersiveBar::eventFilter( QObject *, QEvent *e )
+bool ImmersiveBar::eventFilter( QObject *o, QEvent *e )
 {
-    if( e->type() == QEvent::KeyPress )
-        wake();
+    if( e->type() != QEvent::KeyPress )
+        return false;
+    wake();
+    const QKeyEvent *ke = static_cast<QKeyEvent *>( e );
+    if( o == parentWidget() )
+    {
+        /* Tab while the window itself (or the player) has the keys: into
+         * the bar, the deck's place in the tab order */
+        const QWidget *fw = QApplication::focusWidget();
+        return ke->key() == Qt::Key_Tab && ke->modifiers() == Qt::NoModifier
+            && ( !fw || fw == parentWidget() || area->isAncestorOf( fw ) )
+            && takeFocus();
+    }
+    if( ke->key() == Qt::Key_Escape )
+    {
+        giveFocusBack();
+        return true;
+    }
     return false;
+}
+
+/* The keys its buttons leave (Space, the hotkeys) are the window's */
+void ImmersiveBar::keyPressEvent( QKeyEvent *e )
+{
+    if( parentWidget() )
+        QApplication::sendEvent( parentWidget(), e );
+}
+
+bool ImmersiveBar::nativeEvent( const QByteArray &type, void *message, long *result )
+{
+#ifdef _WIN32
+    /* a click is not a request for the keys: the window keeps them */
+    MSG *msg = static_cast<MSG *>( message );
+    if( msg->message == WM_MOUSEACTIVATE )
+    {
+        *result = MA_NOACTIVATE;
+        return true;
+    }
+#endif
+    return OverlayWindow::nativeEvent( type, message, result );
+}
+
+/* Shows it and gives the keys to its first control */
+bool ImmersiveBar::takeFocus()
+{
+    if( !active )
+        return false;
+    wake();
+    QWidget *w = nextInFocusChain();
+    while( w != this && !( w->isVisible() && w->isEnabled() && ( w->focusPolicy() & Qt::TabFocus ) ) )
+        w = w->nextInFocusChain();
+    if( w == this )
+        return false;
+    w->setFocus( Qt::TabFocusReason );
+    activateWindow();
+    return true;
+}
+
+void ImmersiveBar::giveFocusBack()
+{
+    /* not isActiveWindow(): a tool window can share its owner's */
+    if( QApplication::activeWindow() != this || !parentWidget() )
+        return;
+    parentWidget()->activateWindow();
+    parentWidget()->setFocus( Qt::OtherFocusReason );
 }
 
 void ImmersiveBar::setActive( bool on )
@@ -388,6 +462,7 @@ void ImmersiveBar::setActive( bool on )
     else
     {
         idle.stop();
+        giveFocusBack();
         place();
     }
 }
@@ -412,6 +487,7 @@ void ImmersiveBar::sleepIfIdle()
     if( !active || asleep || im->playingStatus() != PLAYING_S || !im->hasVideo()
         || underMouse() || QApplication::activePopupWidget() )
         return;
+    giveFocusBack();   /* idle: the keys go back with it */
     asleep = true;
     animate( false );
 }

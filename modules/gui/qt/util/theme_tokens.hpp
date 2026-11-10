@@ -218,6 +218,8 @@ namespace RedesignTokens
         static const int ChipPadX = 8, ChipPadY = 3, ChipGap = 8;
         static const int HeaderTop = 46, TitleTop = 8, MetaTop = 8, ListTop = 24;
         static const int TrackNumW = 28, TrackPadX = 10, TrackGap = 12, TrackIcon = 18, TrackTitle = 14;
+        /* not in tokens.json: below this many rows the spectrum makes room */
+        static const int TrackMinRows = 3;
 
         /* spectrum strip: bars rise and fall at full height per 250 ms, linear */
         static const int SpectrumH = 84, SpectrumBars = 64, SpectrumGap = 3, SpectrumPadX = 44;

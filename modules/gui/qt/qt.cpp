@@ -356,9 +356,13 @@ vlc_module_begin ()
         set_callbacks( WindowOpen, WindowClose )
 
     /* the audio mode's spectrum: put on the playlist's audio output by
-     * SpectrumWidget::setTap, never by the user (priority 0) */
+     * SpectrumWidget::setTap, never by the user (priority 0).
+     * shortcut: VLC 3 has no flag that keeps a module out of Preferences >
+     * Audio > Filters (ModuleListConfigControl lists every "audio filter"),
+     * so it shows there; checking it adds the pass-through tap the interface
+     * adds anyway. Hide it if the preferences learn such a flag. */
     add_submodule ()
-        set_description( "Qt spectrum tap" )
+        set_description( N_("Qt spectrum tap") )
         set_capability( "audio filter", 0 )
         add_shortcut( "qt_spectrum" )
         set_callbacks( OpenSpectrumFilter, NULL )

@@ -44,6 +44,10 @@ public:
     };
     void showTab( int i );
     int currentTab();
+protected:
+    /* the deck's effects button shows open meanwhile */
+    void showEvent( QShowEvent * ) Q_DECL_OVERRIDE;
+    void hideEvent( QHideEvent * ) Q_DECL_OVERRIDE;
 private:
     ExtendedDialog( intf_thread_t * );
     virtual ~ExtendedDialog();

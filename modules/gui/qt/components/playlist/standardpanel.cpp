@@ -213,35 +213,37 @@ void StandardPLPanel::addModelActions( QMenu *menu, VLCModel *model, const QMode
 
     QAction *action = NULL;
     VLCModelSubInterface::actionsContainerType container;
+    /* the menus' redesign icons, in their tx2 (menus.cpp menuIcon) */
+    auto icon = []( const char *name ) { return Theme::themedIcon( name, Theme::Text2 ); };
 
     /* Play/Stream/Info static actions */
 
-    ADD_MENU_ENTRY( QIcon( ":/toolbar/play_b.svg" ), qtr(I_POP_PLAY),
+    ADD_MENU_ENTRY( icon( RedesignIcons::MenuPlay ), qtr(I_POP_PLAY),
                     VLCModelSubInterface::ACTION_PLAY )
 
-    ADD_MENU_ENTRY( QIcon( ":/toolbar/pause_b.svg" ), qtr("Pause"),
+    ADD_MENU_ENTRY( icon( RedesignIcons::MenuPause ), qtr("Pause"),
                     VLCModelSubInterface::ACTION_PAUSE )
 
-    ADD_MENU_ENTRY( QIcon( ":/menu/stream.svg" ), qtr(I_POP_STREAM),
+    ADD_MENU_ENTRY( icon( RedesignIcons::MenuStream ), qtr(I_POP_STREAM),
                     VLCModelSubInterface::ACTION_STREAM )
 
-    ADD_MENU_ENTRY( QIcon(), qtr(I_POP_SAVE),
+    ADD_MENU_ENTRY( icon( RedesignIcons::MenuConvert ), qtr("Save/Convert…"),
                     VLCModelSubInterface::ACTION_SAVE );
 
-    ADD_MENU_ENTRY( QIcon( ":/menu/info.svg" ), qtr(I_POP_INFO),
+    ADD_MENU_ENTRY( icon( RedesignIcons::MenuMediaInfo ), qtr(I_POP_INFO),
                     VLCModelSubInterface::ACTION_INFO );
 
     menu->addSeparator();
 
-    ADD_MENU_ENTRY( QIcon( ":/type/folder-grey.svg" ), qtr(I_POP_EXPLORE),
+    ADD_MENU_ENTRY( icon( RedesignIcons::IconShowFolder ), qtr(I_POP_EXPLORE),
                     VLCModelSubInterface::ACTION_EXPLORE );
 
-    ADD_MENU_ENTRY( Theme::themedIcon( RedesignIcons::IconCopy, Theme::Text ), qtr("Copy path"),
+    ADD_MENU_ENTRY( icon( RedesignIcons::IconCopy ), qtr("Copy path"),
                     VLCModelSubInterface::ACTION_COPYPATH );
 
-    QIcon addIcon( ":/buttons/playlist/playlist_add.svg" );
+    const QIcon addIcon = icon( RedesignIcons::IconAdd );
 
-    ADD_MENU_ENTRY( addIcon, qtr(I_POP_NEWFOLDER),
+    ADD_MENU_ENTRY( icon( RedesignIcons::IconAddFolder ), qtr(I_POP_NEWFOLDER),
                     VLCModelSubInterface::ACTION_CREATENODE )
 
     ADD_MENU_ENTRY( QIcon(), qtr(I_POP_RENAMEFOLDER),
@@ -249,10 +251,10 @@ void StandardPLPanel::addModelActions( QMenu *menu, VLCModel *model, const QMode
 
     menu->addSeparator();
     /* In PL or ML, allow to add a file/folder */
-    ADD_MENU_ENTRY( addIcon, qtr(I_PL_ADDF),
+    ADD_MENU_ENTRY( icon( RedesignIcons::MenuOpenFile ), qtr(I_PL_ADDF),
                     VLCModelSubInterface::ACTION_ENQUEUEFILE )
 
-    ADD_MENU_ENTRY( addIcon, qtr(I_PL_ADDDIR),
+    ADD_MENU_ENTRY( icon( RedesignIcons::MenuOpenFolder ), qtr(I_PL_ADDDIR),
                     VLCModelSubInterface::ACTION_ENQUEUEDIR )
 
     ADD_MENU_ENTRY( addIcon, qtr(I_OP_ADVOP),
@@ -262,7 +264,7 @@ void StandardPLPanel::addModelActions( QMenu *menu, VLCModel *model, const QMode
                     VLCModelSubInterface::ACTION_ADDTOPLAYLIST );
 
     menu->addSeparator();
-    ADD_MENU_ENTRY( QIcon(), qtr( I_PL_SAVE ),
+    ADD_MENU_ENTRY( icon( RedesignIcons::MenuSavePlaylist ), qtr( I_PL_SAVE ),
                     VLCModelSubInterface::ACTION_SAVETOPLAYLIST );
 
     menu->addSeparator();
@@ -271,12 +273,12 @@ void StandardPLPanel::addModelActions( QMenu *menu, VLCModel *model, const QMode
 
     if ( model->isSupportedAction( VLCModelSubInterface::ACTION_REMOVE, index ) )
     {
-        ADD_MENU_ENTRY( QIcon( ":/buttons/playlist/playlist_remove.svg" ), qtr(I_POP_DEL),
+        ADD_MENU_ENTRY( icon( RedesignIcons::IconDelete ), qtr(I_POP_DEL),
                         VLCModelSubInterface::ACTION_REMOVE );
         Theme::setDestructive( action );
     }
 
-    ADD_MENU_ENTRY( QIcon( ":/toolbar/clear.svg" ), qtr("Clear the playlist"),
+    ADD_MENU_ENTRY( icon( RedesignIcons::IconRemove ), qtr("Clear the playlist"),
                     VLCModelSubInterface::ACTION_CLEAR );
 
     menu->addSeparator();

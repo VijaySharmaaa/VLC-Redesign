@@ -31,6 +31,8 @@
 
 #include "main_interface.hpp" /* Needed for external MI size */
 #include "input_manager.hpp"
+#include "dialogs_provider.hpp"
+#include "actions_manager.hpp"   /* EXTENDED_ACTION */
 
 #include <QTabWidget>
 #include <QGridLayout>
@@ -153,6 +155,18 @@ ExtendedDialog::ExtendedDialog( intf_thread_t *_p_intf )
 ExtendedDialog::~ExtendedDialog()
 {
     getSettings()->setValue("EPanel/geometry", saveGeometry());
+}
+
+void ExtendedDialog::showEvent( QShowEvent *e )
+{
+    QVLCDialog::showEvent( e );
+    THEDP->setPanelShown( EXTENDED_ACTION, true );
+}
+
+void ExtendedDialog::hideEvent( QHideEvent *e )
+{
+    QVLCDialog::hideEvent( e );
+    THEDP->setPanelShown( EXTENDED_ACTION, false );
 }
 
 void ExtendedDialog::showTab( int i )

@@ -34,7 +34,6 @@
 
 #include <QWidget>
 #include <QToolButton>
-#include <QComboBox>
 
 class QFrame;
 class QAbstractSlider;
@@ -74,25 +73,25 @@ public slots:
     void updateButtonIcons( bool, bool );
 };
 
-class AspectRatioComboBox : public QComboBox
+/* DESIGN_SPEC 3: the aspect ratio as a deck text badge ("16:9", "Default",
+ * accent when not the default); its menu has the vout's aspect-ratio choices */
+class AspectRatioBadge : public QToolButton
 {
     Q_OBJECT
 public:
-    AspectRatioComboBox( intf_thread_t* _p_intf ) : p_intf( _p_intf )
-    {
-        connect( THEMIM->getIM(), &InputManager::voutChanged,
-                 this, &AspectRatioComboBox::updateRatios );
-        connect( this, QOverload<int>::of(&AspectRatioComboBox::currentIndexChanged),
-                 this, &AspectRatioComboBox::updateAspectRatio );
-        updateRatios();
-    }
+    AspectRatioBadge( intf_thread_t * );
+    virtual ~AspectRatioBadge();
 
-public slots:
+private slots:
+    void setVout();
     void updateRatios();
-    void updateAspectRatio( int );
+    void choose( QAction * );
 
 private:
+    static int AspectCB( vlc_object_t *, const char *, vlc_value_t, vlc_value_t, void * );
     intf_thread_t* p_intf;
+    vout_thread_t *p_vout;  /* held, with AspectCB on its aspect-ratio */
+    QMenu *menu;
 };
 
 class SoundWidget : public QWidget

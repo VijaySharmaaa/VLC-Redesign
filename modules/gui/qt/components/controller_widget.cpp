@@ -36,6 +36,7 @@
 
 #include <QHBoxLayout>
 #include <QMenu>
+#include <QStyle>
 #include <QWidgetAction>
 
 SoundWidget::SoundWidget( QWidget *_parent, intf_thread_t * _p_intf,
@@ -240,38 +241,100 @@ void LoopButton::updateButtonIcons( int value )
                                            : RedesignIcons::IconRepeat ) );
 }
 
-void AspectRatioComboBox::updateRatios()
+AspectRatioBadge::AspectRatioBadge( intf_thread_t *_p_intf )
+    : p_intf( _p_intf ), p_vout( NULL )
 {
-    /* Clear the list before updating */
-    clear();
-    vlc_value_t val_list, text_list;
-    vout_thread_t* p_vout = THEMIM->getVout();
+    setProperty( "role", "speed" );     /* the deck's text buttons */
+    setAccessibleName( qtr( "Aspect ratio" ) );
+    setToolTip( qtr( "Aspect ratio" ) );
+    setPopupMode( QToolButton::InstantPopup );
+    menu = new QMenu( this );
+    setMenu( menu );
+    connect( menu, &QMenu::triggered, this, &AspectRatioBadge::choose );
+    connect( THEMIM->getIM(), &InputManager::voutChanged, this, &AspectRatioBadge::setVout );
+    setVout();
+}
 
+AspectRatioBadge::~AspectRatioBadge()
+{
+    if( p_vout )
+    {
+        /* returns once no callback runs: none queues to us after it */
+        var_DelCallback( p_vout, "aspect-ratio", AspectCB, this );
+        vlc_object_release( p_vout );
+    }
+}
+
+/* vout thread: only a queued call to the Qt thread (a hotkey changed it) */
+int AspectRatioBadge::AspectCB( vlc_object_t *, const char *, vlc_value_t,
+                                vlc_value_t, void *data )
+{
+    QMetaObject::invokeMethod( static_cast<AspectRatioBadge *>( data ), "updateRatios",
+                               Qt::QueuedConnection );
+    return VLC_SUCCESS;
+}
+
+void AspectRatioBadge::setVout()
+{
+    vout_thread_t *p_new = THEMIM->getVout();   /* held */
+    if( p_new != p_vout )
+    {
+        if( p_vout )
+        {
+            var_DelCallback( p_vout, "aspect-ratio", AspectCB, this );
+            vlc_object_release( p_vout );
+        }
+        p_vout = p_new;
+        if( p_vout )
+            var_AddCallback( p_vout, "aspect-ratio", AspectCB, this );
+    }
+    else if( p_new )
+        vlc_object_release( p_new );
+    updateRatios();
+}
+
+void AspectRatioBadge::updateRatios()
+{
+    menu->clear();
     /* Disable if there is no vout */
     if( p_vout == NULL )
     {
-        addItem( qtr("Aspect Ratio") );
+        setText( qtr( "Default" ) );
+        setProperty( "on", false );
         setDisabled( true );
+        style()->unpolish( this );
+        style()->polish( this );
         return;
     }
 
+    vlc_value_t val_list, text_list;
+    char *current = var_GetString( p_vout, "aspect-ratio" );
+    /* a value that is not a choice (--aspect-ratio) shows as it is */
+    setText( EMPTY_STR( current ) ? qtr( "Default" ) : qfu( current ) );
     var_Change( p_vout, "aspect-ratio", VLC_VAR_GETCHOICES, &val_list, &text_list );
     for( int i = 0; i < val_list.p_list->i_count; i++ )
-        addItem( qfu( text_list.p_list->p_values[i].psz_string ),
-                 QString( val_list.p_list->p_values[i].psz_string ) );
-    setEnabled( true );
+    {
+        const char *value = val_list.p_list->p_values[i].psz_string;
+        QAction *action = menu->addAction( qfu( text_list.p_list->p_values[i].psz_string ) );
+        action->setData( qfu( value ) );
+        action->setCheckable( true );
+        if( current && !strcmp( value, current ) )
+        {
+            action->setChecked( true );
+            setText( action->text() );
+        }
+    }
     var_FreeList( &val_list, &text_list );
-    vlc_object_release( p_vout );
+    setProperty( "on", !EMPTY_STR( current ) );
+    free( current );
+    setEnabled( true );
+    style()->unpolish( this );
+    style()->polish( this );
 }
 
-void AspectRatioComboBox::updateAspectRatio( int x )
+void AspectRatioBadge::choose( QAction *action )
 {
-    vout_thread_t* p_vout = THEMIM->getVout();
-    if( p_vout && x >= 0 )
-    {
-        var_SetString( p_vout, "aspect-ratio", qtu( itemData(x).toString() ) );
-    }
     if( p_vout )
-        vlc_object_release( p_vout );
+        var_SetString( p_vout, "aspect-ratio", qtu( action->data().toString() ) );
 }
 

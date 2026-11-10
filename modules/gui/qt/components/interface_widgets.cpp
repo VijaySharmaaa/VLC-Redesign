@@ -38,7 +38,10 @@
 #include "components/deck_popover.hpp"
 
 #include <QDate>
+#include <QGridLayout>
 #include <QLabel>
+#include <QSlider>
+#include <QToolButton>
 #include <QPalette>
 #include <QAction>
 #include <QPainter>
@@ -678,6 +681,117 @@ void SpeedLabel::setRate( float rate )
     }
 }
 
+/**********************************************************************
+ * Speed control widget
+ **********************************************************************/
+SpeedControlWidget::SpeedControlWidget( intf_thread_t *_p_i, QWidget *_parent )
+                    : QFrame( _parent ), p_intf( _p_i )
+{
+    const Theme *t = Theme::instance();
+    speedSlider = new QSlider( this );
+    speedSlider->setOrientation( Qt::Horizontal );
+    speedSlider->setAccessibleName( qtr( "Playback speed" ) );
+
+    /* 2^(value/17): 0.25 to 4, finer than the presets */
+    speedSlider->setRange( -34, 34 );
+    speedSlider->setSingleStep( 1 );
+    speedSlider->setPageStep( 1 );
+    speedSlider->setTickInterval( 17 );
+
+    connect( speedSlider, &QSlider::valueChanged, this, &SpeedControlWidget::updateRate );
+
+    const QSize button( t->metric( Theme::IconButton ), t->metric( Theme::IconButton ) );
+    const QSize glyph( t->metric( Theme::IconGlyph ), t->metric( Theme::IconGlyph ) );
+
+    QToolButton *normalSpeedButton = new QToolButton( this );
+    normalSpeedButton->setProperty( "role", "speed" );
+    normalSpeedButton->setFixedHeight( button.height() );
+    normalSpeedButton->setText( QString( "1" ) + QChar( 0x00D7 ) );
+    normalSpeedButton->setToolTip( qtr( "Revert to normal play speed" ) );
+    normalSpeedButton->setAccessibleName( qtr( "Revert to normal play speed" ) );
+    connect( normalSpeedButton, &QToolButton::clicked, this, &SpeedControlWidget::resetRate );
+
+    /* slower and faster step through the rates VLC knows, beyond 0.25-4 */
+    QToolButton *slowerButton = new QToolButton( this );
+    slowerButton->setProperty( "role", "deck" );
+    slowerButton->setFixedSize( button );
+    slowerButton->setIconSize( glyph );
+    slowerButton->setToolTip( qtr( tooltipL[SLOWER_BUTTON] ) );
+    slowerButton->setAccessibleName( qtr( nameL[SLOWER_BUTTON] ) );
+    slowerButton->setIcon( deckIcon( deckIconL[SLOWER_BUTTON] ) );
+    connect( slowerButton, &QToolButton::clicked, THEMIM->getIM(), &InputManager::slower );
+
+    QToolButton *fasterButton = new QToolButton( this );
+    fasterButton->setProperty( "role", "deck" );
+    fasterButton->setFixedSize( button );
+    fasterButton->setIconSize( glyph );
+    fasterButton->setToolTip( qtr( tooltipL[FASTER_BUTTON] ) );
+    fasterButton->setAccessibleName( qtr( nameL[FASTER_BUTTON] ) );
+    fasterButton->setIcon( deckIcon( deckIconL[FASTER_BUTTON] ) );
+    connect( fasterButton, &QToolButton::clicked, THEMIM->getIM(), &InputManager::faster );
+
+    QGridLayout* speedControlLayout = new QGridLayout( this );
+    speedControlLayout->addWidget( speedSlider, 0, 0, 1, 3 );
+    speedControlLayout->addWidget( slowerButton, 1, 0 );
+    speedControlLayout->addWidget( normalSpeedButton, 1, 1, 1, 1, Qt::AlignHCenter );
+    speedControlLayout->addWidget( fasterButton, 1, 2, 1, 1, Qt::AlignRight );
+    speedControlLayout->setContentsMargins( 0, 0, 0, 0 );
+    speedControlLayout->setSpacing( 0 );
+
+    lastValue = 0;
+
+    connect( THEMIM, &MainInputManager::inputChanged, this, &SpeedControlWidget::activateOnState );
+    connect( THEMIM->getIM(), &InputManager::rateChanged, this, &SpeedControlWidget::updateControls );
+    activateOnState();
+    updateControls( var_InheritFloat( THEPL, "rate" ) );
+}
+
+void SpeedControlWidget::activateOnState()
+{
+    speedSlider->setEnabled( THEMIM->getIM()->hasInput() );
+}
+
+void SpeedControlWidget::updateControls( float rate )
+{
+    if( speedSlider->isSliderDown() )
+    {
+        //We don't want to change anything if the user is using the slider
+        return;
+    }
+
+    double value = 17 * log( rate ) / log( 2. );
+    int sliderValue = (int) ( ( value > 0 ) ? value + .5 : value - .5 );
+
+    if( sliderValue < speedSlider->minimum() )
+    {
+        sliderValue = speedSlider->minimum();
+    }
+    else if( sliderValue > speedSlider->maximum() )
+    {
+        sliderValue = speedSlider->maximum();
+    }
+    lastValue = sliderValue;
+
+    speedSlider->setValue( sliderValue );
+}
+
+void SpeedControlWidget::updateRate( int sliderValue )
+{
+    if( sliderValue == lastValue )
+        return;
+    lastValue = sliderValue;
+
+    double speed = pow( 2, (double)sliderValue / 17 );
+    int rate = INPUT_RATE_DEFAULT / speed;
+
+    THEMIM->getIM()->setRate(rate);
+}
+
+void SpeedControlWidget::resetRate()
+{
+    THEMIM->getIM()->setRate( INPUT_RATE_DEFAULT );
+}
+
 CoverArtLabel::CoverArtLabel( QWidget *parent, intf_thread_t *_p_i )
     : QLabel( parent ), p_intf( _p_i ), p_item( NULL )
 {
@@ -868,18 +982,18 @@ void TimeLabel::setDisplayPosition( float pos, int64_t t, int length )
 
     int time = t / 1000000;
 
-    secstotimestr( psz_length, length );
-    secstotimestr( psz_time, ( b_remainingTime && length > 0 ) ? qMax( 0, length - time )
-                                                               : time );
+    const QString lengthStr = timeString( length );
+    const QString timeStr = timeString( ( b_remainingTime && length > 0 ) ? qMax( 0, length - time )
+                                                                          : time );
 
-    // compute the minimum size that will be required for the psz_length
+    // compute the minimum size that will be required for the lengthStr
     // and use it to enforce a minimal size to avoid "dancing" widgets
     QSize minsize( 0, 0 );
     if ( length > 0 )
     {
         QMargins margins = contentsMargins();
         minsize += QSize(
-                  fontMetrics().size( 0, QString( psz_length ), 0, 0 ).width(),
+                  fontMetrics().size( 0, lengthStr, 0, 0 ).width(),
                   sizeHint().height()
                 );
         minsize += QSize( margins.left() + margins.right() + 8, 0 ); /* +padding */
@@ -895,7 +1009,7 @@ void TimeLabel::setDisplayPosition( float pos, int64_t t, int length )
     {
         case TimeLabel::Elapsed:
             setMinimumSize( minsize );
-            setText( QString( psz_time ) );
+            setText( timeStr );
             break;
         case TimeLabel::Remaining:
             if( length <= 0 )
@@ -907,20 +1021,20 @@ void TimeLabel::setDisplayPosition( float pos, int64_t t, int length )
             else if( b_remainingTime )
             {
                 setMinimumSize( minsize );
-                setText( minus + QString( psz_time ) );
+                setText( minus + timeStr );
             }
             else
             {
                 setMinimumSize( minsize );
-                setText( QString( psz_length ) );
+                setText( lengthStr );
             }
             break;
         case TimeLabel::Both:
         default:
             QString timestr = QString( "%1%2/%3" )
             .arg( (b_remainingTime && length > 0) ? QString( minus ) : QString() )
-            .arg( QString( psz_time ) )
-            .arg( QString( ( !length && time ) ? "--:--" : psz_length ) );
+            .arg( timeStr )
+            .arg( ( !length && time ) ? QString( "--:--" ) : lengthStr );
 
             setText( timestr );
             break;

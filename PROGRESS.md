@@ -132,3 +132,59 @@ Evidence: `D:\Projects\VLC\spike-results\p2-edge\` (audit on the merged build, `
 
 **Deviations recorded:** minimum height 480 px instead of 600, so Windows quarter snaps fit on 1080p screens; light-theme accent text `#9a4800` instead of `#B35300` (4.79:1 on the active fill); no "hold Shift to add" hint on the drop target (D2).
 **Not Phase 2:** Ctrl+C (Open Capture Device) freezes the UI for over 90 s while probing devices, also in the stock build (`vlc-pkg-d`), so this predates the redesign.
+
+## Phase 3: review fixes (2026-11-10)
+
+Evidence: `D:\Projects\VLC\spike-results\p3-fix\` (scripts `p3fix.py`, `audit_queue.py`, logs `dark-log.txt`, `queue-log.txt`).
+
+### Manual test steps
+1. Speed: open the speed popover, drag its slider or press Slower/Faster: the deck label shows the exact rate (e.g. 0.70×), no preset is checked; Reset (1×) returns to 1.00× and checks 1.00×.
+2. Speed popover open, then Tools > Customize Interface > Close: the popover closes with no warning in `-vv` (its button was deleted).
+3. View > Minimal Interface is unchecked on a library page with the now-playing bar, checked after Ctrl+H, also in the right-click popup of the video.
+4. Advanced Controls off, Ctrl+H, Shift+L twice: A–B shows accent after leaving minimal view; Shift+L once more clears it.
+5. Mini player up, `qt-auto-raise` = video, add a video: the mini player comes forward, the main window stays hidden. F in the mini player: the mini player goes, the video is full screen; Esc; View > Mini Player is unchecked.
+6. Immersive layout, video playing: Tab from the window puts the keys on the bar's first control (visible focus); Tab moves along the screen order; Space toggles play; Esc gives the keys back. Hovering or clicking the bar never takes them.
+7. Ctrl+L / Ctrl+E: the deck's playlist / effects button shows open (accent glyph, fill) while the panel / dialog is up, also after closing them with their own close button.
+8. Width 860–1280 px with Advanced Controls on: nothing clips; stop, loop, random, speed, mini player and full screen drop out (they stay in the menus) and come back when the window widens or the expert row goes.
+9. Aspect badge: pick 16:9 from its menu, then press A (hotkey): the badge follows.
+10. Focus the now-playing bar's mute or audio mode's Library pill with Tab and press Space: play/pause toggles, the button does nothing; Enter activates it.
+11. Toast: drop a short-named .srt: the full name shows (no ellipsis) at 100 % and 125 % scaling.
+
+### Deviations
+- The deck's centre status label of the prototype is not built (not in DESIGN_SPEC).
+- Segoe UI has no 500 weight: playlist row titles ask for QFont::Medium and Windows renders its nearest face.
+- `qt_spectrum` shows in Preferences > Audio > Filters: VLC 3 has no flag to hide a module there (comment in `qt.cpp`).
+- While the immersive bar has the keys, Qt shortcuts of the main window's menus (Ctrl+L...) wait until Esc; VLC hotkeys still work.
+- Mini player restore button over a cyan frame looks teal: it is the black 0.55 scrim token over the picture, as designed.
+
+### Audit rows without a code change
+- F (immersive bar muted at 100 %): Windows keeps the app's audio session mute across runs (mmdevice reports it at start). A session muted with M starts the next fresh-profile session muted in every volume widget; M again clears it (`p3-fix/queue-log.txt`, `F-*.png`). The widgets follow the real state.
+- H (handle growth): 100 playlist-panel toggles: GDI 60 → 69 on the first (the panel is built), flat to 100, back to 59. Mini player: 60 → 68 on the first cycle (the window is built and kept), flat to 10; longer runs lost the window to the automation, so cycles 11-100 are a manual step (open/close the mini player 100 times, Task Manager GDI objects stay flat).
+
+### Edge cases (`redesign/docs/EDGE_CASES.md`), Phase 3
+Evidence: `D:\Projects\VLC\spike-results\p3-edge\` (audit on the build before the fixes, `log.txt`), `...\p3-fix\` (after the fixes: `dark-*`, `light-*`, `queue-log.txt`, baselines), lane evidence `p3-1\` to `p3-4\`. Not committed.
+
+| Row | Result | Evidence or reason |
+|---|---|---|
+| Nothing loaded (idle) | **pass** | Seek and tracks disabled; labels `--:--`; no division by zero (the seek wheel guard was added in lane 1). |
+| Live streams, unknown length | **fixed** | The seek stayed enabled because `can-seek` was read before the demuxer set it; it's now re-read, and also cleared on stop. "Live" label; no negative time (`p3-fix` A). |
+| Very short and very long media; chapters | **pass** | A 0.6 s clip ends cleanly; 10 h shows `10:00:00`; chapter gaps and the chapter tooltip appear. |
+| Audio-only, video-only, no art, huge art, transparent art | **pass** | All display; audio-only opens audio mode with the spectrum. |
+| No tracks, 20+ tracks, tracks added mid-playback | **pass** | "No tracks"; 3 audio + 20 subtitle tracks scroll; a dropped `.srt` shows a toast (full text after fix E) and appears as a selected track. |
+| Speed extremes | **pass** / **fixed** | 0.25×, 4.00× and 1.30× labels, no preset ticked. The fine speed slider had been removed by the new popover; restored under the presets. |
+| Volume 0/100/125, `qt-max-volume` 200/300, mute → unmute | **pass** / **fixed** | Tick and boost scale with the maximum; unmute restores the level. The boost colour now covers only the part above 100 %. A "muted at start" report was Windows remembering the app's mute between runs, not a widget bug. |
+| Buffering that never finishes; unreachable URL | **pass** | The ring or loading sweep shows; the error dialog appears; quitting during buffering exits cleanly. |
+| Aspect ratios, rotated video, Unicode/emoji/long names | **pass** | 4:3, 21:9, 1:1 and rotated display correctly; no crash on long or emoji names. |
+| Saved toolbar strings from stock 3.0; empty and corrupt strings; editor round trip | **pass** / **fixed** | They load unchanged. The stock disc buttons were unnamed; they're named now (0 unnamed). The editor lists and saves the two new buttons. |
+| Immersive layout; FSC on/off in video fullscreen | **pass** / **fixed** | Only one bar shows in fullscreen. The immersive bar wasn't reachable by keyboard; Tab now moves focus into it, and Esc or idle gives it back. |
+| Docked vs detached playlist; XS drawer | **pass** / **fixed** | The detached window still works. The drawer wasn't reachable while playing: the deck's minimum width kept the window at 1125 px. Optional deck items now drop when space runs out (`p3-fix` 8/C). |
+| Mini player | **fixed** | Auto-raise re-showed the hidden main window, and F went fullscreen behind the mini player. Both now respect it; the View menu check stays correct. |
+| Minimal view and fullscreen with the new deck | **pass** / **fixed** | The "Minimal Interface" check was wrong while the now-playing bar showed; fixed. |
+| Keyboard only: tab order, Space, Esc, arrows in popovers | **fixed** / **pass** | Space activated whichever button had focus (mute, Library); one filter now sends Space to play/pause from every button. Tab order now follows the screen. Esc closes a popover before leaving fullscreen. Shift+L (A–B) works with the deck hidden. Main-window Tab order is a manual step: the video window keeps keyboard focus during automation. |
+| Screen reader names | **fixed** | 0 unnamed controls (was 9 at baseline). |
+| Rapid clicks and open/close 30–100× | **pass** | Play/pause spam ends playing. The panel and mini player take about 9 GDI handles once when first built, then stay flat (panel over 100 toggles; mini player over 10 automated cycles, the rest is a manual step). |
+| Closing with a popover, the mini player or buffering | **pass** | Exit code 0 each time. |
+| `qt_spectrum` never saved | **pass** | After saving Effects and Preferences, `audio-filter=equalizer` is saved with no `qt_spectrum`. It still appears in the advanced Preferences filter list (VLC 3 can't hide a submodule there; documented in `qt.cpp`). |
+| 10,000-item playlist | **deferred** (pre-existing) | Loading freezes the interface for about 45 s; stock VLC freezes for about 40 s on the same load. The cause is in the shared playlist model's per-item updates, which predate the redesign. Scrolling and filtering the loaded list are fast. |
+
+**Decisions recorded (owner to confirm):** the DVD menu buttons leave the default deck; remaining time is shown by default; resume and the tracks popover's details come from stream info; the paused badge resumes on click; the docked playlist is a right-side panel; no status label in the deck centre (it's in the prototype, not the spec).

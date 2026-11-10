@@ -136,7 +136,9 @@ void Toast::place()
 void Toast::fitText()
 {
     const Theme *t = Theme::instance();
-    const int chrome = t->px( 2 * O::ToastPadX + O::ToastIcon + O::ToastGap );
+    /* the same sum as paintEvent's text rect: px() of the whole would round
+     * differently and elide a text that fits */
+    const int chrome = 2 * t->px( O::ToastPadX ) + t->px( O::ToastIcon ) + t->px( O::ToastGap );
     const int room = host->targetRect().width() - 2 * t->px( O::ToastMargin );
     resize( qMax( chrome, qMin( room, chrome + fontMetrics().width( text ) ) ),
             qMax( t->px( O::ToastIcon ), fontMetrics().height() ) + 2 * t->px( O::ToastPadY ) );

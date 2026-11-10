@@ -755,7 +755,7 @@ QToolButton#captionClose:hover, QToolButton#captionClose:pressed { background: @
 #playlistPanel QListView { background: transparent; border: none; outline: 0; }
 /* Phase 3: now playing, mini player, audio mode (components/now_playing.cpp) */
 QLabel[np="mute"] { color: @mute@; }
-QLabel[np="accent"] { color: @accent@; }
+QLabel[np="accent"] { color: @accTx@; }  /* the accent is 2.4:1 on light surfaces */
 QLabel[np="chip"] { background: @accentTint@; color: @accTx@; border-radius: @radiusXs@px; padding: @chipPadY@px @chipPadX@px; }
 QLabel[np="chip2"] { background: @divider@; color: @tx2@; border-radius: @radiusXs@px; padding: @chipPadY@px @chipPadX@px; }
 QToolButton[np="play"] { background: @accent@; border-radius: @playNowR@px; }
@@ -770,13 +770,17 @@ QListView[np="tracks"] { background: transparent; border: none; }
 QToolButton[role="deck"], QToolButton[role="speed"] { background: transparent; border: 2px solid transparent; border-radius: @radiusMd@px; padding: 0; }
 QToolButton[role="deck"]:hover, QToolButton[role="speed"]:hover { background: @hoverFill@; }
 QToolButton[role="deck"]:pressed, QToolButton[role="speed"]:pressed { background: @openFill@; }
-QToolButton[role="deck"]:checked { background: transparent; }
+QToolButton[role="deck"] { color: @tx@; font-weight: 600; }
+QToolButton[role="deck"]:disabled { color: @dim@; }
+QToolButton[role="deck"]:checked { background: transparent; color: @accTx@; }
+QToolButton[role="deck"][record="true"]:checked { background: @errorTint@; }
 QToolButton[role="deck"]:checked:hover { background: @hoverFill@; }
 QToolButton[role="deck"][open="true"], QToolButton[role="speed"][open="true"] { background: @openFill@; }
 QToolButton[role="deck"]:focus, QToolButton[role="speed"]:focus { border-color: @focusRing@; }
 QToolButton[role="speed"] { color: @tx2@; font-weight: 600; padding: 0 @speedPadX@px; }
 QToolButton[role="speed"][on="true"], QToolButton[role="speed"][open="true"] { color: @accTx@; }
 QToolButton[role="speed"]:disabled { color: @dim@; }
+QToolButton[role="speed"]::menu-indicator { image: none; width: 0; }
 QToolButton[role="play"] { background: @accent@; border: 2px solid transparent; border-radius: @playRadius@px; padding: 0; }
 QToolButton[role="play"]:hover { background: @accentHover@; }
 QToolButton[role="play"]:pressed { background: @accent@; }
@@ -870,6 +874,7 @@ QPushButton[role="popoverLink"]:focus { border: 2px solid @focusRing@; border-ra
         { "deckSepMargin", QString::number(px(Deck::SeparatorMargin)) },
         { "playRadius", QString::number(px(Size::PlayDeck) / 2) },
         { "speedPadX", QString::number(px(Deck::SpeedPadX)) },
+        { "errorTint", css(color(ErrorTint)) },
     };
 
     QString out = QString::fromLatin1(qss);
