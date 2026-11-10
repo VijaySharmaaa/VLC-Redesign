@@ -240,10 +240,16 @@ bool AbstractController::eventFilter( QObject *obj, QEvent *e )
     switch( e->type() )
     {
     case QEvent::Polish:
-        /* the shortcut for screen readers, as the tooltip shows it */
-        button->setAccessibleDescription(
-            hotkeyText( p_intf, button->property( "hotkey" ).toByteArray().constData() ) );
+    case QEvent::FocusIn:
+    case QEvent::Enter:
+    {
+        /* the shortcut for screen readers, as the tooltip shows it; again
+         * on focus and hover, before it is read, so a rebound hotkey shows */
+        const QString key = hotkeyText( p_intf, button->property( "hotkey" ).toByteArray().constData() );
+        if( button->accessibleDescription() != key )
+            button->setAccessibleDescription( key );
         break;
+    }
     case QEvent::ToolTip:
     {
         /* read when shown, so a changed hotkey shows at once */
