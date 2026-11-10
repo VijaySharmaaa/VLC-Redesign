@@ -239,6 +239,11 @@ bool AbstractController::eventFilter( QObject *obj, QEvent *e )
     /* Space and Enter: MainInterface's ButtonKeys, for every button */
     switch( e->type() )
     {
+    case QEvent::Polish:
+        /* the shortcut for screen readers, as the tooltip shows it */
+        button->setAccessibleDescription(
+            hotkeyText( p_intf, button->property( "hotkey" ).toByteArray().constData() ) );
+        break;
     case QEvent::ToolTip:
     {
         /* read when shown, so a changed hotkey shows at once */
@@ -692,15 +697,21 @@ QWidget *AbstractController::createWidget( buttonType_e button, int options )
         tracksButton->setCheckable( true );
         ENABLE_ON_INPUT( tracksButton );
         intf_thread_t *intf = p_intf;
+        /* our own state changes are silent: toggled() is then the user's,
+         * a click or a screen reader's toggle (which emits no clicked()) */
         auto sync = [intf, tracksButton]() {
             input_thread_t *p_input = MainInputManager::getInstance( intf )->getInput();
+            const QSignalBlocker silent( tracksButton );
             tracksButton->setChecked( p_input && var_GetInteger( p_input, "spu-es" ) >= 0 );
         };
         connect( THEMIM->getIM(), &InputManager::esChanged, tracksButton, sync );
         connect( THEMIM, &MainInputManager::inputChanged, tracksButton, sync );
         sync();
-        connect( tracksButton, &QToolButton::clicked, tracksButton, [intf, tracksButton, sync]() {
-            tracksButton->setChecked( true );  /* open: accent glyph */
+        connect( tracksButton, &QToolButton::toggled, tracksButton, [intf, tracksButton, sync]() {
+            {
+                const QSignalBlocker silent( tracksButton );
+                tracksButton->setChecked( true );  /* open: accent glyph */
+            }
             QWidget *popover = showTracksPopover( intf, tracksButton );
             if( popover )
                 connect( popover, &QObject::destroyed, tracksButton, sync );
