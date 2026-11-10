@@ -311,6 +311,17 @@ namespace RedesignTokens
          * page that got no item for this long is empty */
         static const int SettleMs = 1500;
     }
+
+    /* ---- Phase 5: dialogs (DESIGN_SPEC 7; sizes from the prototype markup) ---- */
+    namespace Dialogs
+    {
+        /* Open media: the tab tiles */
+        static const int TabTileH = 58, TabTileGap = 6, TabTileGlyph = 22;
+        /* Error: the round icon left of the title */
+        static const int ErrorIcon = 40, ErrorGlyph = 22;
+        /* Go to time: the timecode field */
+        static const int JumpInputH = 44, JumpFont = 20;
+    }
 }
 
 #endif

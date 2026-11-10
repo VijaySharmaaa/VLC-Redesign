@@ -813,6 +813,27 @@ QLineEdit[role="librarySearch"]:focus { border: 2px solid @focusRing@; }
 QPushButton[role="outline"] { background: transparent; }
 QPushButton[role="outline"]:hover { background: @hoverFill@; }
 QLabel[role="libraryDim"] { color: @dim@; }
+/* Phase 5: dialogs (dialogs/open.cpp, errors.cpp; DESIGN_SPEC 7).
+   openTile = an Open media tab tile, split = the accent Play split button,
+   errorIcon = the round error icon, link = a text button in the accent text colour. */
+QToolButton[role="openTile"] { background: @raised@; color: @tx2@; border: 1px solid transparent; border-radius: @radiusLg@px; }
+QToolButton[role="openTile"]:hover { background: @hover@; color: @tx@; }
+QToolButton[role="openTile"]:checked { background: @accentTint@; color: @accTx@; border-color: @accentBorder@; }
+QToolButton[role="openTile"]:focus { border-color: @focusRing@; }
+#OpenDisk QRadioButton { background: @raised@; border: 1px solid transparent; border-radius: @radiusMd@px; padding: @menuPad@px @buttonPadX@px; spacing: 0; }
+#OpenDisk QRadioButton::indicator { image: none; width: 0; height: 0; border: none; }
+#OpenDisk QRadioButton:hover { background: @hover@; }
+#OpenDisk QRadioButton:checked { background: @accentTint@; color: @accTx@; border-color: @accentBorder@; }
+#OpenDisk QRadioButton:focus { border-color: @focusRing@; }
+QToolButton[role="split"] { background: @accent@; color: @onAccent@; font-weight: 600; padding: @menuPad@px @buttonPadX@px; }
+QToolButton[role="split"][popupMode="1"] { padding-right: @splitPadR@px; }
+QToolButton[role="split"]:hover { background: @accentHover@; }
+QToolButton[role="split"]:focus { border-color: @onAccent@; }
+QToolButton[role="split"]::menu-arrow { image: url("@arrowDownOnAccent@"); }
+QLabel[role="errorIcon"] { background: @errorTint@; border-radius: @errorIconR@px; }
+QPushButton[role="link"] { background: transparent; color: @accTx@; border: 2px solid transparent; }
+QPushButton[role="link"]:hover { background: @hoverFill@; }
+QPushButton[role="link"]:focus { border-color: @focusRing@; }
 )QSS";
 
     const Palette &p = palette();
@@ -897,6 +918,10 @@ QLabel[role="libraryDim"] { color: @dim@; }
         { "homeCellPad", QString::number(px(Home::ColumnGap) / 2) },
         { "homeRowPad", QString::number(px(Home::RowPadX)) },
         { "homeRowLine", css(ink(InkAlpha::RowLine)) },
+        /* Phase 5: dialogs */
+        { "splitPadR", QString::number(px(Size::IconGlyph) + px(Size::MenuPanelPadding)) },
+        { "arrowDownOnAccent", tintedIconFile(p_intf, RedesignIcons::IconExpandMore, color(OnAccent), 0) },
+        { "errorIconR", QString::number(px(Dialogs::ErrorIcon) / 2) },
     };
 
     QString out = QString::fromLatin1(qss);
