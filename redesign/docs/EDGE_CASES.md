@@ -26,6 +26,11 @@ Check every changed area against the relevant rows before a phase is closed. Rec
 - [ ] `-I skins2` and `--qt-minimal-view` still work; skins2 isn't affected by the theme.
 - [ ] Translations: long German/Russian strings in menus and buttons (no clipping), right-to-left (Arabic/Hebrew) layout mirroring, CJK fonts.
 - [ ] Keyboard only: tab order, focus visible on every control, Esc closes the top popover/dialog first, hotkeys don't fire while typing in a field.
+- [ ] Tab order through the deck follows the visual order (special widgets such as speed and volume must not come before the button groups).
+- [ ] Space with ANY focusable button focused (deck, mute, now-playing bar, audio-mode "Library" pill, mini player) toggles play/pause and doesn't activate the button.
+- [ ] The deck's minimum width while playing still lets the window reach 800 px (the XS drawer must be reachable).
+- [ ] Toasts are sized to their text: no elision while the content area has room.
+- [ ] Overlay copies of the deck (immersive bar, FSC) show the same mute/volume state as the docked deck when they are created.
 - [ ] Screen reader (Narrator): every icon button has a name, and state changes (play/pause, mute) are announced.
 - [ ] Every combo box drop-down opens at a normal size with all items visible and clickable, in each theme and with each `MainWindow/QtStyle` (Fusion, Windows, an unknown name).
 - [ ] Focus indicator on check boxes and radio buttons has at least 3:1 contrast against the window, in light and dark.
@@ -36,6 +41,9 @@ Check every changed area against the relevant rows before a phase is closed. Rec
 ## Media & playback
 - [ ] Nothing loaded (idle): controls disabled sensibly, no division by zero in time/seek code.
 - [ ] Live streams and unknown length: seek disabled, "Live" label, no negative remaining time.
+- [ ] Seekability learned after the input opens (`can-seek` starts true and is fixed by the demuxer): the seek knob and the now-playing bar seek must follow it, without waiting for a title/chapter event.
+- [ ] After the media ends or stops, the now-playing bar's seek is disabled (no stale `inputCanSeek`).
+- [ ] Test media folders: a `cover.jpg`/`folder.jpg` next to the files is used as art by VLC's folder art finder, so keep "no art" files in a folder without one.
 - [ ] Very short (< 1 s) and very long (> 10 h, h:mm:ss) media; media with and without chapters (chapter ticks).
 - [ ] Audio-only, video-only, no art, huge art, transparent PNG art.
 - [ ] No audio tracks, no subtitle tracks, 20+ tracks (popover scrolls), tracks added mid-playback (an .srt dropped in).
