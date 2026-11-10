@@ -710,9 +710,9 @@ PlayerHeader::PlayerHeader( intf_thread_t *_p_intf, QWidget *owner, QWidget *_vi
     back->setToolTip( qtr( "Back to library" ) );
     /* its Tab, Shift+Tab and Esc, before the button takes them */
     backWindow->winId();   /* creates its window */
-    backWindow->windowHandle()->installEventFilter( this );
-    owner->installEventFilter( this );
-    back->installEventFilter( this );   /* its FocusOut */
+    /* the application's: Shift+Tab on the deck's first control too, before
+     * that control takes it */
+    qApp->installEventFilter( this );
 
     fade = new QVariantAnimation( this );
     fade->setEasingCurve( enterCurve() );
@@ -879,6 +879,23 @@ void PlayerHeader::raiseDrawers()
     }
 }
 
+/* Where Tab from the window itself goes, when that is a deck control */
+const QWidget *PlayerHeader::firstDeckStop() const
+{
+    const QWidget *owner = parentWidget();
+    for( const QWidget *w = owner->nextInFocusChain(); w != owner; w = w->nextInFocusChain() )
+    {
+        if( w->window() != owner || !w->isVisible() || !w->isEnabled()
+         || !( w->focusPolicy() & Qt::TabFocus ) )
+            continue;
+        for( const QWidget *p = w; p; p = p->parentWidget() )
+            if( qobject_cast<const AbstractController *>( p ) )
+                return w;
+        return NULL;
+    }
+    return NULL;
+}
+
 QFont PlayerHeader::titleFont() const
 {
     /* PanelTitle's semibold, at the header's size */
@@ -908,10 +925,11 @@ bool PlayerHeader::eventFilter( QObject *o, QEvent *e )
     if( e->type() != QEvent::KeyPress )
         return false;
     const QKeyEvent *ke = static_cast<QKeyEvent *>( e );
-    if( o == parentWidget() )
+    if( o == parentWidget() || ( ke->key() == Qt::Key_Backtab && o == firstDeckStop() ) )
     {
-        /* Shift+Tab while the window itself or the video has the keys: to
-         * the back button, before the deck in the tab order */
+        /* Shift+Tab while the window itself, the video or the deck's first
+         * control has the keys: to the back button, before the deck in the
+         * tab order */
         const QWidget *fw = QApplication::focusWidget();
         if( ke->key() != Qt::Key_Backtab
          || ( fw && fw != o && fw != video && !video->isAncestorOf( fw ) ) )
@@ -924,6 +942,8 @@ bool PlayerHeader::eventFilter( QObject *o, QEvent *e )
         backWindow->activateWindow();
         return true;
     }
+    if( o != backWindow->windowHandle() )
+        return false;
     /* in the back button's window: Tab goes on to the deck, Shift+Tab and
      * Esc give the keys back */
     if( ke->key() == Qt::Key_Tab && ke->modifiers() == Qt::NoModifier )
