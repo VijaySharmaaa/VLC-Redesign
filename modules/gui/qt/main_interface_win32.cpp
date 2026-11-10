@@ -42,10 +42,10 @@
 
 #include <QWindow>
 #include <qpa/qplatformnativeinterface.h>
-/* shortcut: the contribs only expose qplatformnativeinterface.h among the
- * QPA headers; this one is reached through the private include tree of the
- * pinned Qt 5.6.3, update the path if the Qt contrib ever changes */
-#include <QtGui/5.6.3/QtGui/qpa/qwindowsysteminterface.h>
+/* the contribs only expose qplatformnativeinterface.h among the QPA
+ * headers; this one is in the private include tree of the Qt version
+ * (Makefile.am) */
+#include VLC_QT_WSI_H
 
 #include <windowsx.h>   /* GET_X_LPARAM */
 
