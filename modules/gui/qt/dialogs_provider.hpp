@@ -95,6 +95,8 @@ public:
      * toggle is shown, by its actionType_e (PLAYLIST_ACTION, EXTENDED_ACTION) */
     void setPanelShown( int action, bool shown );
     bool isPanelShown( int action ) const { return shownPanels.contains( action ); }
+    /* for widgets made where no p_intf is passed down */
+    intf_thread_t *intf() const { return p_intf; }
     static QString getDirectoryDialog( intf_thread_t *p_intf);
     static QStringList getOpenURL(QWidget *parent = NULL,
                                   const QString &caption = QString(),

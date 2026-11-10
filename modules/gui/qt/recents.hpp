@@ -30,6 +30,7 @@
 
 #include <QObject>
 #include <QStringList>
+class QDateTime;
 class QRegularExpression;
 class QSignalMapper;
 
@@ -61,8 +62,19 @@ public:
     QStringList recentList();
     QSignalMapper *signalMapper;
 
+    /* resume position in ms, -1 or 0 when there is none */
     int time( const QString &mrl );
-    void setTime( const QString &mrl, const int64_t time );
+    /* when the input closes: position and length in microseconds */
+    void setTime( const QString &mrl, const int64_t time, const int64_t length );
+    /* length in ms, 0 when unknown (entries from older configurations) */
+    int64_t length( const QString &mrl );
+    /* last played, invalid when unknown */
+    QDateTime date( const QString &mrl );
+    void removeRecent( const QString &mrl );
+
+signals:
+    /* the list, an order, a time, a length or a date changed */
+    void changed();
 
 private:
     RecentsMRL( intf_thread_t* _p_intf );
@@ -70,8 +82,12 @@ private:
 
     intf_thread_t *p_intf;
 
+    /* parallel lists, saved under RecentsMRL/: list, times (ms), lengths
+     * (ms) and dates (ISO 8601, UTC); stock VLC ignores the last two */
     QStringList   recents;
     QStringList   times;
+    QStringList   lengths;
+    QStringList   dates;
     QRegularExpression *filter;
     bool          isActive;
 

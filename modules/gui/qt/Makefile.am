@@ -105,6 +105,8 @@ libqt_plugin_la_SOURCES = \
 	gui/qt/components/title_bar.cpp gui/qt/components/title_bar.hpp \
 	gui/qt/components/now_playing.cpp gui/qt/components/now_playing.hpp \
 	gui/qt/components/spectrum.cpp gui/qt/components/spectrum.hpp \
+	gui/qt/components/library/home_page.cpp \
+	gui/qt/components/library/home_page.hpp \
 	gui/qt/components/controller_widget.cpp \
 	gui/qt/components/controller_widget.hpp \
 	gui/qt/components/epg/EPGChannels.cpp \
@@ -231,6 +233,7 @@ nodist_libqt_plugin_la_SOURCES = \
 	gui/qt/components/title_bar.moc.cpp \
 	gui/qt/components/now_playing.moc.cpp \
 	gui/qt/components/spectrum.moc.cpp \
+	gui/qt/components/library/home_page.moc.cpp \
 	gui/qt/components/controller_widget.moc.cpp \
 	gui/qt/components/epg/EPGChannels.moc.cpp \
 	gui/qt/components/epg/EPGProgram.moc.cpp \

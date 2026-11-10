@@ -21,6 +21,7 @@
 
 #include "qt.hpp"
 #include "util/breakpoints.hpp"
+#include "util/theme.hpp"
 
 #include <QSlider>
 #include <QWidget>
@@ -33,6 +34,16 @@ class QBoxLayout;
 class QGridLayout;
 class QElidingLabel;
 class QPropertyAnimation;
+class QPainter;
+class QRectF;
+
+/* Shared with the library pages (components/library) */
+/* "1:02:03" */
+QString timeString( int64_t secs );
+/* The striped placeholder at 135 degrees in the theme's two tints */
+void paintStripes( QPainter &, const QRectF &, qreal period );
+/* A theme font at a token px size */
+QFont fontAt( Theme::TypeRole, int tokenPx, bool semibold );
 
 /* Cover art, cropped to fill, or the striped placeholder (DESIGN_SPEC 4) */
 class ArtView : public QWidget
