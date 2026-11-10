@@ -849,6 +849,21 @@ QLabel[role="errorIcon"] { background: @errorTint@; border-radius: @errorIconR@p
 QPushButton[role="link"] { background: transparent; color: @accTx@; border: 2px solid transparent; }
 QPushButton[role="link"]:hover { background: @hoverFill@; }
 QPushButton[role="link"]:focus { border-color: @focusRing@; }
+/* Phase 5: preferences (components/prefs_page.cpp): the section list, and
+   the Simple Preferences group boxes as cards of rows */
+QFrame[role="prefsList"] { border: none; border-right: 1px solid @divider@; }
+QListWidget[role="prefsSections"] { background: transparent; border: none; outline: 0; }
+QListWidget[role="prefsSections"]::item { height: @prefsItemH@px; padding: 0 @prefsItemPadX@px; margin-bottom: @prefsItemGap@px;
+    border: 2px solid transparent; border-radius: @radiusMd@px; color: @tx2@; }
+QListWidget[role="prefsSections"]::item:hover { background: @divider@; }
+QListWidget[role="prefsSections"]::item:selected { background: @accentTint12@; color: @accTx@; }
+QListWidget[role="prefsSections"]::item:focus { border-color: @focusRing@; }
+PrefsPage QScrollArea, PrefsPage QScrollArea > QWidget > QWidget { background: transparent; }
+PrefsPage QGroupBox, QFrame[role="prefsCard"] { background: @surface@; border: 1px solid @divider@; border-radius: @prefsCardR@px; }
+QFrame[role="prefsRow"], QFrame[role="prefsRowNext"] { background: transparent; border: none; }
+QFrame[role="prefsRowNext"] { border-top: 1px solid @prefsRowLine@; }
+/* the select height less the combo's 1 px border and 1 px margin, each side */
+PrefsPage QComboBox { min-height: @prefsSelectInner@px; }
 )QSS";
 
     const Palette &p = palette();
@@ -946,6 +961,14 @@ QPushButton[role="link"]:focus { border-color: @focusRing@; }
         { "splitPadR", QString::number(px(Size::IconGlyph) + px(Size::MenuPanelPadding)) },
         { "arrowDownOnAccent", tintedIconFile(p_intf, RedesignIcons::IconExpandMore, color(OnAccent), 0) },
         { "errorIconR", QString::number(px(Dialogs::ErrorIcon) / 2) },
+        /* Phase 5: preferences */
+        { "accentTint12", css(color(AccentTint12)) },
+        { "prefsItemH", QString::number(px(Prefs::ItemH)) },
+        { "prefsItemPadX", QString::number(px(Prefs::ItemPadX)) },
+        { "prefsItemGap", QString::number(px(Prefs::ItemGap)) },
+        { "prefsCardR", QString::number(px(Prefs::CardRadius)) },
+        { "prefsRowLine", css(ink(InkAlpha::Hairline)) },
+        { "prefsSelectInner", QString::number(px(Size::SelectH) - 4) },
     };
 
     QString out = QString::fromLatin1(qss);

@@ -343,6 +343,20 @@ namespace RedesignTokens
         /* Go to time: the timecode field */
         static const int JumpInputH = 44, JumpFont = 20;
     }
+
+    /* ---- Phase 5: Preferences page (DESIGN_SPEC 8; sizes from the
+     *      prototype markup) ---- */
+    namespace Prefs
+    {
+        /* section list: 220 px, an icon rail with the sidebar's (below M) */
+        static const int ListW = 220, RailW = 64, ListPadY = 28, ListPadX = 10;
+        static const int ItemH = 34, ItemPadX = 12, ItemGap = 2, ItemIcon = 18;
+        static const int TitleBelow = 18;            /* "Preferences" over the list */
+        static const int ContentPadY = 28, ContentPadX = 32, HeaderBelow = 16;
+        /* the card and its rows */
+        static const int CardRadius = 8, RowMinH = 60, RowPadX = 18, RowPadY = 12;
+        static const int RowGap = 20, DescGap = 3, ButtonGap = 8;
+    }
 }
 
 #endif

@@ -1602,6 +1602,16 @@ bool MainInterface::isMiniPlayerVisible() const
     return miniPlayer && miniPlayer->isVisible();
 }
 
+/* Hidden (tray, mini player), minimised or in video full screen, the window
+ * can't show the page: the caller opens the dialog as before */
+bool MainInterface::showPreferences()
+{
+    if( !isVisible() || isMinimized() || b_videoFullScreen || isMiniPlayerVisible() )
+        return false;
+    sidebar->showPage( Sidebar::Preferences );
+    return true;
+}
+
 /* DESIGN_SPEC 9 / D3: the mini player stands in for the main window, which
  * hides (the video keeps playing in it, unseen); restore brings it back. */
 void MainInterface::toggleMiniPlayer()

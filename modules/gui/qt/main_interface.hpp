@@ -114,6 +114,8 @@ public:
     bool isInterfaceFullScreen() { return b_interfaceFullScreen; }
     bool isInterfaceAlwaysOnTop() { return b_interfaceOnTop; }
     bool isMiniPlayerVisible() const;
+    /* Shows the Preferences page; false when the window can't show it now */
+    bool showPreferences();
     StandardPLPanel* getPlaylistView();
     void showToast( const QString & );
     Sidebar *getSidebar() { return sidebar; }

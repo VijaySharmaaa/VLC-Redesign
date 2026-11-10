@@ -102,6 +102,7 @@ libqt_plugin_la_SOURCES = \
 	gui/qt/components/drop_overlay.cpp gui/qt/components/drop_overlay.hpp \
 	gui/qt/components/video_overlays.cpp gui/qt/components/video_overlays.hpp \
 	gui/qt/components/sidebar.cpp gui/qt/components/sidebar.hpp \
+	gui/qt/components/prefs_page.cpp gui/qt/components/prefs_page.hpp \
 	gui/qt/components/title_bar.cpp gui/qt/components/title_bar.hpp \
 	gui/qt/components/now_playing.cpp gui/qt/components/now_playing.hpp \
 	gui/qt/components/library/library_widgets.cpp gui/qt/components/library/library_widgets.hpp \
@@ -233,6 +234,7 @@ nodist_libqt_plugin_la_SOURCES = \
 	gui/qt/components/overlay_host.moc.cpp \
 	gui/qt/components/toast.moc.cpp \
 	gui/qt/components/sidebar.moc.cpp \
+	gui/qt/components/prefs_page.moc.cpp \
 	gui/qt/components/title_bar.moc.cpp \
 	gui/qt/components/now_playing.moc.cpp \
 	gui/qt/components/library/library_widgets.moc.cpp \

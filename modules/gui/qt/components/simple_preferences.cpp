@@ -204,6 +204,20 @@ static int getDefaultAudioVolume(vlc_object_t *obj, const char *aout)
         return -1;
 }
 
+static QStringList audioFilters( intf_thread_t *p_intf )
+{
+    char* psz = config_GetPsz( p_intf, "audio-filter" );
+    QStringList filters = qfu( psz ).split( ':',
+                                  #if QT_VERSION >= QT_VERSION_CHECK(5, 14, 0)
+                                      Qt::SkipEmptyParts
+                                  #else
+                                      QString::SkipEmptyParts
+                                  #endif
+                                );
+    free( psz );
+    return filters;
+}
+
 /*********************************************************************
  * The List of categories
  *********************************************************************/
@@ -361,14 +375,7 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
 
     // Title Label
     QLabel *panel_label = new QLabel;
-    QFont labelFont = QApplication::font();
-    labelFont.setPointSize( labelFont.pointSize() + 6 );
-    panel_label->setFont( labelFont );
-
-    // Title <hr>
-    QFrame *title_line = new QFrame;
-    title_line->setFrameShape(QFrame::HLine);
-    title_line->setFrameShadow(QFrame::Sunken);
+    panel_label->setFont( Theme::instance()->font( Theme::PanelTitle ) );
 
     QFont italicFont = QApplication::font();
     italicFont.setItalic( true );
@@ -545,6 +552,9 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
             connect( ui.defaultVolume, &QSlider::valueChanged,
                      this, &SPrefsPanel::updateAudioVolume );
 
+            /* the check box labels the slider and its value */
+            ui.defaultVolume->setAccessibleName( ui.resetVolumeCheckbox->text() );
+            ui.volumeValue->setAccessibleName( ui.resetVolumeCheckbox->text() );
             ui.defaultVolume_zone->setEnabled( ui.resetVolumeCheckbox->isChecked() );
             connect( ui.resetVolumeCheckbox, &QCheckBox::toggled,
                      ui.defaultVolume_zone, &QWidget::setEnabled );
@@ -613,17 +623,7 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
             connect( ui.volNormBox, &QCheckBox::toggled, ui.volNormSpin,
                      &QDoubleSpinBox::setEnabled );
 
-            char* psz = config_GetPsz( p_intf, "audio-filter" );
-            qs_filter = qfu( psz ).split( ':',
-                                          #if QT_VERSION >= QT_VERSION_CHECK(5, 14, 0)
-                                              Qt::SkipEmptyParts
-                                          #else
-                                              QString::SkipEmptyParts
-                                          #endif
-                                        );
-
-            free( psz );
-
+            qs_filter = audioFilters( p_intf );
             bool b_enabled = ( qs_filter.contains( "normvol" ) );
             ui.volNormBox->setChecked( b_enabled );
             ui.volNormSpin->setEnabled( b_enabled );
@@ -670,6 +670,7 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
 #endif
             CONFIG_GENERIC( "dvd", String, ui.DVDLabel,
                             DVDDeviceComboBox->lineEdit() );
+            ui.DVDDeviceComboBox->lineEdit()->setAccessibleName( ui.DVDLabel->text() );
             CONFIG_GENERIC_FILE( "input-record-path", Directory, ui.recordLabel,
                                  ui.recordPath, ui.recordBrowse );
 
@@ -914,6 +915,8 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
                             ui.fontSizeLabel, fontSize );
 
             CONFIG_GENERIC_NO_BOOL( "freetype-font", Font, ui.fontLabel, font );
+            if( ui.font->lineEdit() )
+                ui.font->lineEdit()->setAccessibleName( ui.fontLabel->text() );
             CONFIG_GENERIC_NO_BOOL( "freetype-color", Color, ui.fontColorLabel,
                             fontColor );
             CONFIG_GENERIC( "freetype-outline-thickness", IntegerList,
@@ -979,12 +982,12 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
     }
 
     panel_layout->addWidget( panel_label );
-    panel_layout->addWidget( title_line );
 
     QScrollArea *scroller= new QScrollArea;
     scroller->setWidget( panel );
     scroller->setWidgetResizable( true );
     scroller->setFrameStyle( QFrame::NoFrame );
+    scroller->setAccessibleName( panel_label->text() ); /* a Tab stop */
     panel_layout->addWidget( scroller );
 
     setLayout( panel_layout );
@@ -1148,6 +1151,8 @@ void SPrefsPanel::apply()
 
     case SPrefsAudio:
     {
+        /* now: the Preferences page keeps a panel while Effects saves */
+        qs_filter = audioFilters( p_intf );
         bool b_checked =
             qobject_cast<QCheckBox *>(optionWidgets["normalizerChB"])->isChecked();
         if( b_checked && !qs_filter.contains( "normvol" ) )
