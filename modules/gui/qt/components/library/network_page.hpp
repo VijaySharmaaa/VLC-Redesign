@@ -91,7 +91,7 @@ private:
     QGridLayout *lanGrid, *streamGrid;
     QLabel *lanHint;
     QList<NetworkTile *> lanTiles, streamTiles;
-    QTimer *rebuild, *settle;
+    QTimer *rebuild, *settle, *loading;
     CardView *list;
     LibraryFilter *filter;
     PLModel *browsed;

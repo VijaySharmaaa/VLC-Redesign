@@ -183,6 +183,10 @@ NetworkPage::NetworkPage( intf_thread_t *_p_intf, QWidget *parent )
     settle->setSingleShot( true );
     settle->setInterval( Library::SettleMs );
     connect( settle, &QTimer::timeout, this, &NetworkPage::updateState );
+    loading = new QTimer( this );
+    loading->setSingleShot( true );
+    loading->setInterval( Library::NetSettleMs );
+    connect( loading, &QTimer::timeout, this, &NetworkPage::updateState );
 
     connect( header, &LibraryHeader::backRequested, this, &NetworkPage::goBack );
     connect( list, &CardView::backRequested, this, &NetworkPage::goBack );
@@ -367,6 +371,7 @@ void NetworkPage::openSd( const LibraryData::Sd &sd, const QString &title )
             return;
         model = new PLModel( THEPL, p_intf, node, this );
         internet.insert( sd.name, model );
+        connect( model, &QAbstractItemModel::rowsInserted, this, &NetworkPage::updateState );
         /* queued: see load() */
         connect( model, &QAbstractItemModel::rowsRemoved, this, &NetworkPage::updateState,
                  Qt::QueuedConnection );
@@ -376,6 +381,7 @@ void NetworkPage::openSd( const LibraryData::Sd &sd, const QString &title )
 
 void NetworkPage::open( PLModel *model, const QModelIndex &source, const QString &title )
 {
+    loading->start();   /* "Loading..." until items come or it settles */
     header->search()->clear();
     if( browsed != model )
         filter->setSourceModel( model );
@@ -471,6 +477,11 @@ void NetworkPage::updateState()
     lanHint->setVisible( lanTiles.isEmpty() );
     lanHint->setText( settle->isActive() ? qtr( "Looking for media servers and shares..." )
                                          : qtr( "No media server or share found on your network" ) );
-    header->setStatus( listing && filter->rowCount( root ) == 0
-                       && !header->search()->text().trimmed().isEmpty() ? qtr( "No results" ) : QString() );
+    /* an empty list: maybe still coming (a discovery's download, a server
+     * being listed; VLC 3 says neither when it is done), else nothing there
+     * or nothing matches */
+    QString status;
+    if( listing && filter->rowCount( root ) == 0 )
+        status = loading->isActive() ? qtr( "Loading..." ) : qtr( "No results" );
+    header->setStatus( status );
 }

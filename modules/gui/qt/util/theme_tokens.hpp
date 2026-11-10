@@ -306,6 +306,9 @@ namespace RedesignTokens
         /* not in tokens.json: the SDs have no "scan finished" event, so a
          * page that got no item for this long is empty */
         static const int SettleMs = 1500;
+        /* the same for an internet discovery's list, which first downloads
+         * its directory (Icecast: a few MB) */
+        static const int NetSettleMs = 10000;
     }
 }
 
