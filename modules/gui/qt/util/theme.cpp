@@ -859,7 +859,9 @@ QLabel[role="hint"]:focus { border: 1px solid @focusRing@; border-radius: @radiu
 .QSlider::handle:horizontal { width: @knob@px; margin: -@knobMarginA@px 0 -@knobMarginB@px; border-radius: @knobRadius@px; background: @fill@; }
 .QSlider::handle:vertical { height: @knob@px; margin: 0 -@knobMarginB@px 0 -@knobMarginA@px; border-radius: @knobRadius@px; background: @fill@; }
 .QSlider::handle:hover { background: @fillHover@; }
-.QSlider::sub-page:horizontal:disabled, .QSlider::add-page:vertical:disabled, .QSlider::handle:disabled { background: @toggleOff@; }
+.QSlider::sub-page:horizontal:disabled, .QSlider::add-page:vertical:disabled { background: @toggleOff@; }
+/* opaque: the track must not show through the knob */
+.QSlider::handle:disabled { background: @toggleOffSolid@; }
 .QSlider { border: 2px solid transparent; border-radius: @radiusSm@px; }
 .QSlider:focus { border-color: @focusRing@; }
 
@@ -932,7 +934,6 @@ QLabel[role="libraryDim"] { color: @dim@; }
 /* Phase 5: effects (dialogs/extended.cpp, components/extended_panels.cpp) */
 #effectsSheet QTabWidget::pane { background: transparent; border: none; }
 #effectsSheet QTabWidget#effectsTabs::pane { border-top: 1px solid @divider@; }
-#effectsSheet QTabWidget#effectsTabs::tab-bar { left: @fxTabsPadX@px; }
 QToolButton#effectsMore { padding-right: @iconGlyph@px; }
 QToolButton#effectsMore::menu-indicator { image: url("@arrowDown@"); subcontrol-origin: padding; subcontrol-position: center right;
     width: @iconGlyph@px; height: @iconGlyph@px; }
@@ -988,6 +989,13 @@ PrefsPage QComboBox { min-height: @prefsSelectInner@px; }
 )QSS";
 
     const Palette &p = palette();
+    /* a translucent colour flattened on a background */
+    const auto over = [](const QColor &c, QRgb bg) {
+        const qreal a = c.alphaF();
+        return QColor::fromRgbF(c.redF() * a + qRed(bg) / 255. * (1 - a),
+                                c.greenF() * a + qGreen(bg) / 255. * (1 - a),
+                                c.blueF() * a + qBlue(bg) / 255. * (1 - a));
+    };
 #ifdef _WIN32
     /* DWM rounds and outlines pop-ups from Windows 11 (applyWindowFrame):
      * a square border would be clipped at the corners there */
@@ -1028,6 +1036,7 @@ PrefsPage QComboBox { min-height: @prefsSelectInner@px; }
         { "outline", css(ink(InkAlpha::Outline)) },
         { "trackInk", css(ink(InkAlpha::Track)) },
         { "toggleOff", css(ink(InkAlpha::ToggleOff)) },
+        { "toggleOffSolid", css(over(ink(InkAlpha::ToggleOff), p.surface)) },
         { "radiusXs", QString::number(px(Size::RadiusXs)) },
         { "radiusSm", QString::number(px(Size::RadiusSm)) },
         { "radiusMd", QString::number(px(Size::RadiusMd)) },
@@ -1081,7 +1090,6 @@ PrefsPage QComboBox { min-height: @prefsSelectInner@px; }
         { "homeRowPad", QString::number(px(Home::RowPadX)) },
         { "homeRowLine", css(ink(InkAlpha::RowLine)) },
         /* Phase 5: effects */
-        { "fxTabsPadX", QString::number(px(Effects::TabsPadX)) },
         { "chipBorder", css(ink(InkAlpha::ChipBorder)) },
         { "chipRadius", QString::number(px(Size::ChipH) / 2) },
         { "fxChipPadX", QString::number(px(Effects::ChipPadX)) },

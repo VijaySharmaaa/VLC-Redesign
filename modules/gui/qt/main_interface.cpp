@@ -205,6 +205,7 @@ MainInterface::MainInterface( intf_thread_t *_p_intf, bool customFrame ) : QVLCM
     b_isWindowTiled      = false;
     b_altAlone           = false;
     b_nowPlayingSeen     = false;
+    i_minimalSidebarW    = 0;
     b_browsing           = false;
     b_audioModeCheck     = false;
 
@@ -968,9 +969,15 @@ void MainInterface::resizeStack( int w, int h )
          * rows need (a small video squashed them) */
         const QSize frame = frameGeometry().size() - size();
         const QSize work = QApplication::desktop()->availableGeometry( this ).size() - frame;
+        /* a docked panel (playlist, Effects) stays docked: below the S
+         * breakpoint it would turn into a drawer over a small video, which
+         * then shows letterboxed beside it instead */
+        const bool panelDocked = stackAreaSize().width() > stackCentralW->width();
+        const int minW = panelDocked
+                       ? Theme::instance()->px( RedesignTokens::Breakpoint::S ) : 0;
         const QSize target = QSize( windowWidthFor( w, other, withSidebar ),
                                     height() - stackCentralW->height() + h )
-                .expandedTo( QSize( 0, minimumSizeHint().height() ) )
+                .expandedTo( QSize( minW, minimumSizeHint().height() ) )
                 .boundedTo( work );
         resizeWindow( target.width(), target.height() );
     }
@@ -1613,6 +1620,8 @@ void MainInterface::setMinimalView( bool b_minimal )
             i_heightChange += nowPlayingBar->height();
 
         const int i_widthChange = b_sidebarShown ? sidebar->width() : 0;
+        if( b_sidebarShown )   /* not again from a minimal view (full screen, toolbars) */
+            i_minimalSidebarW = i_widthChange;
         if( i_heightChange != 0 || i_widthChange != 0 )
             resizeWindow( width() - i_widthChange, height() - i_heightChange );
     }
@@ -1639,10 +1648,17 @@ void MainInterface::setMinimalView( bool b_minimal )
         if( !b_barVisible && nowPlayingBar->isVisible() )
             i_heightChange += nowPlayingBar->height();
 
-        /* the player pages have no sidebar to bring back */
+        /* the player pages have no sidebar to bring back; the one minimal
+         * view took comes back as it was, when the width it gives still has
+         * that sidebar (the current, sidebar-less width picks a narrower one) */
         const bool withSidebar = !onPlayerPage();
-        const int i_width = b_sidebarShown || !withSidebar ? width()
-                          : windowWidthFor( i_stackWidth, i_otherWidth, true );
+        const int i_back = width() + i_minimalSidebarW;
+        int i_width = width();
+        if( withSidebar && !b_sidebarShown )
+            i_width = i_minimalSidebarW > 0 && Sidebar::widthAt(
+                          BreakpointWatcher::fromWidth( i_back ) ) == i_minimalSidebarW
+                    ? i_back : windowWidthFor( i_stackWidth, i_otherWidth, true );
+        i_minimalSidebarW = 0;
         if( i_heightChange != 0 || i_width != width() )
             resizeWindow( i_width, height() + i_heightChange );
     }

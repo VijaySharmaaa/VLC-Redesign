@@ -380,7 +380,9 @@ void AspectRatioBadge::updateRatios()
         if( current && !strcmp( value, current ) )
         {
             action->setChecked( true );
-            setText( action->text() );
+            /* the "" choice is "Default": the picture's ratio stays */
+            if( *current )
+                setText( action->text() );
         }
     }
     var_FreeList( &val_list, &text_list );
