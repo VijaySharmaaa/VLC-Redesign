@@ -969,9 +969,15 @@ void MainInterface::resizeStack( int w, int h )
          * rows need (a small video squashed them) */
         const QSize frame = frameGeometry().size() - size();
         const QSize work = QApplication::desktop()->availableGeometry( this ).size() - frame;
+        /* a docked panel (playlist, Effects) stays docked: below the S
+         * breakpoint it would turn into a drawer over a small video, which
+         * then shows letterboxed beside it instead */
+        const bool panelDocked = stackAreaSize().width() > stackCentralW->width();
+        const int minW = panelDocked
+                       ? Theme::instance()->px( RedesignTokens::Breakpoint::S ) : 0;
         const QSize target = QSize( windowWidthFor( w, other, withSidebar ),
                                     height() - stackCentralW->height() + h )
-                .expandedTo( QSize( 0, minimumSizeHint().height() ) )
+                .expandedTo( QSize( minW, minimumSizeHint().height() ) )
                 .boundedTo( work );
         resizeWindow( target.width(), target.height() );
     }
