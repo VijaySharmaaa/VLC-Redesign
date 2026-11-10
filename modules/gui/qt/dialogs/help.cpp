@@ -29,6 +29,7 @@
 #include "qt.hpp"
 #include "dialogs/help.hpp"
 #include "util/qt_dirs.hpp"
+#include "util/theme.hpp"
 
 #include <vlc_about.h>
 #include <vlc_intf_strings.h>
@@ -37,6 +38,7 @@
 # include <vlc_update.h>
 #endif
 
+#include <QApplication>
 #include <QTextBrowser>
 #include <QString>
 #include <QDialogButtonBox>
@@ -85,25 +87,14 @@ AboutDialog::AboutDialog( intf_thread_t *_p_intf)
     setWindowRole( "vlc-about" );
     setWindowModality( Qt::WindowModal );
 
-    QString linkColor;
-    QString titleColor;
-    if ( var_InheritBool( p_intf, "qt-dark-palette" ) ) {
-        ui.horizontalFrame->setStyleSheet("background-color: rgb(10, 10, 10);");
-        ui.footer->setStyleSheet("background-color: rgb(25, 25, 25);");
-        linkColor = "#ffa851";
-    } else {
-        ui.horizontalFrame->setStyleSheet("background-color: rgb(230, 230, 230); color: rgb(0, 0, 0);");
-        ui.footer->setStyleSheet("background-color: rgb(245, 245, 245); color: rgb(0, 0, 0);");
-        linkColor = "#0057ae";
-        titleColor = QStringLiteral("color:#353535;");
-    }
-
+    /* The frame keeps the window colour, the footer is a panel; both
+     * follow the application palette that Theme sets. */
+    ui.footer->setBackgroundRole( QPalette::AlternateBase );
+    ui.footer->setAutoFillBackground( true );
+    ui.title->setFont( Theme::instance()->font( Theme::PageTitle ) );
+    ui.title->setText( qtr( "VLC media player" ) );
+    ui.version->setFont( Theme::instance()->font( Theme::PanelTitle ) );
     ui.version->setText(qfu( " " VERSION_MESSAGE ) );
-    ui.title->setText("<html><head/><body><p><span style=\" font-size:26pt;" + titleColor + "\"> " + qtr( "VLC media player" ) + " </span></p></body></html>");
-    QString translatedString = qtr( "<p>VLC media player is a free and open source media player, encoder, and streamer made by the volunteers of the <a href=\"http://www.videolan.org/\"><span style=\" text-decoration: underline; color:#0057ae;\">VideoLAN</span></a> community.</p><p>VLC uses its internal codecs, works on essentially every popular platform, and can read almost all files, CDs, DVDs, network streams, capture cards and other media formats!</p><p><a href=\"http://www.videolan.org/contribute/\"><span style=\" text-decoration: underline; color:#0057ae;\">Help and join us!</span></a>" );
-    if ( var_InheritBool( p_intf, "qt-dark-palette" ) )
-        translatedString.remove(QLatin1String("#0057ae"));
-    ui.MainBlabla->setText("<html><head/><body>" + translatedString + "</p></body> </html>");
 
 #if 0
     if( QDate::currentDate().dayOfYear() >= QT_XMAS_JOKE_DAY && var_InheritBool( p_intf, "qt-icon-change" ) )
@@ -127,18 +118,28 @@ AboutDialog::AboutDialog( intf_thread_t *_p_intf)
     /* People who wrote the software */
     ui.authorsPage->setText( qfu( psz_authors ) );
 
-    ui.licenseButton->setText(QString("<html><head/><body><p><span style=\" text-decoration: underline; color:%1;\">%2</span></p></body></html>")
-                           .arg(linkColor, qtr("License")));
-	ui.licenseButton->installEventFilter(this);
-
-	ui.authorsButton->setText(QString("<html><head/><body><p><span style=\" text-decoration: underline; color:%1;\">%2</span></p></body></html>")
-							   .arg(linkColor, qtr("Authors")));
-	ui.authorsButton->installEventFilter(this);
-
-	ui.creditsButton->setText(QString("<html><head/><body><p><span style=\" text-decoration: underline; color:%1;\">%2</span></p></body></html>")
-							   .arg(linkColor, qtr("Credits")));
-	ui.creditsButton->installEventFilter(this);
+    ui.licenseButton->installEventFilter( this );
+    ui.authorsButton->installEventFilter( this );
+    ui.creditsButton->installEventFilter( this );
     ui.version->installEventFilter( this );
+
+    applyTheme();
+    connect( Theme::instance(), &Theme::changed, this, &AboutDialog::applyTheme );
+}
+
+/* Rich text bakes its colours in: rebuild it when the theme changes. */
+void AboutDialog::applyTheme()
+{
+    const QString link = QApplication::palette().color( QPalette::Link ).name();
+    QString translatedString = qtr( "<p>VLC media player is a free and open source media player, encoder, and streamer made by the volunteers of the <a href=\"http://www.videolan.org/\"><span style=\" text-decoration: underline; color:#0057ae;\">VideoLAN</span></a> community.</p><p>VLC uses its internal codecs, works on essentially every popular platform, and can read almost all files, CDs, DVDs, network streams, capture cards and other media formats!</p><p><a href=\"http://www.videolan.org/contribute/\"><span style=\" text-decoration: underline; color:#0057ae;\">Help and join us!</span></a>" );
+    /* the translated text names the old link colour; use the theme's */
+    translatedString.replace( QLatin1String( "#0057ae" ), link );
+    ui.MainBlabla->setText("<html><head/><body>" + translatedString + "</p></body> </html>");
+
+    const QString button = QStringLiteral( "<span style=\" text-decoration: underline; color:%1;\">%2</span>" );
+    ui.licenseButton->setText( button.arg( link, qtr( "License" ) ) );
+    ui.authorsButton->setText( button.arg( link, qtr( "Authors" ) ) );
+    ui.creditsButton->setText( button.arg( link, qtr( "Credits" ) ) );
 }
 
 void AboutDialog::showLicense()

@@ -33,6 +33,7 @@
 #include "managers/addons_manager.hpp"
 #include "util/animators.hpp"
 #include "util/imagehelper.hpp"
+#include "util/theme.hpp"
 
 #include <cassert>
 
@@ -949,23 +950,15 @@ QColor AddonsListModel::getColorByAddonType( int i_type )
     QColor color;
     switch( i_type )
     {
+    /* shortcut: one accent tint for every known type, the tokens have no
+       categorical palette; add one if the types must be told apart again */
     case ADDON_EXTENSION:
-        color = QColor(0xDB, 0xC5, 0x40);
-        break;
     case ADDON_PLAYLIST_PARSER:
-        color = QColor(0x36, 0xBB, 0x59);
-        break;
     case ADDON_SERVICE_DISCOVERY:
-        color = QColor(0xDB, 0x52, 0x40);
-        break;
     case ADDON_SKIN2:
-        color = QColor(0x8B, 0xD6, 0xFC);
-        break;
     case ADDON_INTERFACE:
-        color = QColor(0x00, 0x13, 0x85);
-        break;
     case ADDON_META:
-        color = QColor(0xCD, 0x23, 0xBF);
+        color = Theme::instance()->color( Theme::AccentTint14 );
         break;
     case ADDON_PLUGIN:
     case ADDON_UNKNOWN:
@@ -1177,8 +1170,8 @@ void AddonItemDelegate::paint( QPainter *painter,
                            statusMargins.top() + statusMargins.bottom() );
         QPainterPath path;
         path.addRoundedRect( statusRect, 2.0, 2.0 );
-        painter->fillPath( path, QColor( Qt::green ).darker( 125 ) );
-        painter->setPen( Qt::white );
+        painter->fillPath( path, Theme::instance()->color( Theme::Accent ) );
+        painter->setPen( Theme::instance()->color( Theme::OnAccent ) );
         painter->drawText(
             statusRect.adjusted( statusMargins.left(), statusMargins.top(),
                                  -statusMargins.right(), -statusMargins.bottom() ),
@@ -1245,7 +1238,7 @@ void AddonItemDelegate::paint( QPainter *painter,
         {
             painter->save();
             painter->setCompositionMode( QPainter::CompositionMode_SourceOver );
-            painter->fillRect( newopt.rect, QColor( 255, 255, 255, 128 ) );
+            painter->fillRect( newopt.rect, Theme::instance()->color( Theme::Glass ) );
             if ( animator && index.isValid() )
             {
                 animator->setIndex( index );

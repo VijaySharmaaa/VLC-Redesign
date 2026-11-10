@@ -35,6 +35,7 @@
 #include "util/buttons/BrowseButton.hpp"
 #include "util/buttons/RoundButton.hpp"
 #include "util/imagehelper.hpp"
+#include "util/theme.hpp"
 
 #include "qt.hpp"
 #include "input_manager.hpp"
@@ -353,7 +354,7 @@ void PreviewWidget::paintEvent( QPaintEvent * )
 
     /* Draw central area */
     QRect conearea( 0, i_offset, size().width(), size().height() - i_total );
-    painter.fillRect( conearea, Qt::black );
+    painter.fillRect( conearea, Theme::instance()->color( Theme::VideoSurface ) );
     QPixmap cone = QPixmap( ":/logo/vlc128.png" );
     if ( ( conearea.size() - QSize(10, 10) - cone.size() ).isEmpty() )
         cone = cone.scaled( conearea.size() - QSize(10, 10), Qt::KeepAspectRatio );
@@ -373,7 +374,7 @@ void PreviewWidget::paintEvent( QPaintEvent * )
     }
 
     /* Draw overlay */
-    painter.fillRect( rect(), QColor( 255, 255, 255, 128 ) );
+    painter.fillRect( rect(), Theme::instance()->color( Theme::Glass ) );
 
     painter.end();
 }

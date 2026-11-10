@@ -166,6 +166,9 @@ InterfacePreviewWidget::InterfacePreviewWidget ( QWidget *parent ) : QLabel( par
 {
     setGeometry( 0, 0, 128, 100 );
     setSizePolicy( QSizePolicy::Fixed, QSizePolicy::Fixed );
+    /* a panel behind the sample screenshot, from the application palette */
+    setBackgroundRole( QPalette::AlternateBase );
+    setAutoFillBackground( true );
 }
 
 void InterfacePreviewWidget::setNormalPreview( bool b_minimal )

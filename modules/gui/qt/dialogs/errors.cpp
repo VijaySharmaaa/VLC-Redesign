@@ -26,6 +26,7 @@
 #endif
 
 #include "dialogs/errors.hpp"
+#include "util/theme.hpp"
 
 #include <QTextCursor>
 #include <QTextEdit>
@@ -76,9 +77,9 @@ void ErrorsDialog::addError( const QString& title, const QString& text )
 void ErrorsDialog::add( bool error, const QString& title, const QString& text )
 {
     messages->textCursor().movePosition( QTextCursor::End );
-    messages->setTextColor( error ? "red" : "yellow" );
+    messages->setTextColor( Theme::instance()->color( error ? Theme::Error : Theme::Accent ) );
     messages->insertPlainText( title + QString( ":\n" ) );
-    messages->setTextColor( "black" );
+    messages->setTextColor( messages->palette().color( QPalette::Text ) );
     messages->insertPlainText( text + QString( "\n" ) );
     messages->ensureCursorVisible();
     if ( var_InheritBool( p_intf, "qt-error-dialogs" ) )
