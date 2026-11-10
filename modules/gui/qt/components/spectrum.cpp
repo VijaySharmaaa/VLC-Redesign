@@ -28,10 +28,17 @@
 #include <vlc_aout.h>
 #include <vlc_filter.h>
 
+#ifdef _WIN32
+# include <windows.h>
+#endif
+
+#include <algorithm>
 #include <atomic>
 
 #include <QMutex>
 #include <QPainter>
+#include <QScreen>
+#include <QWindow>
 #include <QStringList>
 #include <QTimer>
 
@@ -157,11 +164,40 @@ QSize SpectrumWidget::sizeHint() const
 
 void SpectrumWidget::restart()
 {
-    /* reduced motion: static flat bars, nothing to run */
-    if( isVisible() && Theme::instance()->duration( Theme::Spectrum ) > 0 )
+    if( isVisible() )
         timer->start();
     else
         timer->stop();
+}
+
+/* Nothing of it can be seen: minimised, or an inactive window with other
+ * windows over the bars (Windows tells no one about occlusion: ask) */
+bool SpectrumWidget::hidden() const
+{
+    const QWidget *w = window();
+    if( w->isMinimized() )
+        return true;
+    if( w->isActiveWindow() )
+        return false;
+#ifdef _WIN32
+    const HWND top = reinterpret_cast<HWND>( w->winId() );
+    const int y = height() / 2;
+    const int xs[] = { width() / 4, width() / 2, width() * 3 / 4 };
+    for( int x : xs )
+    {
+        /* Qt scales from each screen's origin, which stays in Windows' px */
+        const QPoint g = mapToGlobal( QPoint( x, y ) );
+        const QPoint o = w->windowHandle()->screen()->geometry().topLeft();
+        const QPoint n = o + ( g - o ) * devicePixelRatioF();
+        const POINT pt = { n.x(), n.y() };
+        /* its own overlays (the immersive bar) are owned by the window */
+        if( GetAncestor( WindowFromPoint( pt ), GA_ROOTOWNER ) == top )
+            return false;
+    }
+    return true;
+#else
+    return false;
+#endif
 }
 
 void SpectrumWidget::showEvent( QShowEvent * )
@@ -179,6 +215,23 @@ void SpectrumWidget::hideEvent( QHideEvent * )
 
 void SpectrumWidget::tick()
 {
+    /* reduced motion (read live): static flat bars. Covered: no work. Both
+     * check back at the slow rate, for the setting or the window to return */
+    const bool still = Theme::instance()->duration( Theme::Spectrum ) == 0;
+    if( still || hidden() )
+    {
+        timer->setInterval( NowPlaying::SpectrumMotion );
+        if( still && std::any_of( shown, shown + BANDS, []( float h ) { return h != 0.f; } ) )
+        {
+            memset( shown, 0, sizeof( shown ) );
+            update();
+        }
+        if( !playing )
+            timer->stop();
+        return;
+    }
+    timer->setInterval( NowPlaying::SpectrumFrame );
+
     float target[BANDS] = { 0.f };
     if( playing )
     {

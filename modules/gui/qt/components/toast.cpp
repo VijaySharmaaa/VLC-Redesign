@@ -21,6 +21,7 @@
 #endif
 
 #include "components/toast.hpp"
+#include "components/video_overlays.hpp"
 #include "util/theme.hpp"
 #include "util/redesign_icons.hpp"
 
@@ -42,11 +43,11 @@ static int SnapshotCB( vlc_object_t *, const char *,
     return VLC_SUCCESS;
 }
 
-Toast::Toast( intf_thread_t *_p_intf, QWidget *owner, QWidget *content )
-    : OverlayWindow( owner ), p_intf( _p_intf ), overVideo( false )
+Toast::Toast( intf_thread_t *_p_intf, QWidget *owner, QWidget *_content )
+    : OverlayWindow( owner ), p_intf( _p_intf ), content( _content ), overVideo( false )
 {
     setFont( Theme::instance()->font( Theme::Body ) );
-    host = new OverlayHost( content, this );
+    host = new OverlayHost( _content, this );
     connect( host, &OverlayHost::changed, this, &Toast::place );
 
     fade = new QPropertyAnimation( this, "windowOpacity", this );
@@ -147,10 +148,16 @@ void Toast::fitText()
 QPoint Toast::restingPos() const
 {
     const QRect r = host->targetRect();
-    int margin = Theme::instance()->px( O::ToastMargin );
-    if( overVideo )
-        margin = qMax( margin, r.height() * O::ToastOverVideoPercent / 100 );
-    return QPoint( r.center().x() - width() / 2, r.bottom() + 1 - margin - height() );
+    int bottom = r.bottom() + 1 - Theme::instance()->px( O::ToastMargin );
+    /* subtitles sit at the bottom of the picture, not of the area (bars
+     * around it), and above the immersive bar while it shows */
+    if( overVideo && content )
+    {
+        const QRect pic = videoPictureRect( p_intf, r );
+        bottom = qMin( bottom, pic.bottom() + 1 - content->property( "subtitleLift" ).toInt()
+                               - pic.height() * O::ToastOverVideoPercent / 100 );
+    }
+    return QPoint( r.center().x() - width() / 2, bottom - height() );
 }
 
 void Toast::paintEvent( QPaintEvent * )

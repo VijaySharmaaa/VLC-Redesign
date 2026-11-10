@@ -26,6 +26,7 @@
 #include "util/theme.hpp"
 #include "util/redesign_icons.hpp"
 
+#include <vlc_input.h>
 #include <vlc_vout.h>
 
 #ifdef _WIN32
@@ -73,6 +74,44 @@ namespace
     };
 
     const QEvent::Type WakeEvent = static_cast<QEvent::Type>( QEvent::registerEventType() );
+}
+
+/* shortcut: ignores crop and zoom (the picture is then larger than this),
+ * upgrade if overlays must follow them */
+QRect videoPictureRect( intf_thread_t *p_intf, const QRect &area )
+{
+    input_thread_t *input = THEMIM->getInput();
+    if( !input || area.isEmpty() )
+        return area;
+    double dar = 0.;
+    input_item_t *item = input_GetItem( input );
+    vlc_mutex_lock( &item->lock );
+    for( int i = 0; i < item->i_es && dar == 0.; i++ )
+    {
+        const video_format_t &v = item->es[i]->video;
+        if( item->es[i]->i_cat == VIDEO_ES && v.i_visible_width && v.i_visible_height )
+            dar = double( v.i_visible_width ) / v.i_visible_height
+                * ( v.i_sar_num && v.i_sar_den ? double( v.i_sar_num ) / v.i_sar_den : 1. );
+    }
+    vlc_mutex_unlock( &item->lock );
+    vout_thread_t *vout = input_GetVout( input );
+    if( vout )
+    {
+        char *ar = var_GetString( vout, "aspect-ratio" );
+        unsigned num, den;
+        if( ar && sscanf( ar, "%u:%u", &num, &den ) == 2 && num && den )
+            dar = double( num ) / den;
+        free( ar );
+        vlc_object_release( vout );
+    }
+    if( dar <= 0. )
+        return area;
+    QSize pic( qRound( area.height() * dar ), area.height() );
+    if( pic.width() > area.width() )
+        pic = QSize( area.width(), qRound( area.width() / dar ) );
+    QRect r( QPoint(), pic );
+    r.moveCenter( area.center() );
+    return r;
 }
 
 /**********************************************************************
@@ -273,7 +312,7 @@ void BufferingOverlay::paintEvent( QPaintEvent * )
 ImmersiveBar::ImmersiveBar( intf_thread_t *_p_intf, QWidget *owner, QWidget *_area,
                             bool advanced )
     : OverlayWindow( owner, TakeInput ), p_intf( _p_intf ), area( _area ),
-      inputC( NULL ), controls( NULL ), wakePosted( 0 ), active( false ), asleep( false )
+      inputC( NULL ), controls( NULL ), lift( 0 ), wakePosted( 0 ), active( false ), asleep( false )
 {
     setAccessibleName( qtr( "Playback controls" ) );
     /* Tab moves the keys into it (takeFocus); a click still does not take
@@ -350,6 +389,7 @@ void ImmersiveBar::setVoutList( vout_thread_t **pp_vout, int i_vout )
         {
             /* returns once no callback runs: none posts to us after it */
             var_DelCallback( p_vout, "mouse-moved", MouseMovedCB, this );
+            var_SetInteger( p_vout, "sub-margin", userMargin.take( p_vout ) );
             vlc_object_release( p_vout );
         }
     foreach( vout_thread_t *p_vout, set )
@@ -357,8 +397,58 @@ void ImmersiveBar::setVoutList( vout_thread_t **pp_vout, int i_vout )
         {
             vlc_object_hold( p_vout );
             var_AddCallback( p_vout, "mouse-moved", MouseMovedCB, this );
+            userMargin.insert( p_vout, var_GetInteger( p_vout, "sub-margin" ) );
+            if( lift )
+                var_SetInteger( p_vout, "sub-margin", userMargin.value( p_vout ) + lift );
         }
     vouts = set;
+    if( i_vout )
+        liftSubtitles();
+}
+
+/* While the bar is up, subtitles drawn under it move above it, as the
+ * renders show: "sub-margin" on each vout, from the bottom of the picture.
+ * Its unit is a px of the picture the vout blends subtitles into: the
+ * video's own px, or the window's when the video is smaller than the
+ * window (vout ThreadDisplayRenderPicture). */
+void ImmersiveBar::liftSubtitles()
+{
+    int units = 0, px = 0;
+    const QRect pic = videoPictureRect( p_intf, host->targetRect() );
+    const int over = pic.bottom() - restingRect().top() + 1;   /* logical px */
+    if( active && !asleep && host->targetShown() && over > 0 && !vouts.isEmpty() )
+    {
+        px = over;
+        const qreal dpr = devicePixelRatioF();
+        const QSize shown = pic.size() * dpr;
+        input_thread_t *input = THEMIM->getInput();
+        QSize video;
+        if( input )
+        {
+            input_item_t *item = input_GetItem( input );
+            vlc_mutex_lock( &item->lock );
+            for( int i = 0; i < item->i_es && video.isEmpty(); i++ )
+                if( item->es[i]->i_cat == VIDEO_ES )
+                    video = QSize( item->es[i]->video.i_visible_width, item->es[i]->video.i_visible_height );
+            vlc_mutex_unlock( &item->lock );
+        }
+        units = qRound( over * dpr );
+        if( !video.isEmpty() && shown.height() > 0
+         && qint64( video.width() ) * video.height() >= qint64( shown.width() ) * shown.height() )
+            units = qRound( qreal( units ) * video.height() / shown.height() );
+    }
+    /* the toast keeps above the lifted lines (Toast::restingPos); the
+     * audio page keeps its spectrum above the bar (immersiveInset, logical
+     * px from the bottom; both come with a DynamicPropertyChange event) */
+    area->setProperty( "subtitleLift", px );
+    const bool up = active && !asleep && host->targetShown();
+    area->setProperty( "immersiveInset",
+                       up ? host->targetRect().bottom() + 1 - restingRect().top() : 0 );
+    if( units == lift )
+        return;
+    lift = units;
+    foreach( vout_thread_t *p_vout, vouts )
+        var_SetInteger( p_vout, "sub-margin", userMargin.value( p_vout ) + lift );
 }
 
 /* vout thread: no widget access, only a posted event to the Qt thread */
@@ -496,6 +586,7 @@ void ImmersiveBar::animate( bool in )
 {
     const int ms = Theme::instance()->duration( Theme::ImmersiveFade );
     anim->stop();
+    liftSubtitles();
     if( !ms || !host->targetShown() )
     {
         place();
@@ -521,6 +612,7 @@ void ImmersiveBar::animate( bool in )
 void ImmersiveBar::place()
 {
     anim->stop();
+    liftSubtitles();
     if( !active || asleep || !host->targetShown() )
     {
         hide();

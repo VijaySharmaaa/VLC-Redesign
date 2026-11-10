@@ -40,6 +40,7 @@
 #include <QDate>
 #include <QGridLayout>
 #include <QLabel>
+#include <QLocale>
 #include <QSlider>
 #include <QToolButton>
 #include <QPalette>
@@ -476,7 +477,11 @@ void BackgroundWidget::titleUpdated( const QString& title )
 void BackgroundWidget::showEvent( QShowEvent * e )
 {
     Q_UNUSED( e );
-    if ( b_withart ) fadeAnimation->start();
+    /* reduced motion: the art is there at once (stock fade otherwise) */
+    if ( b_withart && Theme::instance()->duration( Theme::ViewChange ) )
+        fadeAnimation->start();
+    else
+        setProperty( "opacity", 1.0 );
 }
 
 void BackgroundWidget::paintEvent( QPaintEvent *e )
@@ -564,9 +569,15 @@ EasterEggBackgroundWidget::~EasterEggBackgroundWidget()
     delete flakes;
 }
 
+/* the snow is motion: none when Windows animations are off */
+static bool snows()
+{
+    return Theme::instance()->duration( Theme::ViewChange ) > 0;
+}
+
 void EasterEggBackgroundWidget::showEvent( QShowEvent *e )
 {
-    if ( b_enabled ) timer->start();
+    if ( b_enabled && snows() ) timer->start();
     BackgroundWidget::showEvent( e );
 }
 
@@ -586,12 +597,19 @@ void EasterEggBackgroundWidget::resizeEvent( QResizeEvent *e )
 void EasterEggBackgroundWidget::animate()
 {
     b_enabled = true;
-    if ( isVisible() ) timer->start();
+    if ( isVisible() && snows() ) timer->start();
 }
 
 void EasterEggBackgroundWidget::spawnFlakes()
 {
     if ( ! isVisible() ) return;
+    if ( ! snows() )    /* turned off meanwhile: the snow goes; a later show resumes */
+    {
+        timer->stop();
+        reset();
+        update();
+        return;
+    }
 
     double w = (double) width() / RAND_MAX;
 
@@ -669,7 +687,7 @@ SpeedLabel::SpeedLabel( intf_thread_t *_p_intf, QWidget *parent )
 
 void SpeedLabel::setRate( float rate )
 {
-    const QString str = QString::number( rate, 'f', 2 ) + QChar( 0x00D7 );
+    const QString str = QLocale().toString( rate, 'f', 2 ) + QChar( 0x00D7 );
     setText( str );
     setToolTip( qtr( "Current playback speed: %1\nClick to adjust" ).arg( str ) );
     const bool on = qAbs( rate - 1.f ) > .001f;

@@ -56,6 +56,7 @@ protected:
 private:
     void tick();
     void restart();
+    bool hidden() const;
     void setCounted( bool ); /* in the filter's count of visible widgets */
 
     intf_thread_t *p_intf;
