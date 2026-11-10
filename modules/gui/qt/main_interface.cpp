@@ -309,6 +309,9 @@ MainInterface::MainInterface( intf_thread_t *_p_intf, bool customFrame ) : QVLCM
         if( THEMIM->getIM()->hasVideo() || var_CountChoices( input, "video-es" ) > 0 )
             return;
         QWidget *current = stackCentralW->currentWidget();
+        /* the user is in Preferences: it stays, the audio plays under it */
+        if( current == sidebar->page( Sidebar::Preferences ) )
+            return;
         if( current == bgWidget || ( isLibraryPage( current ) && !b_browsing ) )
             showTab( audioPage );
     } );
@@ -1698,6 +1701,10 @@ void MainInterface::toggleMiniPlayer()
  */
 void MainInterface::toggleMinimalView( bool b_minimal )
 {
+    /* its sections are in the sidebar, which minimal view hides: leave it
+     * as Back does (Ctrl+P there opens the dialog) */
+    if( b_minimal && stackCentralW->currentWidget() == sidebar->page( Sidebar::Preferences ) )
+        sidebar->goBack();
     if( !b_minimalView && b_autoresize ) /* Normal mode */
     {
         if( stackCentralW->currentWidget() == bgWidget )
