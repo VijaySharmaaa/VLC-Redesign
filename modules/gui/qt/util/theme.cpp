@@ -571,11 +571,11 @@ QMenuBar::item { background: transparent; padding: @menuTitlePadY@px @menuTitleP
 QMenuBar::item:selected { background: @hoverFill@; color: @tx@; }
 QMenuBar::item:pressed { background: @openFill@; color: @tx@; }
 
-QMenu { background: @raised@; color: @tx@; border: 1px solid @border@; padding: @menuPad@px; min-width: @menuMinW@px;
+QMenu { background: @raised@; color: @tx@; border: @popupBorder@; padding: @menuPad@px; min-width: @menuMinW@px;
     -qt-style-features: background-color; }
 QMenu::separator { height: 1px; background: @border@; margin: @menuPad@px @menuSepX@px; }
 
-QToolTip { background: @raised@; color: @tx@; border: 1px solid @border@; padding: @menuPad@px @menuTitlePadX@px; }
+QToolTip { background: @raised@; color: @tx@; border: @popupBorder@; padding: @menuPad@px @menuTitlePadX@px; }
 
 QPushButton { background: @raised@; color: @tx@; border: 1px solid @outline@; border-radius: @radiusMd@px; padding: @menuPad@px @buttonPadX@px; }
 QPushButton:hover { background: @hover@; }
@@ -588,6 +588,10 @@ QToolButton { background: transparent; border: 2px solid transparent; border-rad
 QToolButton:hover { background: @hoverFill@; }
 QToolButton:pressed { background: @openFill@; }
 QToolButton:checked { background: @accentTint@; }
+QToolButton[popupMode="1"] { padding-right: @iconGlyph@px; }
+QToolButton::menu-button { background: transparent; border: none; width: @iconGlyph@px; }
+QToolButton::menu-arrow { image: url("@arrowDown@"); width: @iconGlyph@px; height: @iconGlyph@px; }
+QToolButton::menu-arrow:disabled { image: url("@arrowDownDim@"); }
 
 QLineEdit, QAbstractSpinBox, QComboBox, QTextEdit, QPlainTextEdit {
     background: @surface@; color: @tx@; border: 1px solid @outline@; border-radius: @radiusMd@px;
@@ -602,7 +606,7 @@ QComboBox::down-arrow, QAbstractSpinBox::down-arrow { image: url("@arrowDown@");
 QAbstractSpinBox::up-arrow { image: url("@arrowUp@"); }
 QComboBox::down-arrow:disabled, QAbstractSpinBox::down-arrow:disabled, QAbstractSpinBox::down-arrow:off { image: url("@arrowDownDim@"); }
 QAbstractSpinBox::up-arrow:disabled, QAbstractSpinBox::up-arrow:off { image: url("@arrowUpDim@"); }
-QComboBox QAbstractItemView { background: @raised@; border: 1px solid @border@; selection-background-color: @hoverFill@; selection-color: @tx@; outline: 0; }
+QComboBox QAbstractItemView { background: @raised@; border: @popupBorder@; selection-background-color: @hoverFill@; selection-color: @tx@; outline: 0; }
 
 QLineEdit:focus, QAbstractSpinBox:focus, QComboBox:focus { border: 2px solid @accent@; padding: 0px @menuPadFocus@px; }
 QTextEdit:focus, QPlainTextEdit:focus, QPushButton:focus { border: 2px solid @accent@; }
@@ -651,6 +655,13 @@ QLabel[role="hint"] { color: @mute@; }
 )QSS";
 
     const Palette &p = palette();
+#ifdef _WIN32
+    /* DWM rounds and outlines pop-ups from Windows 11 (applyWindowFrame):
+     * a square border would be clipped at the corners there */
+    const bool dwmRounds = WinTheme::build() >= 22000;
+#else
+    const bool dwmRounds = false;
+#endif
     const int lineH = QFontMetrics(font(Body)).height();
     const int metaH = QFontMetrics(font(Meta)).height();
     const struct { const char *name; QString value; } vars[] = {
@@ -668,6 +679,8 @@ QLabel[role="hint"] { color: @mute@; }
         { "onAccent", css(color(OnAccent)) },
         { "accentTint", css(color(AccentTint14)) },
         { "accentBorder", css(color(AccentBorder50)) },
+        { "popupBorder", dwmRounds ? QString("none")
+                                   : QString("1px solid %1").arg(css(ink(InkAlpha::Border))) },
         { "hoverFill", css(ink(InkAlpha::HoverFill)) },
         { "openFill", css(ink(InkAlpha::OpenFill)) },
         { "divider", css(ink(InkAlpha::Divider)) },
@@ -719,16 +732,17 @@ QLabel[role="hint"] { color: @mute@; }
  * on screen yet, and windows whose flags changed get it again. */
 void Theme::applyWindowFrame(QWidget *w) const
 {
+    /* Frameless windows (fullscreen controller, time tooltip) draw their
+     * own shape: no caption to colour, no corners to round. */
+    if (w->windowFlags() & Qt::FramelessWindowHint)
+        return;
     const Qt::WindowType type = w->windowType();
     if (type == Qt::Popup || type == Qt::ToolTip)
     {
         WinTheme::setRoundCorners(reinterpret_cast<HWND>(w->winId()));
         return;
     }
-    /* Tool windows such as Effects have a caption too; the frameless ones
-     * (fullscreen controller, time tooltip) have none to colour. */
-    if ((type != Qt::Window && type != Qt::Dialog && type != Qt::Tool)
-        || (w->windowFlags() & Qt::FramelessWindowHint))
+    if (type != Qt::Window && type != Qt::Dialog && type != Qt::Tool)
         return;
     HWND hwnd = reinterpret_cast<HWND>(w->winId());
     const HRESULT hrDark = WinTheme::setDarkTitleBar(hwnd, dark);
