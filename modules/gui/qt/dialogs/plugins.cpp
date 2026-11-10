@@ -370,7 +370,6 @@ AddonsTab::AddonsTab( intf_thread_t *p_intf_ ) : QVLCFrame( p_intf_ )
     button->setToolButtonStyle( Qt::ToolButtonTextBesideIcon );\
     button->setIconSize( QSize( 32, 32 ) );\
     button->setSizePolicy(QSizePolicy::MinimumExpanding,QSizePolicy::Maximum) ;\
-    button->setMinimumSize( 32, 32 );\
     button->setAutoRaise( true );\
     button->setCheckable( true );\
     if ( numb == -1 ) button->setChecked( true );\
@@ -428,7 +427,8 @@ AddonsTab::AddonsTab( intf_thread_t *p_intf_ ) : QVLCFrame( p_intf_ )
 
     QPushButton *reposyncButton = new QPushButton( QIcon( ":/update.svg" ),
                                               qtr("Find more addons online") );
-    reposyncButton->setSizePolicy( QSizePolicy::Ignored, QSizePolicy::Preferred );
+    /* never narrower than its label, like the category buttons above */
+    reposyncButton->setSizePolicy( QSizePolicy::Minimum, QSizePolicy::Preferred );
     switchStack->insertWidget( ONLYLOCALADDONS, reposyncButton );
     switchStack->setCurrentIndex( ONLYLOCALADDONS );
     connect( reposyncButton, &QPushButton::clicked, this, &AddonsTab::reposync );
@@ -950,16 +950,19 @@ QColor AddonsListModel::getColorByAddonType( int i_type )
     QColor color;
     switch( i_type )
     {
-    /* shortcut: one accent tint for every known type, the tokens have no
-       categorical palette; add one if the types must be told apart again */
     case ADDON_EXTENSION:
     case ADDON_PLAYLIST_PARSER:
     case ADDON_SERVICE_DISCOVERY:
     case ADDON_SKIN2:
     case ADDON_INTERFACE:
     case ADDON_META:
-        color = Theme::instance()->color( Theme::AccentTint14 );
+    {
+        /* one hue per type, spread around the accent's at its tint alpha */
+        const QColor tint = Theme::instance()->color( Theme::AccentTint14 );
+        color = QColor::fromHsv( ( tint.hue() + 360 * i_type / ADDON_OTHER ) % 360,
+                                 tint.saturation(), tint.value(), tint.alpha() );
         break;
+    }
     case ADDON_PLUGIN:
     case ADDON_UNKNOWN:
     case ADDON_OTHER:
