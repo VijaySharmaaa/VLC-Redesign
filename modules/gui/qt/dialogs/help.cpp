@@ -105,12 +105,13 @@ AboutDialog::AboutDialog( intf_thread_t *_p_intf)
     setWindowFlags( Qt::Dialog | Qt::WindowTitleHint | Qt::WindowSystemMenuHint |
                     Qt::WindowCloseButtonHint );
     Theme *t = Theme::instance();
-    /* shortcut: the cone and spacing reuse the library's empty-state tokens
-     * (56 px, the design shows 64); add Dialogs::AboutLogo if they differ */
+    /* the card's width; its height follows the wrapped blurb. The spacing
+     * reuses the library empty state's */
+    setMinimumWidth( t->px( RedesignTokens::Dialogs::AboutW ) );
     const int pad = t->px( RedesignTokens::Library::EmptyPad );
     ui.bodyLayout->setContentsMargins( pad, pad, pad, pad );
     ui.bodyLayout->setSpacing( t->px( RedesignTokens::Library::EmptyGap ) );
-    const int cone = t->px( RedesignTokens::Library::EmptyCone );
+    const int cone = t->px( RedesignTokens::Dialogs::AboutLogo );
     ui.VLCcone->setPixmap( QIcon( ":/logo/vlc128.png" ).pixmap( cone, cone ) );
     ui.footer->setBackgroundRole( QPalette::AlternateBase );
     ui.footer->setAutoFillBackground( true );
