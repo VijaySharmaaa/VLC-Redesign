@@ -335,6 +335,15 @@ MainInterface::MainInterface( intf_thread_t *_p_intf, bool customFrame ) : QVLCM
     }
 
     connect( THEDP, &DialogsProvider::toolBarConfUpdated, this, &MainInterface::toolBarConfUpdated );
+    /* the effects sheet and the docked playlist share the right side:
+     * opening the sheet closes the playlist (ExtendedDialog does the reverse) */
+    connect( THEDP, &DialogsProvider::panelShown, this, [this]( int action, bool shown ) {
+        if( action == EXTENDED_ACTION && shown && playlistPanel && playlistPanel->isVisible() )
+        {
+            playlistVisible = false;
+            showPlaylistPanel( false );
+        }
+    } );
     installEventFilter( this );
 
     toast = new Toast( p_intf, this, stackCentralW );

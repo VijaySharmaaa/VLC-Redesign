@@ -118,6 +118,8 @@ public:
     void showToast( const QString & );
     Sidebar *getSidebar() { return sidebar; }
     BreakpointWatcher *getBreakpoints() { return breakpoints; }
+    /* where side sheets dock: the stack, in the content row (ExtendedDialog) */
+    QWidget *getCentralStack() { return stackCentralW; }
     /* Hides QMainWindow::menuBar(), which would replace the title bar */
     QMenuBar *menuBar() const;
 

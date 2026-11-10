@@ -29,42 +29,126 @@
 
 #include "dialogs/extended.hpp"
 
-#include "main_interface.hpp" /* Needed for external MI size */
+#include "main_interface.hpp" /* the dock and the breakpoints */
 #include "input_manager.hpp"
 #include "dialogs_provider.hpp"
-#include "actions_manager.hpp"   /* EXTENDED_ACTION */
+#include "actions_manager.hpp"   /* EXTENDED_ACTION, PLAYLIST_ACTION */
+#include "components/overlay_host.hpp"
+#include "util/theme.hpp"
+#include "util/redesign_icons.hpp"
 
-#include <QTabWidget>
+#include <QApplication>
+#include <QBoxLayout>
 #include <QGridLayout>
-#include <QDialogButtonBox>
+#include <QKeyEvent>
+#include <QKeySequence>
+#include <QLabel>
+#include <QLinearGradient>
+#include <QMenu>
+#include <QPainter>
 #include <QPushButton>
+#include <QScrollArea>
+#include <QTabBar>
+#include <QTabWidget>
+#include <QToolButton>
+#include <QVariantAnimation>
 #include <vlc_modules.h>
 
-ExtendedDialog::ExtendedDialog( intf_thread_t *_p_intf )
-               : QVLCDialog( (QWidget*)_p_intf->p_sys->p_mi, _p_intf )
-{
-#ifdef __APPLE__
-    setWindowFlags( Qt::Drawer );
-#elif !defined( _WIN32 )
-    setWindowFlags( Qt::Tool );
-#endif
-    /* Windows keeps QVLCDialog's dialog frame: a tool window's small caption
-     * and close glyph are not themed by DWM like the other dialogs' */
+using namespace RedesignTokens;
 
-    setWindowOpacity( var_InheritFloat( p_intf, "qt-opacity" ) );
+namespace
+{
+
+/* A page that scrolls vertically, with the sheet's body padding */
+QScrollArea *scrolled( QWidget *page )
+{
+    const int pad = Theme::instance()->px( Effects::BodyPad );
+    QWidget *inner = new QWidget;
+    QVBoxLayout *layout = new QVBoxLayout( inner );
+    layout->setContentsMargins( pad, pad, pad, pad );
+    layout->addWidget( page );
+    QScrollArea *area = new QScrollArea;
+    area->setWidgetResizable( true );
+    area->setFrameShape( QFrame::NoFrame );
+    area->setHorizontalScrollBarPolicy( Qt::ScrollBarAlwaysOff );
+    area->setWidget( inner );
+    return area;
+}
+
+/* Sub-pages are reached from "More": no tab bar, and only the page shown
+ * counts for the size, or the Essential page would scroll as long as the
+ * Colors one */
+void asPages( QTabWidget *pages )
+{
+    QTabBar *bar = pages->findChild<QTabBar *>( QString(), Qt::FindDirectChildrenOnly );
+    if( bar )
+        bar->hide();
+    const auto fit = [pages]( int current ) {
+        for( int i = 0; i < pages->count(); i++ )
+        {
+            const QSizePolicy::Policy p = i == current ? QSizePolicy::Preferred
+                                                       : QSizePolicy::Ignored;
+            pages->widget( i )->setSizePolicy( p, p );
+        }
+    };
+    QObject::connect( pages, &QTabWidget::currentChanged, pages, fit );
+    fit( pages->currentIndex() );
+}
+
+}
+
+ExtendedDialog::ExtendedDialog( intf_thread_t *_p_intf )
+               : QWidget( NULL ), p_intf( _p_intf ), dock( NULL ), dockParent( NULL ),
+                 host( NULL ), slide( NULL ), fullWidth( 0 ), shownWidth( 0 ), drawer( false )
+{
+    MainInterface *p_mi = p_intf->p_sys->p_mi;
+    QWidget *over = p_mi ? p_mi->getCentralStack() : NULL;
+    if( over )
+    {
+        dockParent = over->parentWidget();
+        dock = qobject_cast<QBoxLayout *>( dockParent->layout() );
+        assert( dock );
+        setParent( dockParent );
+    }
+    setObjectName( "effectsSheet" );
+    setAccessibleName( qtr( "Effects and filters" ) );
     setWindowTitle( qtr( "Adjustments and Effects" ) );
     setWindowRole( "vlc-extended" );
+    hide();
 
-    QVBoxLayout *layout = new QVBoxLayout( this );
-    layout->setContentsMargins( 0, 2, 0, 1 );
-    layout->setSpacing( 3 );
+    Theme *t = Theme::instance();
+    content = new QWidget( this );
+    QVBoxLayout *layout = new QVBoxLayout( content );
+    layout->setContentsMargins( 0, 0, 0, 0 );
+    layout->setSpacing( t->px( Effects::TabsPadTop ) );
 
-    mainTabW = new QTabWidget( this );
+    /* Header: title, close */
+    QHBoxLayout *head = new QHBoxLayout;
+    head->setContentsMargins( t->px( Effects::HeadPadLeft ), t->px( Effects::HeadPadTop ),
+                              t->px( Effects::HeadPadRight ), 0 );
+    QLabel *title = new QLabel( qtr( "Effects and filters" ), content );
+    title->setFont( t->font( Theme::PanelTitle ) );
+    head->addWidget( title, 1 );
+    QToolButton *close = new QToolButton( content );
+    const int glyphPx = t->px( Effects::CloseGlyph );
+    close->setIcon( Theme::themedIcon( RedesignIcons::IconClose, Theme::Text2 ) );
+    close->setIconSize( QSize( glyphPx, glyphPx ) );
+    close->setFixedSize( t->px( Effects::CloseButton ), t->px( Effects::CloseButton ) );
+    close->setAccessibleName( qtr( "Close effects" ) );
+    /* shortcut: Ctrl+E is copied from menus.cpp (Tools > Effects and
+     * Filters), read it from that action once the menus expose it */
+    close->setToolTip( QString( "%1 (%2)" ).arg( qtr( "Close effects" ),
+        QKeySequence( QLatin1String( "Ctrl+E" ) ).toString( QKeySequence::NativeText ) ) );
+    connect( close, &QToolButton::clicked, this, &QWidget::hide );
+    head->addWidget( close );
+    layout->addLayout( head );
+
+    mainTabW = new QTabWidget( content );
+    mainTabW->setObjectName( "effectsTabs" );
+    mainTabW->setDocumentMode( true );
 
     /* AUDIO effects */
-    QWidget *audioWidget = new QWidget;
-    QHBoxLayout *audioLayout = new QHBoxLayout( audioWidget );
-    QTabWidget *audioTab = new QTabWidget( audioWidget );
+    audioTab = new QTabWidget;
 
     equal = new Equalizer( p_intf, audioTab );
     connect( equal, &Equalizer::configChanged, this, &ExtendedDialog::putAudioConfig );
@@ -77,12 +161,10 @@ ExtendedDialog::ExtendedDialog( intf_thread_t *_p_intf )
     Spatializer *spatial = new Spatializer( p_intf, audioTab );
     connect( spatial, &Spatializer::configChanged, this, &ExtendedDialog::putAudioConfig );
     audioTab->addTab( spatial, qtr( "Spatializer" ) );
-    audioLayout->addWidget( audioTab );
 
     StereoWidener *stereowiden = new StereoWidener( p_intf, audioTab );
     connect( stereowiden, &StereoWidener::configChanged, this, &ExtendedDialog::putAudioConfig );
     audioTab->addTab( stereowiden, qtr( "Stereo Widener" ) );
-    audioLayout->addWidget( audioTab );
 
     QWidget *advancedTab = new QWidget;
     QGridLayout *advancedTabLayout = new QGridLayout;
@@ -95,89 +177,298 @@ ExtendedDialog::ExtendedDialog( intf_thread_t *_p_intf )
 
     advancedTab->setLayout( advancedTabLayout );
     audioTab->addTab( advancedTab, qtr( "Advanced" ) );
-    audioLayout->addWidget( audioTab );
+    asPages( audioTab );
 
-    mainTabW->insertTab( AUDIO_TAB, audioWidget, qtr( "Audio Effects" ) );
+    mainTabW->insertTab( AUDIO_TAB, scrolled( audioTab ), qtr( "Equalizer" ) );
 
     /* Video Effects */
-    QWidget *videoWidget = new QWidget;
-    QHBoxLayout *videoLayout = new QHBoxLayout( videoWidget );
-    QTabWidget *videoTab = new QTabWidget( videoWidget );
-
+    videoTab = new QTabWidget;
     videoEffect = new ExtVideo( p_intf, videoTab );
     connect( videoEffect, &ExtVideo::configChanged, this, &ExtendedDialog::putVideoConfig );
-    videoLayout->addWidget( videoTab );
-    videoTab->setSizePolicy( QSizePolicy::Preferred, QSizePolicy::Maximum );
+    asPages( videoTab );
 
-    mainTabW->insertTab( VIDEO_TAB, videoWidget, qtr( "Video Effects" ) );
+    mainTabW->insertTab( VIDEO_TAB, scrolled( videoTab ), qtr( "Video" ) );
 
-    syncW = new SyncControls( p_intf, videoTab );
-    mainTabW->insertTab( SYNCHRO_TAB, syncW, qtr( "Synchronization" ) );
+    syncW = new SyncControls( p_intf, NULL );
+    mainTabW->insertTab( SYNCHRO_TAB, scrolled( syncW ), qtr( "Synchronization" ) );
 
     if( module_exists( "v4l2" ) )
     {
-        ExtV4l2 *v4l2 = new ExtV4l2( p_intf, mainTabW );
-        mainTabW->insertTab( V4L2_TAB, v4l2, qtr( "v4l2 controls" ) );
+        ExtV4l2 *v4l2 = new ExtV4l2( p_intf, NULL );
+        mainTabW->insertTab( V4L2_TAB, scrolled( v4l2 ), qtr( "v4l2 controls" ) );
     }
 
-    layout->addWidget( mainTabW );
+    /* "More": every other existing panel */
+    moreButton = new QToolButton( mainTabW );
+    moreButton->setText( qtr( "More" ) );
+    moreButton->setAccessibleName( qtr( "More effects" ) );
+    moreButton->setToolTip( qtr( "More effects" ) );
+    moreButton->setPopupMode( QToolButton::InstantPopup );
+    moreButton->setCheckable( true );
+    moreButton->setToolButtonStyle( Qt::ToolButtonTextOnly );
+    QMenu *moreMenu = new QMenu( moreButton );
+    const struct { QTabWidget *pages; QString title; } groups[] = {
+        { audioTab, qtr( "Audio Effects" ) },
+        { videoTab, qtr( "Video Effects" ) },
+    };
+    for( size_t g = 0; g < sizeof( groups ) / sizeof( groups[0] ); g++ )
+    {
+        QTabWidget *pages = groups[g].pages;
+        moreMenu->addSection( groups[g].title );
+        for( int i = 1; i < pages->count(); i++ )
+            connect( moreMenu->addAction( pages->tabText( i ) ), &QAction::triggered,
+                     this, [this, pages, i]() { showPage( pages, i ); } );
+    }
+    moreButton->setMenu( moreMenu );
+    mainTabW->setCornerWidget( moreButton, Qt::TopRightCorner );
+
+    /* the top tabs lead to each group's first page */
+    connect( mainTabW, &QTabWidget::tabBarClicked, this, [this]( int i ) {
+        if( i == AUDIO_TAB )
+            audioTab->setCurrentIndex( 0 );
+        else if( i == VIDEO_TAB )
+            videoTab->setCurrentIndex( 0 );
+    } );
+    connect( audioTab, &QTabWidget::currentChanged, this, &ExtendedDialog::updateMore );
+    connect( videoTab, &QTabWidget::currentChanged, this, &ExtendedDialog::updateMore );
+
+    layout->addWidget( mainTabW, 1 );
     connect( mainTabW, &QTabWidget::currentChanged, this, &ExtendedDialog::currentTabChanged );
 
-    /* Bottom buttons */
-    QDialogButtonBox *buttonBox = new QDialogButtonBox( Qt::Horizontal, this );
-
-    m_applyButton = new QPushButton( qtr("&Save"), this );
+    /* Save, on the Audio and Video tabs */
+    QHBoxLayout *foot = new QHBoxLayout;
+    const int pad = t->px( Effects::BodyPad );
+    foot->setContentsMargins( pad, 0, pad, pad );
+    foot->addStretch( 1 );
+    m_applyButton = new QPushButton( qtr("&Save"), content );
     m_applyButton->setEnabled( false );
-    buttonBox->addButton( m_applyButton, QDialogButtonBox::ApplyRole );
-
-    buttonBox->addButton(
-        new QPushButton( qtr("&Close"), this ), QDialogButtonBox::RejectRole );
-    layout->addWidget( buttonBox );
-
-    connect( buttonBox, &QDialogButtonBox::rejected, this, &ExtendedDialog::close );
+    foot->addWidget( m_applyButton );
+    layout->addLayout( foot );
     connect( m_applyButton, &QPushButton::clicked, this, &ExtendedDialog::saveConfig );
 
-    /* Restore geometry or move this dialog on the left pane of the MI */
-    if( !restoreGeometry( getSettings()->value("EPanel/geometry").toByteArray() ) )
+    /* UI Automation does not read a buddy label: every slider and box of
+     * the panels gets its label's text as its name */
+    foreach( QLabel *label, content->findChildren<QLabel *>() )
     {
-        resize( QSize( 400, 280 ) );
-
-        MainInterface *p_mi = p_intf->p_sys->p_mi;
-        if( p_mi && p_mi->x() > 50 )
-            move( ( p_mi->x() - frameGeometry().width() - 10 ), p_mi->y() );
-        else
-            move ( 450 , 0 );
+        QWidget *buddy = label->buddy();
+        if( buddy && buddy->accessibleName().isEmpty() )
+            buddy->setAccessibleName( label->text().remove( QLatin1Char( '&' ) )
+                                                   .remove( QLatin1Char( ':' ) ).trimmed() );
     }
 
     connect( THEMIM->getIM(), &InputManager::playingStatusChanged, this, &ExtendedDialog::changedItem );
+    connect( t, &Theme::changed, this, static_cast<void (QWidget::*)()>( &QWidget::update ) );
+
+    if( !dock )
+    {
+        /* a window of its own */
+        QVBoxLayout *frame = new QVBoxLayout( this );
+        frame->setContentsMargins( 0, 0, 0, 0 );
+        frame->addWidget( content );
+        if( !restoreGeometry( getSettings()->value("EPanel/geometry").toByteArray() ) )
+            resize( t->px( Effects::SheetW ), sizeHint().height() );
+        return;
+    }
+
+    /* the drawer's shadow is see-through; paintEvent fills the sheet */
+    setAttribute( Qt::WA_TranslucentBackground );
+    dock->addWidget( this );
+
+    host = new OverlayHost( over, this );
+    connect( host, &OverlayHost::changed, this, &ExtendedDialog::place );
+
+    slide = new QVariantAnimation( this );
+    slide->setEasingCurve( OverlayWindow::enterCurve() );
+    connect( slide, &QVariantAnimation::valueChanged, this,
+             [this]( const QVariant &v ) { setShownWidth( v.toInt() ); } );
+
+    setBreakpoint( p_mi->getBreakpoints()->current() );
+    connect( p_mi->getBreakpoints(), &BreakpointWatcher::changed,
+             this, &ExtendedDialog::setBreakpoint );
+
+    /* the docked playlist takes the right side back */
+    connect( THEDP, &DialogsProvider::panelShown, this, [this]( int action, bool shown ) {
+        if( action == PLAYLIST_ACTION && shown )
+            hide();
+    } );
 }
 
 ExtendedDialog::~ExtendedDialog()
 {
-    getSettings()->setValue("EPanel/geometry", saveGeometry());
+    if( !dock )
+        getSettings()->setValue("EPanel/geometry", saveGeometry());
 }
 
 void ExtendedDialog::showEvent( QShowEvent *e )
 {
-    QVLCDialog::showEvent( e );
+    QWidget::showEvent( e );
     THEDP->setPanelShown( EXTENDED_ACTION, true );
+    /* back from a minimised window: no slide, the focus stays */
+    if( !dock || e->spontaneous() )
+        return;
+    slide->stop();
+    const int ms = Theme::instance()->duration( Theme::PanelSlide );
+    if( ms )
+    {
+        slide->setDuration( ms );
+        slide->setStartValue( 0 );
+        slide->setEndValue( fullWidth );
+        slide->start();
+    }
+    else
+        setShownWidth( fullWidth );
+    if( drawer )
+    {
+        /* a window of its own: take the keys, Esc gives them back */
+        raise();
+        activateWindow();
+    }
+    mainTabW->setFocus();
 }
 
 void ExtendedDialog::hideEvent( QHideEvent *e )
 {
-    QVLCDialog::hideEvent( e );
-    THEDP->setPanelShown( EXTENDED_ACTION, false );
+    QWidget::hideEvent( e );
+    /* a minimised main window hides the sheet too: it stays open */
+    if( !e->spontaneous() )
+        THEDP->setPanelShown( EXTENDED_ACTION, false );
+}
+
+void ExtendedDialog::setBreakpoint( BreakpointWatcher::Size bp )
+{
+    fullWidth = Theme::instance()->px( bp == BreakpointWatcher::XS ? Effects::SheetWXS
+                                                                   : Effects::SheetW );
+    const bool shown = isVisible();
+    if( ( bp == BreakpointWatcher::XS ) != drawer )
+    {
+        /* the sheet moves, never the video: its native window stays put */
+        drawer = bp == BreakpointWatcher::XS;
+        if( drawer )
+        {
+            dock->removeWidget( this );
+            setParent( dockParent->window(),
+                       Qt::Tool | Qt::FramelessWindowHint | Qt::NoDropShadowWindowHint );
+            /* the docked fixed width would clamp the drawer's geometry */
+            setMinimumWidth( 0 );
+            setMaximumWidth( QWIDGETSIZE_MAX );
+        }
+        else
+        {
+            setParent( dockParent );
+            dock->addWidget( this );
+        }
+        if( shown )
+            show();   /* setParent() hides */
+    }
+    slide->stop();
+    setShownWidth( fullWidth );
+}
+
+/* shortcut: the dock and drawer code repeats PlaylistPanel's; share one
+ * side panel class once a third panel needs it */
+void ExtendedDialog::setShownWidth( int w )
+{
+    shownWidth = w;
+    if( drawer )
+        place();
+    else
+        setFixedWidth( w );
+}
+
+int ExtendedDialog::shadowWidth() const
+{
+    return drawer ? Theme::instance()->px( Playlist::DrawerShadow ) : 0;
+}
+
+/* The drawer: over the right of the stack, the shadow to its left */
+void ExtendedDialog::place()
+{
+    if( !drawer )
+        return;
+    const QRect target = host->targetRect();
+    const int w = shownWidth + shadowWidth();
+    /* shortcut: always on the right, as in a left-to-right layout; mirror
+     * it with the dock once right-to-left layouts are checked */
+    setGeometry( target.right() + 1 - w, target.top(), w, target.height() );
+}
+
+void ExtendedDialog::resizeEvent( QResizeEvent * )
+{
+    if( dock )
+        content->setGeometry( shadowWidth(), 0, fullWidth, height() );
+}
+
+void ExtendedDialog::paintEvent( QPaintEvent * )
+{
+    Theme *t = Theme::instance();
+    QPainter p( this );
+    const int s = shadowWidth();
+    if( s )
+    {
+        /* shortcut: a linear ramp for the prototype's 50 px blur */
+        QColor shadow( Qt::black );
+        shadow.setAlpha( Playlist::DrawerShadowAlpha );
+        QLinearGradient ramp( 0, 0, s, 0 );
+        ramp.setColorAt( 0, Qt::transparent );
+        ramp.setColorAt( 1, shadow );
+        p.fillRect( 0, 0, s, height(), ramp );
+    }
+    /* FxBg is 0.97 opaque: over the panel colour, never over nothing */
+    p.fillRect( s, 0, width() - s, height(), t->color( Theme::Panel ) );
+    p.fillRect( s, 0, width() - s, height(), t->color( Theme::FxBg ) );
+    if( dock )
+        p.fillRect( s, 0, Size::Hairline, height(), t->ink( InkAlpha::Divider ) );
+}
+
+/* QVLCDialog's keys: Esc and Enter close */
+void ExtendedDialog::keyPressEvent( QKeyEvent *e )
+{
+    switch( e->key() )
+    {
+    case Qt::Key_Escape:
+    case Qt::Key_Return:
+    case Qt::Key_Enter:
+        hide();
+        return;
+    }
+    if( drawer && dockParent->window() )
+        /* a window of its own: the player's hotkeys still apply */
+        QApplication::sendEvent( dockParent->window(), e );
+    else
+        QWidget::keyPressEvent( e );
 }
 
 void ExtendedDialog::showTab( int i )
 {
     mainTabW->setCurrentIndex( i );
     show();
+    if( !dock )
+    {
+        raise();
+        activateWindow();
+    }
 }
 
 int ExtendedDialog::currentTab()
 {
     return mainTabW->currentIndex();
+}
+
+void ExtendedDialog::showPage( QTabWidget *pages, int page )
+{
+    mainTabW->setCurrentIndex( pages == audioTab ? AUDIO_TAB : VIDEO_TAB );
+    pages->setCurrentIndex( page );
+    pages->currentWidget()->setFocus();
+}
+
+/* "More" names the sub-page shown, if not the group's first */
+void ExtendedDialog::updateMore()
+{
+    const int tab = currentTab();
+    QTabWidget *pages = tab == AUDIO_TAB ? audioTab : tab == VIDEO_TAB ? videoTab : NULL;
+    const bool sub = pages && pages->currentIndex() > 0;
+    moreButton->setText( sub ? pages->tabText( pages->currentIndex() ) : qtr( "More" ) );
+    moreButton->setChecked( sub );
 }
 
 void ExtendedDialog::changedItem( int i_status )
@@ -196,6 +487,7 @@ void ExtendedDialog::currentTabChanged( int i )
     }
     else
         m_applyButton->setVisible( false );
+    updateMore();
 }
 
 void ExtendedDialog::putAudioConfig( const QString& name, const QVariant value )

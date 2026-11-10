@@ -39,11 +39,13 @@
 #include <QComboBox>
 #include <QTimer>
 #include <QFileDialog>
-#include <QGraphicsScene>
 #include <QPainter>
 #include <QRegularExpression>
 #include <QApplication>
-#include <QScreen>
+#include <QFrame>
+#include <QMouseEvent>
+#include <QPushButton>
+#include <QStyle>
 
 #include "components/extended_panels.hpp"
 #include "dialogs/preferences.hpp"
@@ -52,10 +54,13 @@
 #include "util/qt_dirs.hpp"
 #include "util/customwidgets.hpp"
 #include "dialogs_provider.hpp"
+#include "util/theme.hpp"
+#include "util/redesign_icons.hpp"
 
 #include "../../audio_filter/equalizer_presets.h"
 #include <vlc_vout.h>
 #include <vlc_modules.h>
+#include <vlc_actions.h>                 /* vlc_str2keycode */
 #include <vlc_plugin.h>
 
 static bool filterIsPresent( const QString &filters, const QString &filter )
@@ -270,6 +275,70 @@ ExtVideo::ExtVideo( intf_thread_t *_p_intf, QTabWidget *_parent ) :
              ui.cropBotPx, &QSpinBox::setDisabled );
     connect( ui.leftRightCropSync, &QCheckBox::toggled,
              ui.cropRightPx, &QSpinBox::setDisabled );
+
+    /* The Video tab (DESIGN_SPEC 7): each adjust value beside its slider,
+     * in the design's order, and their defaults back */
+    QSlider *const adjust[] = { ui.brightnessSlider, ui.contrastSlider, ui.saturationSlider,
+                                ui.hueSlider, ui.gammaSlider };
+    const int digits = QFontMetrics( ui.adjustEnable->font() ).width( "-180.00" );
+    QWidget *previous = ui.adjustEnable;
+    for( size_t i = 0; i < sizeof( adjust ) / sizeof( adjust[0] ); i++ )
+    {
+        QSlider *slider = adjust[i];
+        slider->setTickPosition( QSlider::NoTicks );
+        QLabel *value = new QLabel( ui.adjustEnable );
+        value->setProperty( "role", "hint" );
+        value->setAlignment( Qt::AlignRight | Qt::AlignVCenter );
+        value->setMinimumWidth( digits );
+        const auto show = [slider, value]( int v ) {
+            const int ticks = slider->tickInterval();
+            value->setText( ticks > 1 ? QString::number( v / double( ticks ), 'f', 2 )
+                                      : QString::number( v ) );
+        };
+        show( slider->value() );
+        connect( slider, &QSlider::valueChanged, value, show );
+        int row, column, rowSpan, columnSpan;
+        ui.gridLayout_6->getItemPosition( ui.gridLayout_6->indexOf( slider ),
+                                          &row, &column, &rowSpan, &columnSpan );
+        ui.gridLayout_6->addWidget( value, row, column + 1 );
+        if( slider == ui.contrastSlider )
+        {
+            QWidget::setTabOrder( previous, ui.brightnessThresholdCheck );
+            previous = ui.brightnessThresholdCheck;
+        }
+        QWidget::setTabOrder( previous, slider );
+        previous = slider;
+    }
+    QPushButton *reset = new QPushButton( qtr( "Reset to defaults" ), ui.adjustEnable );
+    reset->setProperty( "role", "outline" );
+    ui.gridLayout_6->addWidget( reset, ui.gridLayout_6->rowCount(), 0, 1, -1, Qt::AlignLeft );
+    QWidget::setTabOrder( previous, reset );
+    connect( reset, &QPushButton::clicked, this, &ExtVideo::resetAdjust );
+}
+
+/* The adjust filter's options back to their defaults: each slider applies
+ * its own as if moved (updateFilterOptions) */
+void ExtVideo::resetAdjust()
+{
+    QObject *const widgets[] = { ui.brightnessSlider, ui.brightnessThresholdCheck,
+                                 ui.contrastSlider, ui.saturationSlider,
+                                 ui.hueSlider, ui.gammaSlider };
+    for( size_t i = 0; i < sizeof( widgets ) / sizeof( widgets[0] ); i++ )
+    {
+        const module_config_t *p_item =
+            config_FindConfig( qtu( OptionFromWidgetName( widgets[i] ) ) );
+        if( p_item == NULL )
+            continue;
+        QSlider *slider = qobject_cast<QSlider *>( widgets[i] );
+        QCheckBox *check = qobject_cast<QCheckBox *>( widgets[i] );
+        if( slider )
+            /* the conversion of setWidgetValue() */
+            slider->setValue( p_item->i_type == CONFIG_ITEM_FLOAT
+                ? ( int )( p_item->orig.f * ( double )slider->tickInterval() )
+                : ( int )p_item->orig.i );
+        else if( check )
+            check->setChecked( p_item->orig.i != 0 );
+    }
 }
 
 void ExtVideo::cropChange()
@@ -880,6 +949,7 @@ FilterSliderData::FilterSliderData( QObject *parent,
     slider->setMinimum( p_data->f_min / p_data->f_resolution );
     slider->setMaximum( p_data->f_max / p_data->f_resolution );
     nameLabel->setText( p_data->descs );
+    slider->setAccessibleName( QString( p_data->descs ).replace( QLatin1Char( '\n' ), QLatin1Char( ' ' ) ) );
     connect( slider, &QSlider::valueChanged, this, &FilterSliderData::updateText );
     setValue( initialValue() );
     /* In case current == min|max text would not be first updated */
@@ -1166,82 +1236,245 @@ Equalizer::Equalizer( intf_thread_t *p_intf, QWidget *parent )
     build();
 }
 
+namespace
+{
+
+/* An equalizer band (DESIGN_SPEC 7): the track, the 0 line, the accent from
+ * the 0 line to the knob. It paints itself: `.QSlider` rules match only the
+ * exact class. A press jumps to the pointer, like the prototype's bands. */
+class EqBandSlider : public QSlider
+{
+public:
+    EqBandSlider() : QSlider( Qt::Vertical ) {}
+
+protected:
+    void paintEvent( QPaintEvent * ) Q_DECL_OVERRIDE;
+    void mousePressEvent( QMouseEvent *e ) Q_DECL_OVERRIDE
+    {
+        if( e->button() != Qt::LeftButton )
+        {
+            QSlider::mousePressEvent( e );
+            return;
+        }
+        setSliderDown( true );
+        seek( e->pos().y() );
+    }
+    void mouseMoveEvent( QMouseEvent *e ) Q_DECL_OVERRIDE
+    {
+        if( isSliderDown() )
+            seek( e->pos().y() );
+    }
+    void mouseReleaseEvent( QMouseEvent *e ) Q_DECL_OVERRIDE
+    {
+        if( isSliderDown() )
+            setSliderDown( false );
+        else
+            QSlider::mouseReleaseEvent( e );
+    }
+
+private:
+    int knob() const { return Theme::instance()->px( RedesignTokens::Effects::BandKnob ); }
+    int span() const { return height() - knob(); }
+    qreal yOf( int v ) const
+    {
+        return knob() / 2. + QStyle::sliderPositionFromValue( minimum(), maximum(), v, span(), true );
+    }
+    void seek( int y )
+    {
+        setValue( QStyle::sliderValueFromPosition( minimum(), maximum(), y - knob() / 2,
+                                                    span(), true ) );
+    }
+};
+
+void EqBandSlider::paintEvent( QPaintEvent * )
+{
+    using namespace RedesignTokens;
+    Theme *t = Theme::instance();
+    QPainter p( this );
+    p.setRenderHint( QPainter::Antialiasing );
+    if( !isEnabled() )
+        p.setOpacity( Effects::DisabledAlpha / 255. );
+    const qreal track = t->px( Effects::BandTrack );
+    const qreal radius = knob() / 2.;
+    const qreal cx = width() / 2.;
+    const QRectF groove( cx - track / 2, radius, track, span() );
+    p.setPen( Qt::NoPen );
+    p.setBrush( t->ink( InkAlpha::Track ) );
+    p.drawRoundedRect( groove, track / 2, track / 2 );
+    const qreal zero = yOf( qBound( minimum(), 0, maximum() ) );
+    p.fillRect( QRectF( 0, zero, width(), Size::Hairline ), t->ink( InkAlpha::Track ) );
+    const qreal y = yOf( value() );
+    p.setBrush( t->color( Theme::Accent ) );
+    p.drawRoundedRect( QRectF( groove.x(), qMin( y, zero ), track, qAbs( y - zero ) ),
+                       track / 2, track / 2 );
+    if( hasFocus() )
+    {
+        /* the accent is 2.4:1 on light surfaces */
+        p.setPen( QPen( t->color( t->isDark() ? Theme::Accent : Theme::AccentText ),
+                        Size::FocusRing ) );
+        p.setBrush( Qt::NoBrush );
+        p.drawEllipse( QPointF( cx, y ), radius + Size::FocusRing, radius + Size::FocusRing );
+    }
+    p.setPen( Qt::NoPen );
+    p.setBrush( t->color( Theme::Text ) );
+    p.drawEllipse( QPointF( cx, y ), radius, radius );
+}
+
+/* The preset chips, wrapped in rows as wide as the sheet. The height
+ * follows the width through the minimum height, set on each resize. */
+class ChipFlow : public QWidget
+{
+public:
+    explicit ChipFlow( QWidget *parent ) : QWidget( parent ) {}
+    QSize minimumSizeHint() const Q_DECL_OVERRIDE
+    {
+        int w = 0;
+        foreach( const QWidget *chip, chips() )
+            w = qMax( w, chip->sizeHint().width() );
+        return QSize( w, minimumHeight() );
+    }
+
+protected:
+    void resizeEvent( QResizeEvent * ) Q_DECL_OVERRIDE
+    {
+        setMinimumHeight( arrange( width() ) );
+    }
+
+private:
+    QList<QWidget *> chips() const
+    {
+        return findChildren<QWidget *>( QString(), Qt::FindDirectChildrenOnly );
+    }
+    /* places the chips, returns the height they take */
+    int arrange( int w ) const
+    {
+        const int gap = Theme::instance()->px( RedesignTokens::Effects::ChipGap );
+        int x = 0, y = 0, rowH = 0;
+        foreach( QWidget *chip, chips() )
+        {
+            /* sizeHint() leaves out the fixed ChipH height */
+            const QSize s = chip->sizeHint().expandedTo( chip->minimumSize() );
+            if( x > 0 && x + s.width() > w )
+            {
+                x = 0;
+                y += rowH + gap;
+                rowH = 0;
+            }
+            chip->setGeometry( QStyle::visualRect( layoutDirection(), rect(),
+                                                   QRect( QPoint( x, y ), s ) ) );
+            x += s.width() + gap;
+            rowH = qMax( rowH, s.height() );
+        }
+        return y + rowH;
+    }
+};
+
+}
+
 void Equalizer::build()
 {
-    QFont smallFont = QApplication::font();
-    smallFont.setPointSize( smallFont.pointSize() + i_smallfont );
+    using namespace RedesignTokens;
+    Theme *t = Theme::instance();
 
     Ui::EqualizerWidget ui;
     ui.setupUi( this );
-
-    QGridLayout *ctrlLayout = new QGridLayout( ui.slidersPlaceholder );
+    ui.mainLayout->setContentsMargins( 0, 0, 0, 0 );
+    ui.mainLayout->setSpacing( t->px( Effects::SectionGap ) );
+    ui.presetLabel->setProperty( "role", "hint" );
+    presetName = ui.presetName;
 
     /* set up preamp control */
-    ui.preampLabel->setFont( smallFont );
-    ui.preampValue->setFont( smallFont );
+    ui.preampLabel->setProperty( "role", "hint" );
+    preampSlider = ui.preampSlider;
     preamp = new FilterSliderData( this, p_intf,
         ui.preampSlider, ui.preampValue, ui.preampLabel, & preamp_values );
     connectConfigChanged( preamp );
 
-    /* fix sliders spacing accurately */
-#if QT_VERSION >= QT_VERSION_CHECK(5, 11, 0)
-    int i_width = qMax( QFontMetrics( smallFont ).horizontalAdvance( "500 Hz" ),
-                        QFontMetrics( smallFont ).horizontalAdvance( "-20.0 dB" ) );
-#else
-    int i_width = qMax( QFontMetrics( smallFont ).width( "500 Hz" ),
-                        QFontMetrics( smallFont ).width( "-20.0 dB" ) );
-#endif
+    /* the presets VLC knows, as chips */
+    QVBoxLayout *chipsLayout = new QVBoxLayout( ui.presetsPlaceholder );
+    chipsLayout->setContentsMargins( 0, 0, 0, 0 );
+    ChipFlow *flow = new ChipFlow( ui.presetsPlaceholder );
+    flow->setAccessibleName( qtr( "Preset" ) );
+    chipsLayout->addWidget( flow );
+    QWidget *previous = ui.enableCheck;
+    for( int i = 0 ; i < NB_PRESETS ; i ++ )
+    {
+        QPushButton *chip = new QPushButton( qtr( preset_list_text[i] ), flow );
+        chip->setProperty( "role", "chip" );
+        chip->setCheckable( true );
+        chip->setFixedHeight( t->metric( Theme::ChipH ) );
+        connect( chip, &QPushButton::clicked, this, [this, i]() {
+            setCorePreset( i + 1 );   /* its 1st entry was "custom" */
+            updatePreset();           /* the bands may already match */
+        } );
+        setTabOrder( previous, chip );
+        previous = chip;
+        chips << chip;
+    }
+
+    /* the bands, with a +20 / 0 / -20 scale */
+    QGridLayout *ctrlLayout = new QGridLayout( ui.slidersPlaceholder );
+    ctrlLayout->setContentsMargins( 0, 0, 0, 0 );
+    ctrlLayout->setHorizontalSpacing( t->px( Effects::BandGap ) );
+    if( !controls.isEmpty() )
+    {
+        QVBoxLayout *scale = new QVBoxLayout;
+        scale->setSpacing( 0 );
+        const float marks[] = { controls[0].f_max, 0.f, controls[0].f_min };
+        for( size_t m = 0; m < sizeof( marks ) / sizeof( marks[0] ); m++ )
+        {
+            if( m > 0 )
+                scale->addStretch( 1 );
+            QLabel *mark = new QLabel( marks[m] > 0 ? QString( "+%1" ).arg( marks[m] )
+                                                    : QString::number( marks[m] ) );
+            mark->setFont( t->font( Theme::Meta ) );
+            mark->setProperty( "role", "libraryDim" );
+            mark->setAlignment( Qt::AlignRight | Qt::AlignVCenter );
+            mark->setMinimumWidth( t->px( Effects::BandScaleW ) );
+            scale->addWidget( mark );
+        }
+        QWidget *scaleBox = new QWidget( ui.slidersPlaceholder );
+        scaleBox->setLayout( scale );
+        scaleBox->setFixedHeight( t->px( Effects::BandH ) );
+        scale->setContentsMargins( 0, 0, 0, 0 );
+        ctrlLayout->addWidget( scaleBox, 0, 0 );
+    }
     int i = 0;
     foreach( const FilterSliderData::slider_data_t &data, controls )
     {
-        QSlider *slider = new QSlider( Qt::Vertical );
-        slider->setMinimumWidth( i_width );
-        QLabel *valueLabel = new QLabel();
-        valueLabel->setFont( smallFont );
-        valueLabel->setAlignment( Qt::AlignHCenter );
+        EqBandSlider *slider = new EqBandSlider;
+        slider->setFixedHeight( t->px( Effects::BandH ) );
+        slider->setMinimumWidth( t->px( Effects::BandKnob ) + 2 * Size::FocusRing );
+        slider->setAccessibleName( data.descs );
+        /* the value stays in the slider's accessible value and tooltip */
+        QLabel *valueLabel = new QLabel( ui.slidersPlaceholder );
+        valueLabel->hide();
         QLabel *nameLabel = new QLabel();
-        nameLabel->setFont( smallFont );
+        nameLabel->setFont( t->font( Theme::Meta ) );
+        nameLabel->setProperty( "role", "hint" );
         nameLabel->setAlignment( Qt::AlignHCenter );
+        /* "1 KHz" over two lines: ten bands fit the sheet */
+        nameLabel->setWordWrap( true );
         EqualizerSliderData *filter =
             new EqualizerSliderData( this, p_intf,
                                      slider, valueLabel, nameLabel, & data, i );
-        ctrlLayout->addWidget( slider, 0, i, Qt::AlignHCenter );
-        ctrlLayout->addWidget( valueLabel, 2, i, Qt::AlignHCenter );
-        ctrlLayout->addWidget( nameLabel, 1, i, Qt::AlignHCenter );
+        slider->setToolTip( valueLabel->text() );
+        connect( slider, &QSlider::valueChanged, slider,
+                 [slider, valueLabel]() { slider->setToolTip( valueLabel->text() ); } );
+        ctrlLayout->addWidget( slider, 0, i + 1, Qt::AlignHCenter );
+        ctrlLayout->addWidget( nameLabel, 1, i + 1, Qt::AlignHCenter );
+        setTabOrder( previous, slider );
+        previous = slider;
         sliderDatas << filter; /* keep track for applying presets */
+        bandSliders << slider;
+        connect( slider, &QSlider::valueChanged, this, &Equalizer::updatePreset );
         i++;
         connectConfigChanged( filter );
     }
-
-    /* Add the listed presets */
-    ui.presetsCombo->addItem( "", QVariant() ); /* 1st entry = custom/modified */
-    for( i = 0 ; i < NB_PRESETS ; i ++ )
-    {
-        QGraphicsScene scene;
-#if HAS_QT56
-        qreal f_ratio = QApplication::primaryScreen()->devicePixelRatio();
-        QPixmap icon( 40 * f_ratio, 40 * f_ratio );
-#else
-        QPixmap icon( 40, 40 );
-#endif
-        icon.fill( Qt::transparent );
-        QPainter painter( &icon );
-        for ( int j = 0; j < eqz_preset_10b[i].i_band; j++ )
-        {
-            float f_value = eqz_preset_10b[i].f_amp[j];
-            if ( f_value > 20.0 ) f_value = 20.0;
-            if ( f_value < -20.0 ) f_value = -20.0;
-            QRectF shape( j, 20.0 - f_value, 1, f_value );
-            scene.addRect( shape, QPen(), palette().brush( QPalette::WindowText ) );
-        }
-        scene.addLine( 0.0, 20.0, eqz_preset_10b[i].i_band, 20.0,
-                       palette().color( QPalette::WindowText ) );
-        scene.setSceneRect( 0.0, 0.0, eqz_preset_10b[i].i_band , 40.0 );
-        scene.render( &painter, icon.rect(), scene.sceneRect(), Qt::IgnoreAspectRatio );
-        ui.presetsCombo->addItem( icon, qtr( preset_list_text[i] ),
-                                     QVariant( preset_list[i] ) );
-    }
-    connect( ui.presetsCombo, QOverload<int>::of(&QComboBox::activated), this, &Equalizer::setCorePreset );
+    setTabOrder( previous, ui.preampSlider );
+    setTabOrder( ui.preampSlider, ui.eq2PassCheck );
+    connect( ui.preampSlider, &QSlider::valueChanged, this, &Equalizer::updatePreset );
+    updatePreset();
 
     /* Set enable checkbox */
     vlc_object_t *p_aout = (vlc_object_t *)THEMIM->getAout();
@@ -1251,15 +1484,13 @@ void Equalizer::build()
     else
         psz_af = var_InheritString( THEPL, "audio-filter" );
 
-    /* To enable or disable subwidgets */
-    /* If that list grows, better iterate over layout's childs */
-    connect( ui.enableCheck, &QCheckBox::toggled, ui.presetsCombo, &QComboBox::setEnabled );
-    connect( ui.enableCheck, &QCheckBox::toggled, ui.presetLabel, &QLabel::setEnabled );
-    connect( ui.enableCheck, &QCheckBox::toggled, ui.eq2PassCheck, &QCheckBox::setEnabled );
-    connect( ui.enableCheck, &QCheckBox::toggled, ui.slidersPlaceholder, &QWidget::setEnabled );
-    connect( ui.enableCheck, &QCheckBox::toggled, ui.preampSlider, &QSlider::setEnabled );
-    connect( ui.enableCheck, &QCheckBox::toggled, ui.preampValue, &QLabel::setEnabled );
-    connect( ui.enableCheck, &QCheckBox::toggled, ui.preampLabel, &QLabel::setEnabled );
+    /* To enable or disable subwidgets: off dims them, values kept */
+    QWidget *const dependents[] = {
+        ui.presetLabel, ui.presetName, ui.presetsPlaceholder, ui.eq2PassCheck,
+        ui.slidersPlaceholder, ui.preampSlider, ui.preampValue, ui.preampLabel,
+    };
+    for( size_t d = 0; d < sizeof( dependents ) / sizeof( dependents[0] ); d++ )
+        connect( ui.enableCheck, &QCheckBox::toggled, dependents[d], &QWidget::setEnabled );
 
     if( psz_af && filterIsPresent( qfu(psz_af), name ) )
         ui.enableCheck->setChecked( true );
@@ -1277,6 +1508,29 @@ void Equalizer::build()
     connect( ui.eq2PassCheck, &QCheckBox::toggled, this, &Equalizer::enable2Pass );
     if( p_aout )
         vlc_object_release( p_aout );
+}
+
+/* Moving a band shows "Custom", a preset its chip: compared the way
+ * FilterSliderData::setValue() converts, so an applied preset matches */
+void Equalizer::updatePreset()
+{
+    int match = -1;
+    for( int i = 0; i < NB_PRESETS && match < 0; i++ )
+    {
+        const eqz_preset_t &preset = eqz_preset_10b[i];
+        const auto same = []( QSlider *slider, float f, float resolution ) {
+            return qBound( slider->minimum(), static_cast<int>( f / resolution ),
+                           slider->maximum() ) == slider->value();
+        };
+        bool all = same( preampSlider, preset.f_preamp, preamp_values.f_resolution );
+        for( int j = 0; all && j < qMin( preset.i_band, bandSliders.count() ); j++ )
+            all = same( bandSliders[j], preset.f_amp[j], controls[j].f_resolution );
+        if( all )
+            match = i;
+    }
+    for( int i = 0; i < chips.count(); i++ )
+        chips[i]->setChecked( i == match );
+    presetName->setText( match < 0 ? qtr( "Custom" ) : qtr( preset_list_text[match] ) );
 }
 
 void Equalizer::setCorePreset( int i_preset )
@@ -1400,75 +1654,170 @@ PitchShifter::PitchShifter( intf_thread_t *p_intf, QWidget *parent )
 #define SUBSDELAY_MODE_RELATIVE_SOURCE_DELAY   1
 #define SUBSDELAY_MODE_RELATIVE_SOURCE_CONTENT 2
 
-SyncWidget::SyncWidget( QWidget *_parent ) : QWidget( _parent )
+namespace
 {
-    QHBoxLayout *layout = new QHBoxLayout;
-    spinBox.setAlignment( Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter );
-    spinBox.setDecimals( 3 );
-    spinBox.setMinimum( -600.0 );
-    spinBox.setMaximum( 600.0 );
-    spinBox.setSingleStep( 0.1 );
-    spinBox.setSuffix( " s" );
-    spinBox.setButtonSymbols( QDoubleSpinBox::PlusMinus );
-    connect( &spinBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &SyncWidget::valueChangedHandler );
-    layout->addWidget( &spinBox );
-    layout->addWidget( &spinLabel );
-    layout->setContentsMargins( 0, 0, 0, 0 );
-    setLayout( layout );
+
+/* "+0.150 s": the sign shows on delays too */
+class SignedSpinBox : public QDoubleSpinBox
+{
+protected:
+    QString textFromValue( double value ) const Q_DECL_OVERRIDE
+    {
+        const QString text = QDoubleSpinBox::textFromValue( value );
+        return value > 0 ? QLatin1Char( '+' ) + text : text;
+    }
+};
+
+/* The text of a hotkey's first binding, empty when unbound */
+QString hotkeyText( intf_thread_t *p_intf, const char *hotkey )
+{
+    QString text;
+    char *psz = var_InheritString( p_intf, hotkey );
+    if( psz )
+    {
+        char *tab = strchr( psz, '\t' );
+        if( tab )
+            *tab = '\0';
+        const uint_fast32_t key = vlc_str2keycode( psz );
+        if( key != KEY_UNSET )
+            text = VLCKeyToString( key, true );
+        free( psz );
+    }
+    /* "J", as on the key */
+    return text.length() == 1 ? text.toUpper() : text;
 }
 
-void SyncWidget::valueChangedHandler( double d )
+/* "Decrease (G)", or the bare label when the action has no key */
+QString withHotkey( const QString &label, const QString &key )
 {
-    if ( d < 0 )
-        spinLabel.setText( qtr("(Hastened)") );
-    else if ( d > 0 )
-        spinLabel.setText( qtr("(Delayed)") );
-    else
-        spinLabel.setText( "" );
-    emit valueChanged( d );
+    return key.isEmpty() ? label : QString( "%1 (%2)" ).arg( label, key );
+}
+
+/* One card of the Synchronization tab: title and description, the control */
+QFrame *syncRow( const QString &title, const QString &desc, QWidget *control )
+{
+    using namespace RedesignTokens;
+    Theme *t = Theme::instance();
+    QFrame *row = new QFrame;
+    row->setProperty( "role", "fxRow" );
+    QHBoxLayout *layout = new QHBoxLayout( row );
+    const int pad = t->px( Effects::SyncRowPad );
+    layout->setContentsMargins( pad, pad, pad, pad );
+    layout->setSpacing( t->px( Effects::SyncRowGap ) );
+    QVBoxLayout *texts = new QVBoxLayout;
+    texts->setSpacing( 0 );
+    QLabel *titleLabel = new QLabel( title );
+    QFont titleFont = t->font( Theme::Body );
+    titleFont.setWeight( QFont::Medium );
+    titleLabel->setFont( titleFont );
+    titleLabel->setBuddy( control );
+    QLabel *descLabel = new QLabel( desc );
+    descLabel->setFont( t->font( Theme::Meta ) );
+    descLabel->setProperty( "role", "hint" );
+    descLabel->setWordWrap( true );
+    texts->addWidget( titleLabel );
+    texts->addWidget( descLabel );
+    layout->addLayout( texts, 1 );
+    layout->addWidget( control );
+    control->setAccessibleName( title );
+    control->setAccessibleDescription( desc );
+    return row;
+}
+
+}
+
+SyncWidget::SyncWidget( QWidget *_parent, const QString &name,
+                        const QString &downKey, const QString &upKey )
+    : QWidget( _parent )
+{
+    using namespace RedesignTokens;
+    Theme *t = Theme::instance();
+    QHBoxLayout *layout = new QHBoxLayout( this );
+    layout->setContentsMargins( 0, 0, 0, 0 );
+    layout->setSpacing( t->px( Effects::BandGap ) );
+
+    spinBox = new SignedSpinBox;
+    spinBox->setAlignment( Qt::AlignCenter );
+    spinBox->setDecimals( 3 );
+    spinBox->setMinimum( -600.0 );
+    spinBox->setMaximum( 600.0 );
+    spinBox->setSingleStep( 0.05 );     /* P5-2: 50 ms, the hotkeys keep theirs */
+    spinBox->setSuffix( " s" );
+    spinBox->setButtonSymbols( QDoubleSpinBox::NoButtons );
+    spinBox->setFont( t->font( Theme::Mono ) );
+    spinBox->setAccessibleName( name );
+    connect( spinBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+             this, &SyncWidget::valueChanged );
+
+    const int buttonPx = t->px( Effects::StepperButton );
+    const int glyphPx = t->px( Effects::StepperGlyph );
+    const struct { const char *icon; QString label, key; int step; } steps[] = {
+        { RedesignIcons::IconRemove, qtr( "Decrease %1" ).arg( name ), downKey, -1 },
+        { RedesignIcons::IconAdd, qtr( "Increase %1" ).arg( name ), upKey, 1 },
+    };
+    for( size_t i = 0; i < sizeof( steps ) / sizeof( steps[0] ); i++ )
+    {
+        QToolButton *b = new QToolButton( this );
+        b->setProperty( "role", "stepper" );
+        b->setIcon( Theme::themedIcon( steps[i].icon, Theme::Text ) );
+        b->setIconSize( QSize( glyphPx, glyphPx ) );
+        b->setFixedSize( buttonPx, buttonPx );
+        b->setAutoRepeat( true );
+        b->setAccessibleName( steps[i].label );
+        b->setToolTip( withHotkey( steps[i].label, steps[i].key ) );
+        const int step = steps[i].step;
+        connect( b, &QToolButton::clicked, spinBox, [this, step]() { spinBox->stepBy( step ); } );
+        if( i == 0 )
+            layout->addWidget( b );
+        else
+        {
+            layout->addWidget( spinBox );
+            layout->addWidget( b );
+        }
+    }
+    /* the widest value fits: the sign, 3 digits, the decimals and the unit */
+    spinBox->setMinimumWidth( QFontMetrics( spinBox->font() ).width( "+000.000 s" )
+                              + 2 * t->px( Size::MenuPanelPadding ) );
+    setFocusProxy( spinBox );
 }
 
 void SyncWidget::setValue( double d )
 {
-    spinBox.setValue( d );
+    spinBox->setValue( d );
 }
 
 SyncControls::SyncControls( intf_thread_t *_p_intf, QWidget *_parent ) :
                             QWidget( _parent ) , p_intf( _p_intf )
 {
-    QGroupBox *AVBox, *subsBox;
+    using namespace RedesignTokens;
+    Theme *t = Theme::instance();
     QToolButton *updateButton;
 
     b_userAction = true;
 
-    QGridLayout *mainLayout = new QGridLayout( this );
+    QVBoxLayout *mainLayout = new QVBoxLayout( this );
+    mainLayout->setContentsMargins( 0, 0, 0, 0 );
+    mainLayout->setSpacing( t->px( Effects::SyncRowGap ) );
+
+    /* the hotkeys' hints: P5-2 keeps their own steps */
+    const QString audioDown = hotkeyText( p_intf, "key-audiodelay-down" );
+    const QString audioUp = hotkeyText( p_intf, "key-audiodelay-up" );
+    const QString subsDown = hotkeyText( p_intf, "key-subdelay-down" );
+    const QString subsUp = hotkeyText( p_intf, "key-subdelay-up" );
+    const auto keysHint = []( const QString &desc, const QString &down, const QString &up ) {
+        return down.isEmpty() || up.isEmpty() ? desc
+             : qtr( "%1. Keys: %2 / %3" ).arg( desc, down, up );
+    };
 
     /* AV sync */
-    AVBox = new QGroupBox( qtr( "Audio/Video" ) );
-    QGridLayout *AVLayout = new QGridLayout( AVBox );
-
-    QLabel *AVLabel = new QLabel;
-    AVLabel->setText( qtr( "Audio track synchronization:" ) );
-    AVLayout->addWidget( AVLabel, 0, 0, 1, 1 );
-
-    AVSpin = new SyncWidget( this );
-    AVLayout->addWidget( AVSpin, 0, 2, 1, 1 );
-    mainLayout->addWidget( AVBox, 1, 0, 1, 5 );
+    AVSpin = new SyncWidget( this, qtr( "Audio track" ), audioDown, audioUp );
+    mainLayout->addWidget( syncRow( qtr( "Audio track" ),
+        keysHint( qtr( "Positive delays audio behind video" ), audioDown, audioUp ), AVSpin ) );
 
     /* Subs */
-    subsBox = new QGroupBox( qtr( "Subtitles/Video" ) );
-    QGridLayout *subsLayout = new QGridLayout( subsBox );
-
-    QLabel *subsLabel = new QLabel;
-    subsLabel->setText( qtr( "Subtitle track synchronization:" ) );
-    subsLayout->addWidget( subsLabel, 0, 0, 1, 1 );
-
-    subsSpin = new SyncWidget( this );
-    subsLayout->addWidget( subsSpin, 0, 2, 1, 1 );
-
-    QLabel *subSpeedLabel = new QLabel;
-    subSpeedLabel->setText( qtr( "Subtitle speed:" ) );
-    subsLayout->addWidget( subSpeedLabel, 1, 0, 1, 1 );
+    subsSpin = new SyncWidget( this, qtr( "Subtitle track" ), subsDown, subsUp );
+    mainLayout->addWidget( syncRow( qtr( "Subtitle track" ),
+        keysHint( qtr( "Positive shows subtitles later" ), subsDown, subsUp ), subsSpin ) );
 
     subSpeedSpin = new QDoubleSpinBox;
     subSpeedSpin->setAlignment( Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter );
@@ -1478,11 +1827,9 @@ SyncControls::SyncControls( intf_thread_t *_p_intf, QWidget *_parent ) :
     subSpeedSpin->setSingleStep( 0.2 );
     subSpeedSpin->setSuffix( " fps" );
     subSpeedSpin->setButtonSymbols( QDoubleSpinBox::PlusMinus );
-    subsLayout->addWidget( subSpeedSpin, 1, 2, 1, 1 );
-
-    QLabel *subDurationLabel = new QLabel;
-    subDurationLabel->setText( qtr( "Subtitle duration factor:" ) );
-    subsLayout->addWidget( subDurationLabel, 2, 0, 1, 1 );
+    subSpeedSpin->setFont( t->font( Theme::Mono ) );
+    mainLayout->addWidget( syncRow( qtr( "Subtitle speed" ),
+        qtr( "Stretch timing for mismatched frame rates" ), subSpeedSpin ) );
 
     subDurationSpin = new QDoubleSpinBox;
     subDurationSpin->setAlignment( Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter );
@@ -1491,13 +1838,20 @@ SyncControls::SyncControls( intf_thread_t *_p_intf, QWidget *_parent ) :
     subDurationSpin->setMaximum( 20 );
     subDurationSpin->setSingleStep( 0.2 );
     subDurationSpin->setButtonSymbols( QDoubleSpinBox::PlusMinus );
-    subsLayout->addWidget( subDurationSpin, 2, 2, 1, 1 );
-
-    mainLayout->addWidget( subsBox, 2, 0, 2, 5 );
+    subDurationSpin->setFont( t->font( Theme::Mono ) );
+    /* the row reads the mode's explanation initSubsDuration() puts in the tooltip */
+    initSubsDuration();
+    mainLayout->addWidget( syncRow( qtr( "Subtitle duration factor" ),
+        subDurationSpin->toolTip().replace( QLatin1Char( '\n' ), QLatin1Char( ' ' ) ),
+        subDurationSpin ) );
 
     updateButton = new QToolButton;
     updateButton->setAutoRaise( true );
-    mainLayout->addWidget( updateButton, 0, 4, 1, 1 );
+    QHBoxLayout *updateRow = new QHBoxLayout;
+    updateRow->addStretch( 1 );
+    updateRow->addWidget( updateButton );
+    mainLayout->addLayout( updateRow );
+    mainLayout->addStretch( 1 );
 
     /* Various Connects */
     connect( AVSpin, &SyncWidget::valueChanged, this, &SyncControls::advanceAudio ) ;
@@ -1508,8 +1862,7 @@ SyncControls::SyncControls( intf_thread_t *_p_intf, QWidget *_parent ) :
     connect( THEMIM->getIM(), &InputManager::synchroChanged, this, &SyncControls::update );
     BUTTON_SET_ACT_I( updateButton, "", update,
             qtr( "Force update of this dialog's values" ), update );
-
-    initSubsDuration();
+    updateButton->setAccessibleName( qtr( "Force update of this dialog's values" ) );
 
     /* Set it */
     update();

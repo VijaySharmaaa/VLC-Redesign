@@ -310,6 +310,28 @@ namespace RedesignTokens
          * its directory (Icecast: a few MB) */
         static const int NetSettleMs = 10000;
     }
+
+    /* ---- Phase 5: effects sheet (DESIGN_SPEC 7; sizes from the
+     *      prototype markup) ---- */
+    namespace Effects
+    {
+        static const int SheetW = 430, SheetWXS = 340;
+        static const int HeadPadTop = 14, HeadPadRight = 14, HeadPadLeft = 18;
+        static const int CloseButton = 30, CloseGlyph = 18;
+        static const int TabsPadX = 14, TabsPadTop = 12, BodyPad = 18, SectionGap = 18;
+        static const int ChipGap = 6, ChipPadX = 10;
+        static const int BandH = 170, BandTrack = 4, BandKnob = 14, BandGap = 4, BandScaleW = 28;
+        static const int VideoRowGap = 20;
+        static const int SyncRowPad = 14, SyncRowGap = 12, SyncRowRadius = 8;
+        static const int StepperButton = 30, StepperGlyph = 18;
+        static const int DisabledAlpha = 102; /* 0.4: bands with the equalizer off */
+    }
+    namespace InkAlpha
+    {
+        static const int ChipBorder = 31;    /* 0.12 */
+        static const int StepperFill = 15;   /* 0.06 */
+        static const int StepperHover = 31;  /* 0.12 */
+    }
 }
 
 #endif

@@ -814,6 +814,20 @@ QLineEdit[role="librarySearch"]:focus { border: 2px solid @focusRing@; }
 QPushButton[role="outline"] { background: transparent; }
 QPushButton[role="outline"]:hover { background: @hoverFill@; }
 QLabel[role="libraryDim"] { color: @dim@; }
+/* Phase 5: effects (dialogs/extended.cpp, components/extended_panels.cpp) */
+#effectsSheet QTabWidget::pane { background: transparent; border: none; }
+#effectsSheet QTabWidget#effectsTabs::pane { border-top: 1px solid @divider@; }
+#effectsSheet QTabWidget#effectsTabs::tab-bar { left: @fxTabsPadX@px; }
+#effectsTabs > QToolButton { padding-right: @iconGlyph@px; }
+#effectsSheet QScrollArea, #effectsSheet QScrollArea > QWidget > QWidget { background: transparent; }
+QPushButton[role="chip"] { background: transparent; color: @tx2@; border: 1px solid @chipBorder@; border-radius: @chipRadius@px; padding: 0 @fxChipPadX@px; }
+QPushButton[role="chip"]:hover { background: @hoverFill@; }
+QPushButton[role="chip"]:checked { background: @accentTint@; color: @accTx@; border-color: @accentBorder@; }
+QPushButton[role="chip"]:focus { border: 2px solid @focusRing@; padding: 0 @fxChipPadXFocus@px; }
+QPushButton[role="chip"]:disabled { background: transparent; color: @dim@; border-color: @divider@; }
+QFrame[role="fxRow"] { background: @raised@; border-radius: @fxRowRadius@px; }
+QToolButton[role="stepper"] { background: @stepperFill@; }
+QToolButton[role="stepper"]:hover { background: @stepperHover@; }
 )QSS";
 
     const Palette &p = palette();
@@ -898,6 +912,15 @@ QLabel[role="libraryDim"] { color: @dim@; }
         { "homeCellPad", QString::number(px(Home::ColumnGap) / 2) },
         { "homeRowPad", QString::number(px(Home::RowPadX)) },
         { "homeRowLine", css(ink(InkAlpha::RowLine)) },
+        /* Phase 5: effects */
+        { "fxTabsPadX", QString::number(px(Effects::TabsPadX)) },
+        { "chipBorder", css(ink(InkAlpha::ChipBorder)) },
+        { "chipRadius", QString::number(px(Size::ChipH) / 2) },
+        { "fxChipPadX", QString::number(px(Effects::ChipPadX)) },
+        { "fxChipPadXFocus", QString::number(px(Effects::ChipPadX) - 1) },
+        { "fxRowRadius", QString::number(px(Effects::SyncRowRadius)) },
+        { "stepperFill", css(ink(InkAlpha::StepperFill)) },
+        { "stepperHover", css(ink(InkAlpha::StepperHover)) },
     };
 
     QString out = QString::fromLatin1(qss);
