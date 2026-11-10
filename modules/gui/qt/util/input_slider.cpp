@@ -35,6 +35,7 @@
 #include "input_manager.hpp"
 #include "imagehelper.hpp"
 #include "customwidgets.hpp"
+#include "util/theme.hpp"
 #include <vlc_actions.h>
 
 #include <QPaintEvent>
@@ -77,36 +78,6 @@ SeekSlider::SeekSlider( intf_thread_t *p_intf, Qt::Orientation q, QWidget *_pare
     mHandleLength = -1;
     b_seekable = true;
     alternativeStyle = NULL;
-
-    // prepare some static colors
-    QPalette p = palette();
-    QColor background = p.color( QPalette::Active, QPalette::Window );
-    tickpointForeground = p.color( QPalette::Active, QPalette::WindowText );
-    tickpointForeground.setHsv( tickpointForeground.hue(),
-            ( background.saturation() + tickpointForeground.saturation() ) / 2,
-            ( background.value() + tickpointForeground.value() ) / 2 );
-
-    // set the background color and gradient
-    QColor backgroundBase( p.window().color() );
-    backgroundGradient.setColorAt( 0.0, backgroundBase.darker( 140 ) );
-    backgroundGradient.setColorAt( 1.0, backgroundBase );
-
-    // set the foreground color and gradient
-    QColor foregroundBase( 50, 156, 255 );
-    foregroundGradient.setColorAt( 0.0,  foregroundBase );
-    foregroundGradient.setColorAt( 1.0,  foregroundBase.darker( 140 ) );
-
-    // prepare the handle's gradient
-    handleGradient.setColorAt( 0.0, p.window().color().lighter( 120 ) );
-    handleGradient.setColorAt( 0.9, p.window().color().darker( 120 ) );
-
-    // prepare the handle's shadow gradient
-    QColor shadowBase = p.shadow().color();
-    if( shadowBase.lightness() > 100 )
-        shadowBase = QColor( 60, 60, 60 ); // Palette's shadow is too bright
-    shadowDark = shadowBase.darker( 150 );
-    shadowLight = shadowBase.lighter( 180 );
-    shadowLight.setAlpha( 50 );
 
     /* Timer used to fire intermediate updatePos() when sliding */
     seekLimitTimer = new QTimer( this );
@@ -629,72 +600,26 @@ SoundSlider::SoundSlider( QWidget *_parent, float _i_step,
 
     setFixedSize( WLENGTH, WHEIGHT );
 
-    pixOutside = ImageHelper::loadSvgToPixmap(":/toolbar/volslide-outside.svg", width(), height() );
-
-    const QPixmap temp = ImageHelper::loadSvgToPixmap(":/toolbar/volslide-inside.svg", width(), height() );
-    const QBitmap mask( temp.createHeuristicMask() );
-
-    pixGradient = QPixmap( pixOutside.size() );
-    pixGradient2 = QPixmap( pixOutside.size() );
-
-#if HAS_QT56
-    pixGradient.setDevicePixelRatio(QApplication::primaryScreen()->devicePixelRatio());
-    pixGradient2.setDevicePixelRatio(QApplication::primaryScreen()->devicePixelRatio());
-#endif
-
-    /* Gradient building from the preferences */
-    QLinearGradient gradient( PADDINGL, 2, width() - PADDINGR, 2 );
-    QLinearGradient gradient2( PADDINGL, 2, width()- PADDINGR, 2 );
-
-    QStringList colorList = qfu( psz_colors ).split( ";" );
-    free( psz_colors );
-
-    /* Fill with 255 if the list is too short */
-    if( colorList.count() < 12 )
-        for( int i = colorList.count(); i < 12; i++)
+    /* A qt-slider-colours the user changed wins over the theme's accent */
+    module_config_t *p_colors = config_FindConfig( "qt-slider-colours" );
+    if( psz_colors && !( p_colors && p_colors->orig.psz
+                         && !strcmp( psz_colors, p_colors->orig.psz ) ) )
+    {
+        colorList = qfu( psz_colors ).split( ";" );
+        /* Fill with 255 if the list is too short */
+        while( colorList.count() < 12 )
             colorList.append( "255" );
+    }
+    free( psz_colors );
 
     textfont.setPointSize( 7 );
     textrect.setRect( 0, 0, 34, 15 );
 
-    /* Regular colors */
-#define c(i) colorList.at(i).toInt()
-#define add_color(gradient, range, c1, c2, c3) \
-    gradient.setColorAt( range, QColor( c(c1), c(c2), c(c3) ) );
-
-    /* Desaturated colors */
-#define desaturate(c) c->setHsvF( c->hueF(), 0.2 , 0.5, 1.0 )
-#define add_desaturated_color(gradient, range, c1, c2, c3) \
-    foo = new QColor( c(c1), c(c2), c(c3) );\
-    desaturate( foo ); gradient.setColorAt( range, *foo );\
-    delete foo;
-
-    /* combine the two helpers */
-#define add_colors( gradient1, gradient2, range, c1, c2, c3 )\
-    add_color( gradient1, range, c1, c2, c3 ); \
-    add_desaturated_color( gradient2, range, c1, c2, c3 );
-
-    float f_mid_point = ( 100.0 / maximum() );
-    QColor * foo;
-    add_colors( gradient, gradient2, 0.0, 0, 1, 2 );
-    add_colors( gradient, gradient2, f_mid_point - 0.05, 3, 4, 5 );
-    add_colors( gradient, gradient2, f_mid_point + 0.05, 6, 7, 8 );
-    add_colors( gradient, gradient2, 1.0, 9, 10, 11 );
-
-    painter.begin( &pixGradient );
-    painter.setPen( Qt::NoPen );
-    painter.setBrush( gradient );
-    painter.drawRect( pixGradient.rect() );
-    painter.end();
-
-    painter.begin( &pixGradient2 );
-    painter.setPen( Qt::NoPen );
-    painter.setBrush( gradient2 );
-    painter.drawRect( pixGradient2.rect() );
-    painter.end();
-
-    pixGradient.setMask( mask );
-    pixGradient2.setMask( mask );
+    buildPixmaps();
+    connect( Theme::instance(), &Theme::changed, this, [this]() {
+        buildPixmaps();
+        update();
+    } );
 
     connect(&wheelEventConverter, &WheelToVLCConverter::vlcWheelKey, this, [this](int vlcButton){
         int newvalue = 0;
@@ -715,6 +640,88 @@ SoundSlider::SoundSlider( QWidget *_parent, float _i_step,
         setValue( __MIN( __MAX( minimum(), newvalue ), maximum() ) );
         emit sliderMoved( value() );
     });
+}
+
+void SoundSlider::buildPixmaps()
+{
+    const Theme *theme = Theme::instance();
+
+    /* outline and track from the theme */
+    pixOutside = ImageHelper::loadSvgToPixmap( ":/toolbar/volslide-outside.svg", width(), height() );
+    const QPixmap inside = ImageHelper::loadSvgToPixmap( ":/toolbar/volslide-inside.svg", width(), height() );
+    const QBitmap mask( inside.createHeuristicMask() );
+
+    QPixmap track( pixOutside.size() );
+#if HAS_QT56
+    track.setDevicePixelRatio( pixOutside.devicePixelRatio() );
+#endif
+    track.fill( theme->ink( RedesignTokens::InkAlpha::Track ) );
+    track.setMask( mask );
+    painter.begin( &pixOutside );
+    painter.setCompositionMode( QPainter::CompositionMode_SourceIn );
+    painter.fillRect( QRect( QPoint( 0, 0 ), pixOutside.size() ), theme->ink( RedesignTokens::InkAlpha::ToggleOff ) );
+    painter.setCompositionMode( QPainter::CompositionMode_DestinationOver );
+    painter.drawPixmap( 0, 0, track );
+    painter.end();
+
+    pixGradient = QPixmap( pixOutside.size() );
+    pixGradient2 = QPixmap( pixOutside.size() );
+
+#if HAS_QT56
+    pixGradient.setDevicePixelRatio( pixOutside.devicePixelRatio() );
+    pixGradient2.setDevicePixelRatio( pixOutside.devicePixelRatio() );
+#endif
+
+    QLinearGradient gradient( PADDINGL, 2, width() - PADDINGR, 2 );
+    QLinearGradient gradient2( PADDINGL, 2, width() - PADDINGR, 2 );
+
+    /* The value maps linearly onto the gradient, so 100 % sits at 100/max;
+     * outside 0..1 (qt-max-volume up to 100) Qt ignores the stop. */
+    const qreal f_mid_point = 100.0 / maximum();
+    if( colorList.isEmpty() )
+    {
+        /* DESIGN_SPEC 3: accent up to 100 %, boost colour above */
+        const QColor accent = theme->color( Theme::Accent );
+        const QColor boost = theme->color( Theme::VolumeBoost );
+        gradient.setColorAt( 0.0, accent );
+        gradient.setColorAt( qMin( f_mid_point, 1.0 ), accent );
+        if( f_mid_point < 1.0 )
+        {
+            gradient.setColorAt( f_mid_point + 0.001, boost );
+            gradient.setColorAt( 1.0, boost );
+        }
+        gradient2.setColorAt( 0.0, theme->ink( RedesignTokens::InkAlpha::ToggleOff ) );
+    }
+    else
+    {
+#define c(i) colorList.at(i).toInt()
+        const qreal stops[] = { 0.0, qBound( 0.0, f_mid_point - 0.05, 1.0 ),
+                                qBound( 0.0, f_mid_point + 0.05, 1.0 ), 1.0 };
+        for( int i = 0; i < 4; i++ )
+        {
+            QColor color( c( 3 * i ), c( 3 * i + 1 ), c( 3 * i + 2 ) );
+            gradient.setColorAt( stops[i], color );
+            /* muted: desaturated */
+            color.setHsvF( color.hueF(), 0.2, 0.5, 1.0 );
+            gradient2.setColorAt( stops[i], color );
+        }
+#undef c
+    }
+
+    painter.begin( &pixGradient );
+    painter.setPen( Qt::NoPen );
+    painter.setBrush( gradient );
+    painter.drawRect( pixGradient.rect() );
+    painter.end();
+
+    painter.begin( &pixGradient2 );
+    painter.setPen( Qt::NoPen );
+    painter.setBrush( gradient2 );
+    painter.drawRect( pixGradient2.rect() );
+    painter.end();
+
+    pixGradient.setMask( mask );
+    pixGradient2.setMask( mask );
 }
 
 void SoundSlider::wheelEvent( QWheelEvent *event )
@@ -808,11 +815,13 @@ void SoundSlider::paintEvent( QPaintEvent *e )
     painter.begin( this );
 
     float f_scale = paintGradient->width() / float( width() );
-    const int offsetDst = int( ( ( width() - ( PADDINGR + PADDINGL ) ) * value() + 100 ) / maximum() ) + PADDINGL;
-    const int offsetSrc = int( ( ( paintGradient->width() - ( PADDINGR + PADDINGL ) * f_scale ) * value() + 100 ) / maximum() + PADDINGL * f_scale );
+    /* + max/2 rounds to the nearest pixel for any qt-max-volume */
+    const int offsetDst = int( ( ( width() - ( PADDINGR + PADDINGL ) ) * value() + maximum() / 2 ) / maximum() ) + PADDINGL;
+    const int offsetSrc = int( ( ( paintGradient->width() - ( PADDINGR + PADDINGL ) * f_scale ) * value() + maximum() / 2 ) / maximum() + PADDINGL * f_scale );
 
-    painter.drawPixmap( 0, 0, offsetDst, height(), *paintGradient, 0, 0, offsetSrc, paintGradient->height() );
+    /* the track is part of the outline pixmap: draw it below the fill */
     painter.drawPixmap( 0, 0, width(), height(), pixOutside, 0, 0,  pixOutside.width(), pixOutside.height() );
+    painter.drawPixmap( 0, 0, offsetDst, height(), *paintGradient, 0, 0, offsetSrc, paintGradient->height() );
 
     /* read at paint time: the theme can change while VLC runs */
     painter.setPen( palette().color( QPalette::WindowText ) );
