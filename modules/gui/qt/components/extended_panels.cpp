@@ -46,6 +46,7 @@
 #include <QMouseEvent>
 #include <QPushButton>
 #include <QStyle>
+#include <QLocale>
 
 #include "components/extended_panels.hpp"
 #include "dialogs/preferences.hpp"
@@ -291,8 +292,9 @@ ExtVideo::ExtVideo( intf_thread_t *_p_intf, QTabWidget *_parent ) :
         value->setMinimumWidth( digits );
         const auto show = [slider, value]( int v ) {
             const int ticks = slider->tickInterval();
-            value->setText( ticks > 1 ? QString::number( v / double( ticks ), 'f', 2 )
-                                      : QString::number( v ) );
+            /* the locale's decimal mark, as the Synchronization spin boxes */
+            value->setText( ticks > 1 ? QLocale().toString( v / double( ticks ), 'f', 2 )
+                                      : QLocale().toString( v ) );
         };
         show( slider->value() );
         connect( slider, &QSlider::valueChanged, value, show );
@@ -968,7 +970,7 @@ void FilterSliderData::updateText( int i )
     float f = ((float) i) * p_data->f_resolution * p_data->f_visual_multiplier;
     valueLabel->setText( QString( p_data->units )
                     .prepend( "%1 " )
-                    .arg( QString::number( f, 'f', 1 ) ) );
+                    .arg( QLocale().toString( f, 'f', 1 ) ) );
 }
 
 float FilterSliderData::initialValue()
@@ -1426,8 +1428,8 @@ void Equalizer::build()
         {
             if( m > 0 )
                 scale->addStretch( 1 );
-            QLabel *mark = new QLabel( marks[m] > 0 ? QString( "+%1" ).arg( marks[m] )
-                                                    : QString::number( marks[m] ) );
+            const QString num = QLocale().toString( marks[m] );
+            QLabel *mark = new QLabel( marks[m] > 0 ? QString( "+%1" ).arg( num ) : num );
             mark->setFont( t->font( Theme::Meta ) );
             mark->setProperty( "role", "libraryDim" );
             mark->setAlignment( Qt::AlignRight | Qt::AlignVCenter );
@@ -1699,7 +1701,7 @@ protected:
 /* "Decrease (G)", or the bare label when the action has no key */
 QString withHotkey( const QString &label, const QString &key )
 {
-    return key.isEmpty() ? label : QString( "%1 (%2)" ).arg( label, key );
+    return key.isEmpty() ? label : qtr( "%1 (%2)" ).arg( label, key );
 }
 
 /* One card of the Synchronization tab: title and description, the control */
