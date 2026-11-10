@@ -303,28 +303,44 @@ static inline void addMenuToMainbar( QMenu *func, QString title, QMenuBar *bar )
     connect( _menu, &QMenu::aboutToShow, THEDP->menusUpdateMapper, QOverload<>::of(&QSignalMapper::map) ); \
     THEDP->menusUpdateMapper->setMapping( _menu, f ); }
 
+// A redesign icon on an action, where menus show icons
+static inline void setMenuIcon( QAction *action, const char *icon ) {
+#ifndef __APPLE__ /* No icons in menus in Mac */
+    if( icon )
+        action->setIcon( menuIcon( icon ) );
+#else
+    Q_UNUSED( action ); Q_UNUSED( icon );
+#endif
+}
+
 // Add a simple action
-static inline void addAction( QMenu *_menu, QVariant val, QString title ) {
+static inline void addAction( QMenu *_menu, QVariant val, QString title,
+                              const char *icon = NULL ) {
     QAction *_action = new QAction( title, _menu );
     _action->setData( val );
+    setMenuIcon( _action, icon );
     _menu->addAction( _action );
 }
 
 // Add an action with a submenu
-static inline QMenu *addActionWithSubmenu( QMenu *_menu, QVariant val, QString title ) {
+static inline QMenu *addActionWithSubmenu( QMenu *_menu, QVariant val, QString title,
+                                           const char *icon = NULL ) {
     QAction *_action = new QAction( title, _menu );
     QMenu *_submenu = new QMenu( _menu );
     _action->setData( val );
     _action->setMenu( _submenu );
+    setMenuIcon( _action, icon );
     _menu->addAction( _action );
     return _submenu;
 }
 
-// Add an action that is a checkbox
-static inline void addActionWithCheckbox( QMenu *_menu, QVariant val, QString title ) {
+// Add an action that is a checkbox (checked, it shows the check instead)
+static inline void addActionWithCheckbox( QMenu *_menu, QVariant val, QString title,
+                                          const char *icon = NULL ) {
     QAction *_action = new QAction( title, _menu );
     _action->setData( val );
     _action->setCheckable( true );
+    setMenuIcon( _action, icon );
     _menu->addAction( _action );
 }
 
@@ -523,6 +539,7 @@ QMenu *VLCMenuBar::ViewMenu( intf_thread_t *p_intf, QMenu *current, MainInterfac
     action->setChecked( (mi->getControlsVisibilityStatus()
                          & MainInterface::CONTROLS_HIDDEN ) );
 
+    setMenuIcon( action, RedesignIcons::MenuMenuBar );
     connect( action, &QAction::triggered, mi, &MainInterface::toggleMinimalView );
     connect( mi, &MainInterface::minimalViewToggled, action, &QAction::setChecked );
 
@@ -532,6 +549,7 @@ QMenu *VLCMenuBar::ViewMenu( intf_thread_t *p_intf, QMenu *current, MainInterfac
     connect( action, &QAction::triggered, mi, &MainInterface::setImmersive );
     /* Mini player: no shortcut, Ctrl+H stays the minimal interface (D3) */
     action = menu->addAction( qtr( "Mini &Player" ) );
+    setMenuIcon( action, RedesignIcons::MenuMiniPlayer );
     action->setCheckable( true );
     action->setChecked( mi->isMiniPlayerVisible() );
     connect( action, &QAction::triggered, mi, &MainInterface::toggleMiniPlayer );
@@ -540,6 +558,7 @@ QMenu *VLCMenuBar::ViewMenu( intf_thread_t *p_intf, QMenu *current, MainInterfac
     /* FullScreen View */
     action = menu->addAction( qtr( "&Fullscreen Interface" ), mi,
             SLOT( toggleInterfaceFullScreen() ), QString( "F11" ) );
+    setMenuIcon( action, RedesignIcons::MenuFullscreenUI );
     action->setCheckable( true );
     action->setChecked( mi->isInterfaceFullScreen() );
     connect( mi, &MainInterface::fullscreenInterfaceToggled,
@@ -548,6 +567,7 @@ QMenu *VLCMenuBar::ViewMenu( intf_thread_t *p_intf, QMenu *current, MainInterfac
     /* Advanced Controls */
     action = menu->addAction( qtr( "&Advanced Controls" ), mi,
             SLOT( toggleAdvancedButtons() ) );
+    setMenuIcon( action, RedesignIcons::MenuAdvControls );
     action->setCheckable( true );
     if( mi->getControlsVisibilityStatus() & MainInterface::CONTROLS_ADVANCED )
         action->setChecked( true );
@@ -555,6 +575,7 @@ QMenu *VLCMenuBar::ViewMenu( intf_thread_t *p_intf, QMenu *current, MainInterfac
 
 #ifndef QT_NO_STATUSBAR
     action = menu->addAction( qtr( "Status Bar" ) );
+    setMenuIcon( action, RedesignIcons::MenuStatusBar );
     action->setCheckable( true );
     action->setChecked( mi->statusBar()->isVisible() );
     connect( action, &QAction::triggered, mi, &MainInterface::setStatusBarVisibility );
@@ -640,16 +661,19 @@ QMenu *VLCMenuBar::AudioMenu( intf_thread_t *p_intf, QMenu * current )
     input_thread_t *p_input;
 
     if (!audioDeviceMenu)
+    {
         audioDeviceMenu = new QMenu( qtr( "Audio &Device" ) );
+        setMenuIcon( audioDeviceMenu->menuAction(), RedesignIcons::MenuAudioDevice );
+    }
 
     if( current->isEmpty() )
     {
-        addActionWithSubmenu( current, "audio-es", qtr( "Audio &Track" ) );
+        addActionWithSubmenu( current, "audio-es", qtr( "Audio &Track" ), RedesignIcons::MenuAudioTrack );
         current->addMenu( audioDeviceMenu );
-        addActionWithSubmenu( current, "stereo-mode", qtr( "&Stereo Mode" ) );
+        addActionWithSubmenu( current, "stereo-mode", qtr( "&Stereo Mode" ), RedesignIcons::MenuStereoMode );
         current->addSeparator();
 
-        addActionWithSubmenu( current, "visual", qtr( "&Visualizations" ) );
+        addActionWithSubmenu( current, "visual", qtr( "&Visualizations" ), RedesignIcons::MenuVisualizations );
         VolumeEntries( p_intf, current );
     }
 
@@ -699,28 +723,28 @@ QMenu *VLCMenuBar::VideoMenu( intf_thread_t *p_intf, QMenu *current )
 
     if( current->isEmpty() )
     {
-        addActionWithSubmenu( current, "video-es", qtr( "Video &Track" ) );
+        addActionWithSubmenu( current, "video-es", qtr( "Video &Track" ), RedesignIcons::MenuVideoTrack );
 
         current->addSeparator();
         /* Surface modifiers */
-        addActionWithCheckbox( current, "fullscreen", qtr( "&Fullscreen" ) );
-        addActionWithCheckbox( current, "autoscale", qtr( "Always Fit &Window" ) );
-        addActionWithCheckbox( current, "video-wallpaper", qtr( "Set as Wall&paper" ) );
+        addActionWithCheckbox( current, "fullscreen", qtr( "&Fullscreen" ), RedesignIcons::MenuFullscreen );
+        addActionWithCheckbox( current, "autoscale", qtr( "Always Fit &Window" ), RedesignIcons::MenuFitWindow );
+        addActionWithCheckbox( current, "video-wallpaper", qtr( "Set as Wall&paper" ), RedesignIcons::MenuWallpaper );
 
         current->addSeparator();
         /* Size modifiers */
-        addActionWithSubmenu( current, "zoom", qtr( "&Zoom" ) );
-        addActionWithSubmenu( current, "aspect-ratio", qtr( "&Aspect Ratio" ) );
-        addActionWithSubmenu( current, "crop", qtr( "&Crop" ) );
+        addActionWithSubmenu( current, "zoom", qtr( "&Zoom" ), RedesignIcons::MenuZoom );
+        addActionWithSubmenu( current, "aspect-ratio", qtr( "&Aspect Ratio" ), RedesignIcons::MenuAspectRatio );
+        addActionWithSubmenu( current, "crop", qtr( "&Crop" ), RedesignIcons::MenuCrop );
 
         current->addSeparator();
         /* Rendering modifiers */
-        addActionWithSubmenu( current, "deinterlace", qtr( "&Deinterlace" ) );
+        addActionWithSubmenu( current, "deinterlace", qtr( "&Deinterlace" ), RedesignIcons::MenuDeinterlace );
         addActionWithSubmenu( current, "deinterlace-mode", qtr( "&Deinterlace mode" ) );
 
         current->addSeparator();
         /* Other actions */
-        addAction( current, "video-snapshot", qtr( "Take &Snapshot" ) );
+        addAction( current, "video-snapshot", qtr( "Take &Snapshot" ), RedesignIcons::MenuSnapshot );
     }
 
     p_input = THEMIM->getInput();
@@ -739,8 +763,8 @@ QMenu *VLCMenuBar::NavigMenu( intf_thread_t *p_intf, QMenu *menu )
     QAction *action;
     QMenu *submenu;
 
-    addActionWithSubmenu( menu, "title", qtr( "T&itle" ) );
-    submenu = addActionWithSubmenu( menu, "chapter", qtr( "&Chapter" ) );
+    addActionWithSubmenu( menu, "title", qtr( "T&itle" ), RedesignIcons::MenuTitle );
+    submenu = addActionWithSubmenu( menu, "chapter", qtr( "&Chapter" ), RedesignIcons::MenuChapter );
     submenu->setTearOffEnabled( true );
     addActionWithSubmenu( menu, "program", qtr( "&Program" ) );
 
@@ -928,6 +952,7 @@ void VLCMenuBar::PopupMenuControlEntries( QMenu *menu, intf_thread_t *p_intf,
     }
 
     action = menu->addMenu( rateMenu );
+    setMenuIcon( action, RedesignIcons::MenuSpeed );
     action->setData( ACTION_STATIC );
 
     menu->addSeparator();
@@ -949,6 +974,7 @@ void VLCMenuBar::PopupMenuControlEntries( QMenu *menu, intf_thread_t *p_intf,
     action->setData( ACTION_STATIC );
 
     action = menu->addAction( qtr( I_MENU_GOTOTIME ), THEDP, SLOT( gotoTimeDialog() ), qtr( "Ctrl+T" ) );
+    setMenuIcon( action, RedesignIcons::MenuJumpToTime );
     action->setData( ACTION_ALWAYS_ENABLED );
 
     menu->addSeparator();
