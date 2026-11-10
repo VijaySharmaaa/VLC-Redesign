@@ -27,6 +27,7 @@
 #include "components/library/home_page.hpp"
 #include "components/library/library_widgets.hpp"
 #include "components/now_playing.hpp"   /* paintStripes, fontAt */
+#include "input_manager.hpp"
 #include "recents.hpp"
 #include "util/breakpoints.hpp"
 #include "util/customwidgets.hpp"     /* timeString */
@@ -52,6 +53,7 @@
 #include <QPainter>
 #include <QPainterPath>
 #include <QScrollBar>
+#include <QStyle>
 #include <QStyledItemDelegate>
 #include <QTreeWidget>
 #include <QUrl>
@@ -187,10 +189,13 @@ public:
                         || option.viewItemPosition == QStyleOptionViewItem::OnlyOne;
         const bool last = option.viewItemPosition == QStyleOptionViewItem::End
                        || option.viewItemPosition == QStyleOptionViewItem::OnlyOne;
+        /* the first column is on the right in RTL */
         if( first )
-            p->fillRect( r.left(), r.top(), w, r.height(), c );
+            p->fillRect( QStyle::visualRect( option.direction, r,
+                                             QRect( r.left(), r.top(), w, r.height() ) ), c );
         if( last )
-            p->fillRect( r.right() - w + 1, r.top(), w, r.height(), c );
+            p->fillRect( QStyle::visualRect( option.direction, r,
+                                             QRect( r.right() - w + 1, r.top(), w, r.height() ) ), c );
     }
 
 protected:
@@ -308,7 +313,8 @@ void ResumeCard::paintEvent( QPaintEvent * )
         const int h = t->px( Home::Progress );
         const QRectF track( 0, thumbH - h, width(), h );
         p.fillRect( track, t->ink( InkAlpha::ProgressTrack ) );
-        p.fillRect( QRectF( 0, thumbH - h, width() * progress, h ), t->color( Theme::Accent ) );
+        const QRect done( 0, thumbH - h, qRound( width() * progress ), h );
+        p.fillRect( QStyle::visualRect( layoutDirection(), rect(), done ), t->color( Theme::Accent ) );
     }
     if( !badge.isEmpty() )
     {
@@ -321,10 +327,11 @@ void ResumeCard::paintEvent( QPaintEvent * )
         const int badgeRadius = t->px( Library::BadgeRadius );   /* as the library cards' */
         p.setPen( Qt::NoPen );
         p.setBrush( QColor::fromRgba( CardBadgeBg ) );
-        p.drawRoundedRect( r, badgeRadius, badgeRadius );
+        const QRect at = QStyle::visualRect( layoutDirection(), rect(), r );
+        p.drawRoundedRect( at, badgeRadius, badgeRadius );
         p.setFont( f );
         p.setPen( t->color( Theme::OnVideo ) );
-        p.drawText( r, Qt::AlignCenter, badge );
+        p.drawText( at, Qt::AlignCenter, badge );
     }
     p.restore();
 
@@ -378,6 +385,8 @@ HomePage::HomePage( intf_thread_t *_p_intf, QWidget *parent )
 {
     Theme *t = Theme::instance();
     setAccessibleName( qtr( "Home" ) );
+    /* the cards and the table are the Tab stops; QScrollArea scrolls to them */
+    setFocusPolicy( Qt::NoFocus );
     setFrameShape( QFrame::NoFrame );
     setWidgetResizable( true );
     setHorizontalScrollBarPolicy( Qt::ScrollBarAlwaysOff );
@@ -486,6 +495,16 @@ HomePage::HomePage( intf_thread_t *_p_intf, QWidget *parent )
     connect( RecentsMRL::getInstance( p_intf ), &RecentsMRL::changed,
              this, &HomePage::rebuild, Qt::QueuedConnection );
     connect( t, &Theme::changed, this, &HomePage::rebuild );
+    /* an entry gets its length when its input closes: show it while it plays */
+    connect( THEMIM->getIM(), &InputManager::positionUpdated, this, [this]( float, int64_t, int len ) {
+        input_thread_t *input = THEMIM->getInput();
+        if( len <= 0 || !input )
+            return;
+        char *uri = input_item_GetURI( input_GetItem( input ) );
+        if( uri )
+            RecentsMRL::getInstance( p_intf )->setLength( qfu( uri ), int64_t( len ) * 1000 );
+        free( uri );
+    } );
 
     rebuild();
 }
@@ -653,23 +672,35 @@ void HomePage::layoutForWidth()
     const bool small = bp <= BreakpointWatcher::S;
     const int cellPad = 2 * ( t->px( Home::ColumnGap ) / 2 );
     table->setColumnHidden( PathCol, bp == BreakpointWatcher::XS );
-    table->header()->resizeSection( PathCol,
-        t->px( small ? Home::PathColS : Home::PathColL ) + cellPad );
-    table->header()->resizeSection( DurationCol,
-        t->px( small ? Home::DurationColS : Home::DurationColL ) + cellPad );
+    const int duration = t->px( small ? Home::DurationColS : Home::DurationColL ) + cellPad;
+    table->header()->resizeSection( DurationCol, duration );
     /* a 12-hour clock ("Today, 10:52 AM") is wider than the design's: fit
      * that in this locale, and every row's text, in the font it is drawn in
      * (the stylesheet's, so polished first) */
     table->ensurePolished();
     const QFontMetrics fm( table->font() );
+    const QFontMetrics pathFm( t->font( Theme::Mono ) );
     int when = qMax( t->px( small ? Home::WhenColS : Home::WhenColL ),
                      fm.width( whenText( QDateTime( QDate::currentDate(), QTime( 10, 52 ) ).toUTC() ) ) );
+    int titleW = 0, pathW = 0;
     for( int i = 0; i < table->topLevelItemCount(); i++ )
-        when = qMax( when, fm.width( table->topLevelItem( i )->text( WhenCol ) ) );
+    {
+        const QTreeWidgetItem *item = table->topLevelItem( i );
+        when = qMax( when, fm.width( item->text( WhenCol ) ) );
+        titleW = qMax( titleW, fm.width( item->text( TitleCol ) ) );
+        pathW = qMax( pathW, pathFm.width( item->text( PathCol ) ) );
+    }
     /* the delegate's own text margins, as QCommonStyle lays out item text */
     const int textMargin = table->style()->pixelMetric( QStyle::PM_FocusFrameHMargin, 0, table ) + 1;
-    table->header()->resizeSection( WhenCol, when + 2 * textMargin
-                                    + t->px( Home::ColumnGap ) / 2 + t->px( Home::RowPadX ) );
+    when += 2 * textMargin + t->px( Home::ColumnGap ) / 2 + t->px( Home::RowPadX );
+    table->header()->resizeSection( WhenCol, when );
+    /* the path takes the room the titles leave, never less than the design's
+     * width: the title column stretches over the rest */
+    const int title = t->px( Home::RowPadX ) + t->px( Home::IconCol ) + titleW
+                    + 2 * textMargin + cellPad;
+    const int path = qMin( pathW + 2 * textMargin + cellPad, avail - title - duration - when );
+    table->header()->resizeSection( PathCol,
+        qMax( t->px( small ? Home::PathColS : Home::PathColL ) + cellPad, path ) );
 }
 
 void HomePage::play( const QString &mrl, bool resume )

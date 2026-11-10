@@ -68,6 +68,8 @@ public:
     void setTime( const QString &mrl, const int64_t time, const int64_t length );
     /* length in ms, 0 when unknown (entries from older configurations) */
     int64_t length( const QString &mrl );
+    /* while mrl plays: its length in ms as the input knows it so far */
+    void setLength( const QString &mrl, int64_t length );
     /* last played, invalid when unknown */
     QDateTime date( const QString &mrl );
     void removeRecent( const QString &mrl );

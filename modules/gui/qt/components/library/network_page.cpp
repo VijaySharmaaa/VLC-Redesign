@@ -156,6 +156,8 @@ NetworkPage::NetworkPage( intf_thread_t *_p_intf, QWidget *parent )
     body = new QStackedWidget( this );
     tilesPage = new QScrollArea( body );
     tilesPage->setProperty( "role", "library" );
+    /* the tiles are the Tab stops; QScrollArea scrolls to them */
+    tilesPage->setFocusPolicy( Qt::NoFocus );
     tilesPage->setFrameShape( QFrame::NoFrame );
     tilesPage->setWidgetResizable( true );
     tilesPage->setHorizontalScrollBarPolicy( Qt::ScrollBarAlwaysOff );
