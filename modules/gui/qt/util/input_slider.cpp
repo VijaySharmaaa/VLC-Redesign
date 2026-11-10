@@ -105,6 +105,8 @@ SeekSlider::SeekSlider( intf_thread_t *p_intf, Qt::Orientation q, QWidget *_pare
     /* Init to 0 */
     setPosition( -1.0, 0, 0 );
 
+    /* shortcut: stock 2000/500 ms; upgrade to Motion tokens when the theme
+     * lane adds them (SeekLoading, SeekLoadingDelay) */
     QPropertyAnimation *animLoadingIn = new QPropertyAnimation( this, "loadingProperty", this );
     animLoadingIn->setDuration( 2000 );
     animLoadingIn->setStartValue( 0.0 );
@@ -120,6 +122,15 @@ SeekSlider::SeekSlider( intf_thread_t *p_intf, Qt::Orientation q, QWidget *_pare
     animLoading->addAnimation( animLoadingIn );
     animLoading->addAnimation( animLoadingOut );
     animLoading->setLoopCount( -1 );
+    /* Windows animations turned off while it bounces: it stops at the next turn */
+    connect( animLoading, &QAbstractAnimation::currentLoopChanged, this, [this]() {
+        if( Theme::instance()->duration( Theme::Spinner ) == 0 )
+        {
+            animLoading->stop();
+            mLoading = 0.0;
+            update();
+        }
+    } );
 
     startAnimLoadingTimer = new QTimer( this );
     startAnimLoadingTimer->setSingleShot( true );
@@ -184,12 +195,19 @@ void SeekSlider::setChapters( SeekPoints *chapters_ )
  * \brief Main public method, superseeding setValue. Disabling the slider when neeeded
  *
  * \param pos Position, between 0 and 1. -1 disables the slider
- * \param time Elapsed time. Unused
+ * \param time Elapsed time, in microseconds
  * \param legnth Duration time.
  ***/
 void SeekSlider::setPosition( float pos, int64_t time, int length )
 {
-    VLC_UNUSED(time);
+    /* screen readers: the time, not the raw 0..10000 value (only on a new
+     * second, each change is an accessibility event) */
+    const QString where = pos < 0.f ? QString()
+        : length > 0 ? qtr( "%1 of %2" ).arg( timeString( time / CLOCK_FREQ ), timeString( length ) )
+                     : timeString( time / CLOCK_FREQ );
+    if( where != accessibleDescription() )
+        setAccessibleDescription( where );
+
     if( pos == -1.0  || ! b_seekable )
     {
         setEnabled( false );
@@ -529,6 +547,9 @@ inline float SeekSlider::getValuePercentageFromXPos( int posX )
 
 void SeekSlider::startAnimLoading()
 {
+    /* reduced motion: an endless bounce is motion, the disabled bar says enough */
+    if( Theme::instance()->duration( Theme::Spinner ) == 0 )
+        return;
     animLoading->start();
 }
 
