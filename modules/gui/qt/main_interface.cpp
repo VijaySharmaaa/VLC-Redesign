@@ -2195,14 +2195,21 @@ void MainInterface::keyReleaseEvent( QKeyEvent *e )
 
 void MainInterface::handleKeyPress( QKeyEvent *e )
 {
-    /* Esc closes the top-most surface first: the Effects sheet, then
-     * Preferences (back), then minimal view or (key-leave-fullscreen) the
-     * full screen. Menus, pop-ups and dialogs are windows of their own and
-     * take it before. */
+    /* Esc closes the top-most surface first: the Effects sheet, the
+     * playlist drawer, then Preferences (back), then minimal view or
+     * (key-leave-fullscreen) the full screen. Menus, pop-ups and dialogs
+     * are windows of their own and take it before. */
     if( e->key() == Qt::Key_Escape && e->modifiers() == Qt::NoModifier
      && THEDP->isPanelShown( EXTENDED_ACTION ) )
     {
         ExtendedDialog::getInstance( p_intf )->hide();
+        e->accept();
+        return;
+    }
+    if( e->key() == Qt::Key_Escape && e->modifiers() == Qt::NoModifier
+     && playlistPanel && playlistPanel->isWindow() && playlistPanel->isVisible() )
+    {
+        togglePlaylist();   /* the XS drawer, over the page */
         e->accept();
         return;
     }

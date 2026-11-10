@@ -32,6 +32,7 @@
 
 #include <QAbstractButton>
 #include <QButtonGroup>
+#include <QKeyEvent>
 #include <QKeySequence>
 #include <QLabel>
 #include <QPainter>
@@ -76,6 +77,22 @@ public:
     }
 
 protected:
+    /* Home and End go to the first and last section, as in a list */
+    void keyPressEvent( QKeyEvent *e ) Q_DECL_OVERRIDE
+    {
+        QButtonGroup *g = group();
+        if( kind == Section && g && e->modifiers() == Qt::NoModifier
+         && ( e->key() == Qt::Key_Home || e->key() == Qt::Key_End ) )
+        {
+            QAbstractButton *b = e->key() == Qt::Key_Home ? g->buttons().first()
+                                                          : g->buttons().last();
+            b->setFocus( Qt::TabFocusReason );
+            b->click();
+            return;
+        }
+        QAbstractButton::keyPressEvent( e );
+    }
+
     void paintEvent( QPaintEvent * ) Q_DECL_OVERRIDE;
 
 private:

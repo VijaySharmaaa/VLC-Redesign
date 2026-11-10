@@ -250,9 +250,16 @@ static QFrame *buildRow( const Row &r, const QString &orphan, bool first, QList<
         }
         if( w->focusPolicy() & Qt::TabFocus )
         {
-            /* buttons with their own text (radio choices) keep it */
+            /* buttons with their own text (radio choices) keep it; a value
+             * beside a switch (the days between update checks) has its
+             * option's own name, not the switch's */
             QAbstractButton *b = qobject_cast<QAbstractButton *>( w );
-            if( w->accessibleName().isEmpty() && !( b && !b->text().isEmpty() ) )
+            const QByteArray option = w->property( "vlcOption" ).toByteArray();
+            module_config_t *p_config = toggle && w != toggle && !option.isEmpty()
+                                      ? config_FindConfig( option.constData() ) : NULL;
+            if( w->accessibleName().isEmpty() && p_config && p_config->psz_text )
+                w->setAccessibleName( qtr( p_config->psz_text ) );
+            else if( w->accessibleName().isEmpty() && !( b && !b->text().isEmpty() ) )
                 w->setAccessibleName( plainName );
             if( w->accessibleDescription().isEmpty() )
                 w->setAccessibleDescription( desc );
