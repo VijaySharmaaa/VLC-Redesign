@@ -104,3 +104,31 @@ Evidence: `spike-results\p2-fix\` (`before\`, `after\` from `probe.py`/`probe2.p
 | Docked playlist toggled across the rail breakpoint / minimal view | **fixed** | widths stable over 10 toggles; minimal keeps its height. From 1600 px the window returns at 1400 px with the same stack width (both widths fit the stored stack size; the smaller is taken). |
 | `TaskbarButtonCreated` twice | **fixed** | list and connections once, buttons re-added per message, no ThumbBar errors. |
 | Toast over the subtitle it announces | **fixed** | `edge\d03-srt-toast.png`. |
+
+### Edge cases (`redesign/docs/EDGE_CASES.md`), Phase 2
+Evidence: `D:\Projects\VLC\spike-results\p2-edge\` (audit on the merged build, `edge.log`), `...\p2-fix\` (after the fixes: `after\`, `edge\fix_edge.log`), lane evidence `...\p2a\`, `p2b\`, `p2c\`. Not committed. Machine: one 1920×1080 monitor at 125 %, taskbar at the bottom.
+
+| Row | Result | Evidence or reason |
+|---|---|---|
+| Minimum size | **fixed** | 800 px wide; height is the 480 token or half the work area, whichever is smaller, so quarter snaps fit (deviation from "800 × 600", see below). Clamped to the screen's work area. |
+| Maximised; restore after maximise; Win+↑/↓; title-bar double-click | **pass** | The maximised client ends at the work-area bottom, so the taskbar stays visible (`p2-edge\w01b`). Restore returns the exact rectangle. |
+| Snapped half / quarter; snap layouts | **pass** / **fixed** | Half 958×1019. Quarter was clamped to 600 px high; now 510 (fix commit 309ff877a4). The snap-layouts flyout appears over the maximise button (`p2a\02-snap-flyout.png`). |
+| Alt+Space | **pass** | The system menu opens; Esc closes it. |
+| DPI change, monitor drag, multi-monitor fullscreen | **deferred** | One monitor only. Metrics now scale with the logical DPI through `Theme::px()` (3e6992cd95). 150/200 % untested. |
+| Windows 10 | **deferred** | No Windows 10 machine. The native caption fallback is implemented but not run. |
+| Menu bar hidden/shown, minimal view (Ctrl+H ×5), `--qt-minimal-view` | **pass** | The window rectangle is identical each cycle, idle and with video. Alt reveals the menus; after Alt+Tab the flag clears (fix). |
+| Fullscreen with and without the FSC; F11 | **pass** / **fixed** | With the FSC off, keys still work; menu shortcuts fire once in every view. F11 hid the menus after the merge; now it keeps them (309ff877a4). The window came back 38 px lower after end-of-media fullscreen; fixed. |
+| Docked vs detached playlist | **pass** / **fixed** | Ctrl+L opens and hides the separate window when undocked. Docked toggles made the window shrink (1300 → 1012 px over 20 toggles) and lose 28 px in minimal view; both fixed, widths stable over 10 toggles. |
+| Old `vlc-qt-interface.ini` (normal, off-screen, maximised) | **pass** / **fixed** | Normal and off-screen restore on screen. A maximised stock ini restored as a fake maximise; now truly maximised. |
+| Systray on/off, start minimised, pause on minimise | **pass** | Tray icon follows the option; nothing shows when starting minimised; minimising paused playback. |
+| Taskbar thumbnail buttons | **pass** / **fixed** | Present; the task-bar list was created again on each `TaskbarButtonCreated` (a leak); now created once. |
+| `-I skins2` | **pass** | Skin windows open and play. |
+| Keyboard: tab order, visible focus, Esc order, typing in a field | **pass** (partial tab order) | Focus is visible; typing "f m" in a field triggers nothing; Esc closes the menu before leaving fullscreen. Tab cycles only Open media → Home → Preferences: the deck controls were never focusable in stock VLC; Phase 3 makes them focusable. |
+| Screen reader names | **pass** (no regression) | 9 unnamed controls, as at baseline; all new title-bar and sidebar buttons are named. |
+| Rapid toggling 20× (Ctrl+H, Ctrl+L, F11, pages) | **pass** after the fix | GDI/USER handles stable; the Ctrl+L width drift is fixed (above). |
+| Drag and drop (files over library and video, `.srt`, URL) | **pass** | The overlay hides on leave and drop; the `.srt` drop shows its toast, now lifted above the subtitle line (fix); a URL drop enqueues. Drops onto the title bar weren't tested. Shift = enqueue isn't implemented (decision D2). |
+| Closing during playback, with a toast, with the drop overlay | **pass** | Exit code 0 within 0.3 s each. |
+| Animations off | **pass** | The toast and drop target don't animate when Windows animations are off, but still show and hold 2.4 s (lane C test; the setting was restored after the test). |
+
+**Deviations recorded:** minimum height 480 px instead of 600, so Windows quarter snaps fit on 1080p screens; light-theme accent text `#9a4800` instead of `#B35300` (4.79:1 on the active fill); no "hold Shift to add" hint on the drop target (D2).
+**Not Phase 2:** Ctrl+C (Open Capture Device) freezes the UI for over 90 s while probing devices, also in the stock build (`vlc-pkg-d`), so this predates the redesign.
