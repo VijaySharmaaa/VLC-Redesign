@@ -46,6 +46,8 @@ QFont fontAt( Theme::TypeRole, int tokenPx, bool semibold );
 
 /* "FLAC", "H.264": short codec names, or the fourcc */
 QString codecName( const QString &fourcc );
+/* The back arrow, pointing right in a right-to-left UI */
+QIcon backIcon( Theme::ColorRole );
 
 /* Cover art, cropped to fill, or the striped placeholder (DESIGN_SPEC 4) */
 class ArtView : public QWidget
@@ -80,6 +82,8 @@ private:
     int valueAt( int x ) const;
     void seek();
     intf_thread_t *p_intf;
+    QString timeText;   /* "0:10 of 1:00": the accessible value */
+    friend class ThinSeekAccessible;
 };
 
 /* What the now-playing views share: title, meta line, format and art of

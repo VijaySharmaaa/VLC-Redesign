@@ -230,6 +230,19 @@ int64_t RecentsMRL::length( const QString &mrl )
     return i_index != -1 ? lengths.value( i_index ).toLongLong() : 0;
 }
 
+void RecentsMRL::setLength( const QString &mrl, int64_t length )
+{
+    int i_index = recents.indexOf( mrl );
+    /* to the second: the input's estimate can change while it plays (VBR
+     * MP3), but its exact length at close must not be rounded off again */
+    if( i_index != -1 && length > 0
+     && lengths.value( i_index ).toLongLong() / 1000 != length / 1000 )
+    {
+        lengths[i_index] = QString::number( length );
+        emit changed();
+    }
+}
+
 QDateTime RecentsMRL::date( const QString &mrl )
 {
     int i_index = recents.indexOf( mrl );

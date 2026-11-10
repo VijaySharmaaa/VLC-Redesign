@@ -51,6 +51,7 @@
 #include <QPushButton>
 #include <QRunnable>
 #include <QScrollBar>
+#include <QStyle>
 #include <QToolButton>
 #include <QVBoxLayout>
 
@@ -431,9 +432,11 @@ void CardDelegate::paintCard( QPainter *p, const QStyleOptionViewItem &option,
         const QFontMetrics fm( font );
         const QSizeF size( fm.width( text ) + 2 * t->px( Library::BadgePadX ),
                            fm.height() + 2 * t->px( Library::BadgePadY ) );
-        const QRectF badge( thumb.right() - t->px( Library::BadgeInset ) - size.width(),
-                            thumb.bottom() - t->px( Library::BadgeInset ) - size.height(),
-                            size.width(), size.height() );
+        QRectF badge( thumb.right() - t->px( Library::BadgeInset ) - size.width(),
+                      thumb.bottom() - t->px( Library::BadgeInset ) - size.height(),
+                      size.width(), size.height() );
+        if( option.direction == Qt::RightToLeft )
+            badge.moveLeft( thumb.left() + thumb.right() - badge.right() );
         p->setPen( Qt::NoPen );
         p->setBrush( QColor::fromRgba( CardBadgeBg ) );
         p->drawRoundedRect( badge, t->px( Library::BadgeRadius ), t->px( Library::BadgeRadius ) );
@@ -483,7 +486,7 @@ void CardDelegate::paintRow( QPainter *p, const QStyleOptionViewItem &option,
     const int iconPx = t->px( Playlist::RowIcon );
     const QRect iconRect( option.rect.x() + padX, option.rect.center().y() - iconPx / 2, iconPx, iconPx );
     paintGlyph( p, LibraryData::isFolder( model, source ) ? RedesignIcons::IconFolder : RedesignIcons::IconOpenFile,
-                Theme::AccentText, iconPx, iconRect );
+                Theme::AccentText, iconPx, QStyle::visualRect( option.direction, option.rect, iconRect ) );
 
     p->setFont( t->font( Theme::Body ) );
     const QFontMetrics fm( p->font() );
@@ -494,10 +497,13 @@ void CardDelegate::paintRow( QPainter *p, const QStyleOptionViewItem &option,
     const QRect titleRect( iconRect.right() + 1 + gap, option.rect.y(),
                            timeRect.left() - iconRect.right() - 1 - gap, option.rect.height() );
     p->setPen( t->color( Theme::Text ) );
-    p->drawText( titleRect, Qt::AlignLeft | Qt::AlignVCenter,
+    /* the alignments follow the painter's direction, the rects do not */
+    p->drawText( QStyle::visualRect( option.direction, option.rect, titleRect ),
+                 Qt::AlignLeft | Qt::AlignVCenter,
                  fm.elidedText( index.data().toString(), Qt::ElideRight, titleRect.width() ) );
     p->setPen( t->color( Theme::Mute ) );
-    p->drawText( timeRect, Qt::AlignRight | Qt::AlignVCenter, time );
+    p->drawText( QStyle::visualRect( option.direction, option.rect, timeRect ),
+                 Qt::AlignRight | Qt::AlignVCenter, time );
 }
 
 QString CardDelegate::artPath( input_item_t *input, const QModelIndex &source ) const
@@ -659,6 +665,13 @@ void CardView::keyPressEvent( QKeyEvent *e )
     QListView::keyPressEvent( e );
 }
 
+/* "Label (Ctrl+F)" in the platform's spelling */
+static QString withShortcut( const QString &label, const char *keys )
+{
+    return qtr( "%1 (%2)" ).arg( label,
+        QKeySequence( QLatin1String( keys ) ).toString( QKeySequence::NativeText ) );
+}
+
 /**********************************************************************
  * LibraryHeader
  **********************************************************************/
@@ -671,11 +684,11 @@ LibraryHeader::LibraryHeader( const QString &_title, QWidget *parent )
     layout->setSpacing( t->px( Library::HeaderGap ) );
 
     back = new QToolButton( this );
-    back->setIcon( Theme::themedIcon( RedesignIcons::IconBack, Theme::Text ) );
+    back->setIcon( backIcon( Theme::Text ) );
     back->setIconSize( QSize( t->metric( Theme::IconGlyph ), t->metric( Theme::IconGlyph ) ) );
     back->setFixedSize( t->metric( Theme::IconButton ), t->metric( Theme::IconButton ) );
     back->setAccessibleName( qtr( "Back" ) );
-    back->setToolTip( qtr( "Back (Backspace)" ) );
+    back->setToolTip( withShortcut( qtr( "Back" ), "Backspace" ) );
     back->setFocusPolicy( Qt::TabFocus );
     back->hide();
     connect( back, &QToolButton::clicked, this, &LibraryHeader::backRequested );
@@ -728,13 +741,6 @@ void LibraryHeader::resizeEvent( QResizeEvent *e )
 /**********************************************************************
  * LibraryEmptyState
  **********************************************************************/
-/* "Label (Ctrl+F)" in the platform's spelling */
-static QString withShortcut( const QString &label, const char *keys )
-{
-    return qtr( "%1 (%2)" ).arg( label,
-        QKeySequence( QLatin1String( keys ) ).toString( QKeySequence::NativeText ) );
-}
-
 namespace {
 /* Wrapped text sized once to its lines (below). It must not tell the
  * layouts its height depends on its width: a QScrollArea (Home) then sizes
