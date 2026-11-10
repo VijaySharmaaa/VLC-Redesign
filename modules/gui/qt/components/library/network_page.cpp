@@ -191,11 +191,7 @@ NetworkPage::NetworkPage( intf_thread_t *_p_intf, QWidget *parent )
         if( body->currentWidget() == list )
             filter->setText( text );
         else
-        {
-            foreach( NetworkTile *tile, lanTiles + streamTiles )
-                tile->setHidden( !matches( tile, text ) );
             layoutTiles();
-        }
         updateState();
     } );
     connect( THEMIM, &MainInputManager::leafBecameParent, this, [this]( int id ) {
@@ -298,7 +294,6 @@ void NetworkPage::rebuildLanTiles()
 {
     qDeleteAll( lanTiles );
     lanTiles.clear();
-    const QString search = header->search()->text().trimmed();
     foreach( const Lan &lan, lans )
         for( int i = 0; i < lan.model->rowCount(); i++ )
         {
@@ -306,7 +301,6 @@ void NetworkPage::rebuildLanTiles()
             const QString name = lan.model->getTitle( source );
             NetworkTile *tile = new NetworkTile( lan.icon, name, lan.model->getURI( source ),
                                                  tilesPage->widget() );
-            tile->setHidden( !matches( tile, search ) );
             PLModel *model = lan.model;
             connect( tile, &QAbstractButton::clicked, this, [this, model, source, name]() {
                 if( source.isValid() )
@@ -323,16 +317,21 @@ void NetworkPage::layoutTiles()
     if( !loaded )
         return;
     const int cols = tileColumns[BreakpointWatcher::fromWidth( window()->width() )];
-    const auto place = [cols]( QGridLayout *grid, const QList<NetworkTile *> &tiles ) {
+    const QString search = header->search()->text().trimmed();
+    const auto place = [cols, &search]( QGridLayout *grid, const QList<NetworkTile *> &tiles ) {
         foreach( NetworkTile *tile, tiles )
             grid->removeWidget( tile );
         int n = 0;
         foreach( NetworkTile *tile, tiles )
-            if( !tile->isHidden() )
+        {
+            const bool shown = matches( tile, search );
+            tile->setVisible( shown );
+            if( shown )
             {
                 grid->addWidget( tile, n / cols, n % cols );
                 n++;
             }
+        }
         for( int c = 0; c < Library::NetColsL || c < grid->columnCount(); c++ )
             grid->setColumnStretch( c, c < cols ? 1 : 0 );
     };
