@@ -67,6 +67,7 @@
 #include <QLabel>
 #include <QStackedWidget>
 #include <QScreen>
+#include <QDesktopWidget>
 #ifdef _WIN32
 #include <QFileInfo>
 #endif
@@ -250,6 +251,9 @@ MainInterface::MainInterface( intf_thread_t *_p_intf, bool customFrame ) : QVLCM
     installEventFilter( this );
 
     toast = new Toast( p_intf, this, stackCentralW );
+    connect( stackCentralW, &QStackedWidget::currentChanged, toast,
+             [this]() { toast->setOverVideo( videoWidget
+                            && stackCentralW->currentWidget() == videoWidget ); } );
     dropOverlay = new DropOverlay( this );
 
     connect( this, &MainInterface::askToQuit, THEDP, &DialogsProvider::quit );
@@ -277,8 +281,10 @@ MainInterface::MainInterface( intf_thread_t *_p_intf, bool customFrame ) : QVLCM
     if( settings->value( "MainWindow/playlist-visible", false ).toBool() )
         togglePlaylist();
 
-    QVLCTools::restoreWidgetPosition( settings, this,
-            QSize( RedesignTokens::Breakpoint::XSMinW, RedesignTokens::Breakpoint::XSMinH ) );
+    /* Before the restore and the show: a minimum set later resizes a
+     * maximised window to it, a fake maximise */
+    computeMinimumSize( b_minimalView );
+    QVLCTools::restoreWidgetPosition( settings, this, minimumSize() );
 
     b_interfaceFullScreen = isFullScreen();
 
@@ -288,7 +294,9 @@ MainInterface::MainInterface( intf_thread_t *_p_intf, bool customFrame ) : QVLCM
     if( b_minimalView )
         toggleMinimalView( true );
 
-    computeMinimumSize( b_minimalView );
+    /* keyboard focus starts on the window (its keys drive the player), not
+     * on the first sidebar button: Tab reaches that */
+    setFocus();
 }
 
 MainInterface::~MainInterface()
@@ -335,16 +343,22 @@ MainInterface::~MainInterface()
     p_intf->p_sys->p_mi = NULL;
 }
 
-/* The design's smallest window; minimal view keeps the old video-only
- * minimum (a 0 height lets the layout decide it). */
+/* The design's smallest window, within the screen's work area; minimal
+ * view keeps the old video-only minimum (a 0 height lets the layout
+ * decide it). */
 void MainInterface::computeMinimumSize( bool b_minimal )
 {
     if( b_minimal )
+    {
         setMinimumSize( 80, 0 );
-    else
-        setMinimumSize( qMax( RedesignTokens::Breakpoint::XSMinW,
-                              80 + controls->sizeHint().width() ),
-                        RedesignTokens::Breakpoint::XSMinH );
+        return;
+    }
+    const Theme *t = Theme::instance();
+    const QSize work = QApplication::desktop()->availableGeometry( this ).size();
+    /* at most half the work area high, so a quarter snap fits */
+    setMinimumSize( qMin( work.width(), qMax( t->px( RedesignTokens::Breakpoint::XSMinW ),
+                                              80 + controls->sizeHint().width() ) ),
+                    qMin( work.height() / 2, t->px( RedesignTokens::Breakpoint::XSMinH ) ) );
 }
 
 QMenuBar *MainInterface::menuBar() const
@@ -539,10 +553,19 @@ void MainInterface::createMainWidget( QSettings *creationSettings )
 
     for( int i = 0; i < Sidebar::PageCount; i++ )
         stackCentralW->addWidget( sidebar->page( static_cast<Sidebar::Page>( i ) ) );
-    connect( sidebar, &Sidebar::pageRequested,
-             this, [this]( QWidget *page ) { showTab( page ); } );
+    connect( sidebar, &Sidebar::pageRequested, this, [this]( QWidget *page ) {
+        /* shortcut: until the Phase 3 now-playing bar, clicking the open
+         * page again (or the cone) goes back to what is playing */
+        if( stackCentralW->currentWidget() == page && THEMIM->getIM()->hasInput() )
+            showTab( videoWidget && THEMIM->getIM()->hasVideo()
+                     ? static_cast<QWidget *>( videoWidget ) : bgWidget );
+        else
+            showTab( page );
+    } );
     connect( stackCentralW, &QStackedWidget::currentChanged, sidebar,
              [this]() { sidebar->setCurrentWidget( stackCentralW->currentWidget() ); } );
+    /* the window opens on Home; bgWidget stays for cover art */
+    stackCentralW->setCurrentWidget( sidebar->page( Sidebar::Home ) );
 
     breakpoints = new BreakpointWatcher( this );
     breakpoints->addTarget( sidebar );
@@ -698,6 +721,37 @@ void MainInterface::debug()
     msg_Dbg( p_intf, "Stack sizeHint: %i - %i", stackCentralW->sizeHint().height(), stackCentralW->sizeHint().width() );
     msg_Dbg( p_intf, "Central size: %i - %i", centralWidget()->size().height(), centralWidget()->size().width() );
 #endif
+}
+
+/* The window width that leaves stackWidth to the stack, when everything but
+ * the stack and the sidebar takes otherWidth: the sidebar's own width
+ * depends on the window's breakpoint, so the remembered stack sizes stay
+ * the same whatever the sidebar was when they were taken. */
+int MainInterface::windowWidthFor( int stackWidth, int otherWidth, bool withSidebar ) const
+{
+    if( !withSidebar )
+        return otherWidth + stackWidth;
+    for( int bp = BreakpointWatcher::XS; bp <= BreakpointWatcher::L; bp++ )
+    {
+        const BreakpointWatcher::Size size = static_cast<BreakpointWatcher::Size>( bp );
+        const int w = otherWidth + stackWidth + Sidebar::widthAt( size );
+        if( BreakpointWatcher::fromWidth( w ) == size )
+            return w;
+    }
+    return otherWidth + stackWidth + Sidebar::widthAt( BreakpointWatcher::L );
+}
+
+void MainInterface::resizeStack( int w, int h )
+{
+    if( !isFullScreen() && !isMaximized() && !b_isWindowTiled )
+    {
+        const bool withSidebar = !sidebar->isHidden();
+        const int other = width() - stackCentralW->width()
+                        - ( withSidebar ? sidebar->width() : 0 );
+        resizeWindow( windowWidthFor( w, other, withSidebar ),
+                      height() - stackCentralW->height() + h );
+    }
+    debug();
 }
 
 inline void MainInterface::showVideo() { showTab( videoWidget ); }
@@ -899,7 +953,12 @@ void MainInterface::setVideoSize( unsigned int w, unsigned int h )
 #endif
             if( (float)h / factor > screen.height() )
             {
-                w = screen.width();
+                /* the stack's width in a window as wide as the screen */
+                const bool withSidebar = !sidebar->isHidden();
+                w = screen.width() - ( width() - stackCentralW->width() );
+                if( withSidebar )
+                    w += sidebar->width() - Sidebar::widthAt(
+                             BreakpointWatcher::fromWidth( screen.width() ) );
                 h = screen.height();
                 h -= titleBar->barHeight();
                 if( !b_minimalView )
@@ -1113,7 +1172,12 @@ void MainInterface::togglePlaylist()
         }
         else /* Hide it! */
         {
-            restoreStackOldWidget();
+            /* shortcut: until the Phase 3 now-playing bar, a playing video
+             * is the way back, not the library page left for the playlist */
+            if( videoWidget && THEMIM->getIM()->hasVideo() )
+                showVideo();
+            else
+                restoreStackOldWidget();
         }
         playlistVisible = ( stackCentralW->currentWidget() == playlistWidget );
     }
@@ -1182,7 +1246,7 @@ void MainInterface::dockPlaylist( bool p_docked )
 /*
  * displayNormalView is the private function used by
  * the SLOT setVideoFullScreen to hide the controls;
- * setInterfaceFullScreen hides the title bar
+ * setInterfaceFullScreen hides the title bar in video full screen
  */
 void MainInterface::displayNormalView()
 {
@@ -1205,6 +1269,10 @@ void MainInterface::setMinimalView( bool b_minimal )
     bool b_statusBarVisible = statusBar()->isVisible();
 #endif
     bool b_inputCVisible = inputC->isVisible();
+    /* the sidebar goes too: its width, and the stack's for the way back */
+    const bool b_sidebarShown = !sidebar->isHidden();
+    const int i_stackWidth = stackCentralW->width();
+    const int i_otherWidth = width() - i_stackWidth - ( b_sidebarShown ? sidebar->width() : 0 );
 
     /* The title bar becomes a strip with the window buttons, or nothing
      * under a native caption: its new height is known right away */
@@ -1230,8 +1298,9 @@ void MainInterface::setMinimalView( bool b_minimal )
         if( b_inputCVisible )
             i_heightChange += inputC->height();
 
-        if( i_heightChange != 0 )
-            resizeWindow( width(), height() - i_heightChange );
+        const int i_widthChange = b_sidebarShown ? sidebar->width() : 0;
+        if( i_heightChange != 0 || i_widthChange != 0 )
+            resizeWindow( width() - i_widthChange, height() - i_heightChange );
     }
 
     sidebar->setVisible( !b_minimal );
@@ -1254,8 +1323,10 @@ void MainInterface::setMinimalView( bool b_minimal )
         if( !b_inputCVisible && inputC->isVisible() )
             i_heightChange += inputC->height();
 
-        if( i_heightChange != 0 )
-            resizeWindow( width(), height() + i_heightChange );
+        const int i_width = b_sidebarShown ? width()
+                          : windowWidthFor( i_stackWidth, i_otherWidth, true );
+        if( i_heightChange != 0 || i_width != width() )
+            resizeWindow( i_width, height() + i_heightChange );
     }
 
     if( !b_minimal )
@@ -1797,6 +1868,9 @@ void MainInterface::closeEvent( QCloseEvent *e )
 
 bool MainInterface::eventFilter( QObject *obj, QEvent *event )
 {
+    /* Alt+Tab: the Alt press was ours, its release is not */
+    if( event->type() == QEvent::WindowDeactivate )
+        b_altAlone = false;
     if ( event->type() == MainInterface::ToolbarsNeedRebuild ) {
         event->accept();
         recreateToolbars();
@@ -1813,7 +1887,7 @@ void MainInterface::toolBarConfUpdated()
 
 void MainInterface::setInterfaceFullScreen( bool fs )
 {
-    titleBar->setFullScreen( fs );
+    titleBar->setFullScreen( fs, b_videoFullScreen );
     if( fs )
     {
         updateCustomFrame( true );

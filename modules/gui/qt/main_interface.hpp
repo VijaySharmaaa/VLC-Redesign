@@ -256,19 +256,8 @@ protected slots:
 
     void handleKeyPress( QKeyEvent * );
 
-    void resizeStack( int w, int h )
-    {
-        if( !isFullScreen() && !isMaximized() && !b_isWindowTiled )
-        {
-            if( b_minimalView )
-                resizeWindow( w, h ); /* Oh yes, it shouldn't
-                                   be possible that size() - stackCentralW->size() < 0
-                                   since stackCentralW is contained in the QMW... */
-            else
-                resizeWindow( width() - stackCentralW->width() + w, height() - stackCentralW->height() + h );
-        }
-        debug();
-    }
+    void resizeStack( int w, int h );
+    int windowWidthFor( int stackWidth, int otherWidth, bool withSidebar ) const;
 
     void setVideoSize( unsigned int, unsigned int );
     void videoSizeChanged( int, int );

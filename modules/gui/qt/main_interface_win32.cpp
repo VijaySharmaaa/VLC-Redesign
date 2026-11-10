@@ -42,6 +42,10 @@
 
 #include <QWindow>
 #include <qpa/qplatformnativeinterface.h>
+/* shortcut: the contribs only expose qplatformnativeinterface.h among the
+ * QPA headers; this one is reached through the private include tree of the
+ * pinned Qt 5.6.3, update the path if the Qt contrib ever changes */
+#include <QtGui/5.6.3/QtGui/qpa/qwindowsysteminterface.h>
 
 #include <windowsx.h>   /* GET_X_LPARAM */
 
@@ -134,6 +138,10 @@ void MainInterfaceWin32::updateCustomFrame( bool fullscreen )
     const bool zoomed = IsZoomed( hwnd ) && GetWindowRect( hwnd, &before );
     QGuiApplication::platformNativeInterface()->setWindowProperty(
             windowHandle()->handle(), "WindowsCustomMargins", QVariant::fromValue( margins ) );
+    /* Windows moved the client by the caption height; Qt learns it from a
+     * queued event: take it now, or a resize() right after (the video
+     * closing at the end of full screen) moves the window by that height */
+    QWindowSystemInterface::flushWindowSystemEvents( QEventLoop::ExcludeUserInputEvents );
     if( zoomed )
         SetWindowPos( hwnd, NULL, before.left, before.top, before.right - before.left,
                       before.bottom - before.top,
@@ -216,54 +224,65 @@ void MainInterfaceWin32::createTaskBarButtons()
     /*Here is the code for the taskbar thumb buttons
     FIXME:We need pretty buttons in 16x16 px that are handled correctly by masks in Qt
     */
-    p_taskbl = NULL;
-    himl = NULL;
-
-    HRESULT hr = CoInitializeEx( NULL, COINIT_APARTMENTTHREADED );
-    if( FAILED(hr) )
-        return;
-
-    void *pv;
-    hr = CoCreateInstance( CLSID_TaskbarList, NULL, CLSCTX_INPROC_SERVER,
-                           IID_ITaskbarList3, &pv);
-    if( FAILED(hr) )
+    /* TaskbarButtonCreated comes again whenever Windows recreates the
+     * button (the frame change at start, an Explorer restart): the list,
+     * the images and the connections are made once, the buttons each time */
+    HRESULT hr;
+    if( p_taskbl == NULL )
     {
-        CoUninitialize();
-        return;
+        hr = CoInitializeEx( NULL, COINIT_APARTMENTTHREADED );
+        if( FAILED(hr) )
+            return;
+
+        void *pv;
+        hr = CoCreateInstance( CLSID_TaskbarList, NULL, CLSCTX_INPROC_SERVER,
+                               IID_ITaskbarList3, &pv);
+        if( FAILED(hr) )
+        {
+            CoUninitialize();
+            return;
+        }
+
+        p_taskbl = (ITaskbarList3 *)pv;
+        p_taskbl->HrInit();
+
+        int iconX = GetSystemMetrics(SM_CXSMICON);
+        int iconY = GetSystemMetrics(SM_CYSMICON);
+        himl = ImageList_Create( iconX /*cx*/, iconY /*cy*/, ILC_COLOR32 /*flags*/,
+                                 4 /*cInitial*/, 0 /*cGrow*/);
+        if( himl == NULL )
+        {
+            p_taskbl->Release();
+            p_taskbl = NULL;
+            CoUninitialize();
+            return;
+        }
+
+        QPixmap img   = QPixmap(":/win7/prev.svg").scaled( iconX, iconY );
+        QPixmap img2  = QPixmap(":/win7/pause.svg").scaled( iconX, iconY );
+        QPixmap img3  = QPixmap(":/win7/play.svg").scaled( iconX, iconY );
+        QPixmap img4  = QPixmap(":/win7/next.svg").scaled( iconX, iconY );
+        QBitmap mask  = img.createMaskFromColor(Qt::transparent);
+        QBitmap mask2 = img2.createMaskFromColor(Qt::transparent);
+        QBitmap mask3 = img3.createMaskFromColor(Qt::transparent);
+        QBitmap mask4 = img4.createMaskFromColor(Qt::transparent);
+
+        if( -1 == ImageList_Add(himl, qt_pixmapToWinHBITMAP(img, PremultipliedAlpha), qt_pixmapToWinHBITMAP(mask)))
+            msg_Err( p_intf, "%s ImageList_Add failed", "First" );
+        if( -1 == ImageList_Add(himl, qt_pixmapToWinHBITMAP(img2, PremultipliedAlpha), qt_pixmapToWinHBITMAP(mask2)))
+            msg_Err( p_intf, "%s ImageList_Add failed", "Second" );
+        if( -1 == ImageList_Add(himl, qt_pixmapToWinHBITMAP(img3, PremultipliedAlpha), qt_pixmapToWinHBITMAP(mask3)))
+            msg_Err( p_intf, "%s ImageList_Add failed", "Third" );
+        if( -1 == ImageList_Add(himl, qt_pixmapToWinHBITMAP(img4, PremultipliedAlpha), qt_pixmapToWinHBITMAP(mask4)))
+            msg_Err( p_intf, "%s ImageList_Add failed", "Fourth" );
+
+        connect( THEMIM->getIM(), &InputManager::playingStatusChanged,
+                 this, &MainInterfaceWin32::changeThumbbarButtons );
+        connect( THEMIM, &MainInputManager::playlistItemAppended,
+                this, &MainInterfaceWin32::playlistItemAppended );
+        connect( THEMIM, &MainInputManager::playlistItemRemoved,
+                this, &MainInterfaceWin32::playlistItemRemoved );
     }
-
-    p_taskbl = (ITaskbarList3 *)pv;
-    p_taskbl->HrInit();
-
-    int iconX = GetSystemMetrics(SM_CXSMICON);
-    int iconY = GetSystemMetrics(SM_CYSMICON);
-    himl = ImageList_Create( iconX /*cx*/, iconY /*cy*/, ILC_COLOR32 /*flags*/,
-                             4 /*cInitial*/, 0 /*cGrow*/);
-    if( himl == NULL )
-    {
-        p_taskbl->Release();
-        p_taskbl = NULL;
-        CoUninitialize();
-        return;
-    }
-
-    QPixmap img   = QPixmap(":/win7/prev.svg").scaled( iconX, iconY );
-    QPixmap img2  = QPixmap(":/win7/pause.svg").scaled( iconX, iconY );
-    QPixmap img3  = QPixmap(":/win7/play.svg").scaled( iconX, iconY );
-    QPixmap img4  = QPixmap(":/win7/next.svg").scaled( iconX, iconY );
-    QBitmap mask  = img.createMaskFromColor(Qt::transparent);
-    QBitmap mask2 = img2.createMaskFromColor(Qt::transparent);
-    QBitmap mask3 = img3.createMaskFromColor(Qt::transparent);
-    QBitmap mask4 = img4.createMaskFromColor(Qt::transparent);
-
-    if( -1 == ImageList_Add(himl, qt_pixmapToWinHBITMAP(img, PremultipliedAlpha), qt_pixmapToWinHBITMAP(mask)))
-        msg_Err( p_intf, "%s ImageList_Add failed", "First" );
-    if( -1 == ImageList_Add(himl, qt_pixmapToWinHBITMAP(img2, PremultipliedAlpha), qt_pixmapToWinHBITMAP(mask2)))
-        msg_Err( p_intf, "%s ImageList_Add failed", "Second" );
-    if( -1 == ImageList_Add(himl, qt_pixmapToWinHBITMAP(img3, PremultipliedAlpha), qt_pixmapToWinHBITMAP(mask3)))
-        msg_Err( p_intf, "%s ImageList_Add failed", "Third" );
-    if( -1 == ImageList_Add(himl, qt_pixmapToWinHBITMAP(img4, PremultipliedAlpha), qt_pixmapToWinHBITMAP(mask4)))
-        msg_Err( p_intf, "%s ImageList_Add failed", "Fourth" );
 
     // Define an array of two buttons. These buttons provide images through an
     // image list and also provide tooltips.
@@ -298,12 +317,6 @@ void MainInterfaceWin32::createTaskBarButtons()
         else
             msg_Dbg( p_intf, "taskbar thumbnail buttons added" );
     }
-    connect( THEMIM->getIM(), &InputManager::playingStatusChanged,
-             this, &MainInterfaceWin32::changeThumbbarButtons );
-    connect( THEMIM, &MainInputManager::playlistItemAppended,
-            this, &MainInterfaceWin32::playlistItemAppended );
-    connect( THEMIM, &MainInputManager::playlistItemRemoved,
-            this, &MainInterfaceWin32::playlistItemRemoved );
     if( THEMIM->getIM()->playingStatus() == PLAYING_S )
         changeThumbbarButtons( THEMIM->getIM()->playingStatus() );
 }

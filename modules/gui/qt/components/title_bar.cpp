@@ -23,6 +23,7 @@
 #include "components/title_bar.hpp"
 #include "util/theme.hpp"
 #include "util/redesign_icons.hpp"
+#include "util/breakpoints.hpp"
 
 #include <QApplication>
 #include <QEvent>
@@ -62,13 +63,15 @@ namespace
 
 TitleBar::TitleBar( QWidget *_window )
     : QWidget( _window ), window( _window ),
-      b_captionButtons( false ), b_minimal( false ), b_fullScreen( false )
+      b_captionButtons( false ), b_minimal( false ), b_fullScreen( false ),
+      b_videoFullScreen( false )
 {
     QHBoxLayout *layout = new QHBoxLayout( this );
     layout->setContentsMargins( 0, 0, 0, 0 );
     layout->setSpacing( 0 );
 
-    cone = addButton( qtr( "Go to library" ), Size::TitleConeW );
+    Theme *t = Theme::instance();
+    cone = addButton( qtr( "Go to library" ), t->px( Size::TitleConeW ) );
     connect( cone, &QToolButton::clicked, this, &TitleBar::libraryRequested );
 
     bar = new QMenuBar( this );
@@ -76,16 +79,16 @@ TitleBar::TitleBar( QWidget *_window )
     layout->addWidget( bar, 0, Qt::AlignVCenter );
     layout->addStretch();
 
-    minButton = addButton( qtr( "Minimize" ), Size::CaptionButtonW );
-    maxButton = addButton( QString(), Size::CaptionButtonW );
-    closeButton = addButton( qtr( "Close" ), Size::CaptionButtonW );
+    minButton = addButton( qtr( "Minimize" ), t->metric( Theme::CaptionButtonW ) );
+    maxButton = addButton( QString(), t->metric( Theme::CaptionButtonW ) );
+    closeButton = addButton( qtr( "Close" ), t->metric( Theme::CaptionButtonW ) );
     closeButton->setObjectName( "captionClose" );
     connect( minButton, &QToolButton::clicked, window, &QWidget::showMinimized );
     connect( maxButton, &QToolButton::clicked, this, &TitleBar::toggleMaximized );
     connect( closeButton, &QToolButton::clicked, window, &QWidget::close );
 
     window->installEventFilter( this );
-    connect( Theme::instance(), &Theme::changed, this, &TitleBar::updateIcons );
+    connect( t, &Theme::changed, this, &TitleBar::updateIcons );
     updateIcons();
     updateLayout();
 }
@@ -110,9 +113,9 @@ QToolButton *TitleBar::addButton( const QString &name, int width )
 void TitleBar::updateIcons()
 {
     Theme *t = Theme::instance();
-    const QSize coneSize( Size::TitleCone, Size::TitleCone );
-    const QSize glyph( Size::CaptionGlyph, Size::CaptionGlyph );
-    const QSize small( Size::CaptionGlyphSmall, Size::CaptionGlyphSmall );
+    const QSize coneSize( t->px( Size::TitleCone ), t->px( Size::TitleCone ) );
+    const QSize glyph( t->px( Size::CaptionGlyph ), t->px( Size::CaptionGlyph ) );
+    const QSize small( t->px( Size::CaptionGlyphSmall ), t->px( Size::CaptionGlyphSmall ) );
 
     cone->setIconSize( coneSize );
     cone->setIcon( t->icon( RedesignIcons::IconCone, Theme::Text, coneSize ) );
@@ -128,7 +131,7 @@ void TitleBar::updateIcons()
     const QString name = maximized ? qtr( "Restore" ) : qtr( "Maximize" );
     maxButton->setIconSize( small );
     maxButton->setIcon( maximized
-        ? restoreIcon( t->color( Theme::Text2 ), Size::CaptionGlyphSmall )
+        ? restoreIcon( t->color( Theme::Text2 ), small.width() )
         : t->icon( RedesignIcons::IconMaximize, Theme::Text2, small ) );
     maxButton->setAccessibleName( name );
     maxButton->setToolTip( name );
@@ -141,10 +144,11 @@ void TitleBar::updateLayout()
     setFixedHeight( Theme::instance()->metric( strip ? Theme::MenuTitleH : Theme::TitleBar ) );
     cone->setVisible( !b_minimal );
     bar->setVisible( !b_minimal );
-    minButton->setVisible( b_captionButtons );
-    maxButton->setVisible( b_captionButtons );
-    closeButton->setVisible( b_captionButtons );
-    setVisible( !b_fullScreen && ( !b_minimal || b_captionButtons ) );
+    const bool buttons = b_captionButtons && !b_fullScreen;
+    minButton->setVisible( buttons );
+    maxButton->setVisible( buttons );
+    closeButton->setVisible( buttons );
+    setVisible( !b_videoFullScreen && ( !b_minimal || buttons ) );
     update();
 }
 
@@ -160,9 +164,10 @@ void TitleBar::setMinimal( bool minimal )
     updateLayout();
 }
 
-void TitleBar::setFullScreen( bool fullScreen )
+void TitleBar::setFullScreen( bool fullScreen, bool video )
 {
     b_fullScreen = fullScreen;
+    b_videoFullScreen = fullScreen && video;
     updateLayout();
 }
 
@@ -214,13 +219,16 @@ void TitleBar::paintEvent( QPaintEvent * )
     Theme *t = Theme::instance();
     QPainter p( this );
     p.fillRect( rect(), t->color( Theme::Chrome ) );
-    p.fillRect( QRect( 0, height() - 1, width(), 1 ), t->ink( InkAlpha::Divider ) );
+    p.fillRect( QRect( 0, height() - Size::Hairline, width(), Size::Hairline ),
+                t->ink( InkAlpha::Divider ) );
 
-    /* a native caption shows the title itself; minimal view has no room */
-    if( !b_captionButtons || b_minimal )
+    /* a native caption shows the title itself; minimal view, full screen
+     * and the XS breakpoint (as in the design) have no room for it */
+    if( !b_captionButtons || b_minimal || b_fullScreen
+     || BreakpointWatcher::fromWidth( window->width() ) == BreakpointWatcher::XS )
         return;
-    const int left = bar->geometry().right() + 1 + Size::TitlePadX;
-    const QRect r( left, 0, minButton->x() - Size::TitlePadX - left, height() );
+    const int left = bar->geometry().right() + 1 + t->px( Size::TitlePadX );
+    const QRect r( left, 0, minButton->x() - t->px( Size::TitlePadX ) - left, height() );
     if( r.width() <= 0 )
         return;
     p.setFont( t->font( Theme::Meta ) );

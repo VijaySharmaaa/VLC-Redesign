@@ -45,9 +45,11 @@ public:
     void setCaptionButtonsVisible( bool );
     bool hasCaptionButtons() const { return b_captionButtons; }
     /* Minimal view keeps a slim strip with the window buttons, or nothing
-     * under a native caption; full screen hides the bar. */
+     * under a native caption. Video full screen hides the bar; interface
+     * full screen (F11) keeps the menus, as before the redesign, without
+     * the window buttons. */
     void setMinimal( bool );
-    void setFullScreen( bool );
+    void setFullScreen( bool fullScreen, bool video );
     /* Alt in minimal view: show or hide the menus inside the strip. */
     void toggleMenus();
     /* Height the bar takes in the window, 0 when hidden. */
@@ -77,7 +79,7 @@ private:
     QWidget *window;
     QMenuBar *bar;
     QToolButton *cone, *minButton, *maxButton, *closeButton;
-    bool b_captionButtons, b_minimal, b_fullScreen;
+    bool b_captionButtons, b_minimal, b_fullScreen, b_videoFullScreen;
 };
 
 #endif
