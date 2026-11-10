@@ -1,5 +1,5 @@
 /*****************************************************************************
- * video_overlays.hpp : paused badge, buffering ring and immersive bar
+ * video_overlays.hpp : paused badge, buffering ring, immersive bar, header
  *****************************************************************************
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -27,6 +27,8 @@
 
 #include <QAtomicInt>
 #include <QHash>
+#include <QIcon>
+#include <QPointer>
 
 class QAbstractButton;
 class QVariantAnimation;
@@ -36,6 +38,8 @@ class QVBoxLayout;
 class InputControlsWidget;
 class ControlsWidget;
 class InputManager;
+class NowPlayingInfo;
+class PlayerHeader;
 
 /* Where the vout draws the current video inside area (global px): the
  * track's size and aspect, or the user's aspect ratio, fitted and centred.
@@ -97,22 +101,21 @@ public:
 
     void setActive( bool );
     void rebuild( bool advanced );   /* after a toolbar or advanced change */
+    void setHeader( PlayerHeader * );   /* sleeps and wakes with the bar */
 
 protected:
     void paintEvent( QPaintEvent * ) Q_DECL_OVERRIDE;
     void customEvent( QEvent * ) Q_DECL_OVERRIDE;
     bool eventFilter( QObject *, QEvent * ) Q_DECL_OVERRIDE;
-    void keyPressEvent( QKeyEvent * ) Q_DECL_OVERRIDE;
-    bool nativeEvent( const QByteArray &, void *, long * ) Q_DECL_OVERRIDE;
 
 private:
     static int MouseMovedCB( vlc_object_t *, const char *,
                              vlc_value_t, vlc_value_t, void * );
     void setVoutList( vout_thread_t **, int );
     bool takeFocus();
-    void giveFocusBack();
     void wake();
     void sleepIfIdle();
+    void setAsleep( bool );
     void animate( bool in );
     void place();
     QRect restingRect() const;
@@ -131,6 +134,47 @@ private:
     QTimer idle;
     QParallelAnimationGroup *anim;
     QPropertyAnimation *fade, *slide;
+    QPointer<PlayerHeader> header;
+    bool active, asleep;
+};
+
+/* The player's top row over the video (renders 1.2.x): back to the library,
+ * the title and the meta line on a scrim that fades into the picture. The
+ * strip lets the mouse through to the video; the back button takes it in a
+ * small window of its own, reached with Shift+Tab from the player. In the
+ * immersive layout it sleeps and wakes with the deck. */
+class PlayerHeader : public OverlayWindow
+{
+public:
+    PlayerHeader( intf_thread_t *, QWidget *owner, QWidget *video, NowPlayingInfo * );
+    virtual ~PlayerHeader();
+
+    QAbstractButton *backButton() const { return back; }
+    void setActive( bool );    /* the video page, neither full screen nor minimal */
+    void setAsleep( bool );    /* the immersive deck's idle hide */
+    bool hovered() const;      /* the mouse on its back button */
+
+protected:
+    void paintEvent( QPaintEvent * ) Q_DECL_OVERRIDE;
+    bool eventFilter( QObject *, QEvent * ) Q_DECL_OVERRIDE;
+
+private:
+    void refresh();
+    void place();
+    void setOpacity( qreal );
+    void raiseDrawers();
+    QFont titleFont() const;
+    int rowHeight() const;
+    QRect backRect( int width ) const;  /* in the strip, mirrored right to left */
+
+    intf_thread_t *p_intf;
+    NowPlayingInfo *info;
+    QWidget *video;
+    OverlayHost *host;
+    OverlayWindow *backWindow;
+    QAbstractButton *back;
+    QVariantAnimation *fade;
+    QString meta;
     bool active, asleep;
 };
 

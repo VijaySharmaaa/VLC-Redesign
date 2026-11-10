@@ -36,15 +36,20 @@
  * over it. It never takes focus and, being owned rather than topmost, stays
  * above its owner only. By default it takes no input either (drags and drops
  * fall through to the window below); TakeInput gets clicks and hands drags
- * and drops to the owner, so a drop on it plays as a drop on the window. */
+ * and drops to the owner, so a drop on it plays as a drop on the window.
+ * One that accepts focus (Tab moves the keys into it) still never takes
+ * them on a click, and hands the keys its buttons leave to the owner. */
 class OverlayWindow : public QWidget
 {
 public:
     enum InputMode { PassInput, TakeInput };
     explicit OverlayWindow( QWidget *owner, InputMode = PassInput );
     static QEasingCurve enterCurve();   /* the tokens' enter easing */
+    void giveFocusBack();   /* the keys back to the owner, if it has them */
 protected:
     bool event( QEvent * ) Q_DECL_OVERRIDE;
+    void keyPressEvent( QKeyEvent * ) Q_DECL_OVERRIDE;
+    bool nativeEvent( const QByteArray &, void *, long * ) Q_DECL_OVERRIDE;
 };
 
 /* Follows a widget of the main window: emits changed() once per burst of

@@ -59,6 +59,7 @@ class StandardPLPanel;
 class Toast;
 class DropOverlay;
 class PausedBadge;
+class PlayerHeader;
 class BufferingOverlay;
 class ImmersiveBar;
 class Sidebar;
@@ -169,7 +170,7 @@ protected:
     bool onPlayerPage() const;
     bool deckFloats() const;
     void updateDeckPlacement();
-    void createPausedBadge();
+    void createVideoOverlays();
     /* The deck, or under the library once something played, the
      * now-playing bar */
     void setDeckVisible( bool );
@@ -196,6 +197,7 @@ protected:
     Toast               *toast;
     DropOverlay         *dropOverlay;
     PausedBadge         *pausedBadge;
+    PlayerHeader        *playerHeader;
     BufferingOverlay    *buffering;
     ImmersiveBar        *immersiveBar;  ///< only in the immersive layout
 

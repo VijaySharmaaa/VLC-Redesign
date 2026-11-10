@@ -115,13 +115,14 @@ const QEvent::Type MainInterface::ToolbarsNeedRebuild =
 namespace
 {
     /* A button of the player controls: the deck and its immersive and FSC
-     * copies, the now-playing bar, the mini player */
+     * copies, the now-playing bar, the mini player, the player header */
     bool inPlayerControls( const QWidget *w )
     {
         for( ; w; w = w->parentWidget() )
             if( qobject_cast<const AbstractController *>( w )
              || qobject_cast<const NowPlayingBar *>( w )
-             || qobject_cast<const MiniPlayer *>( w ) )
+             || qobject_cast<const MiniPlayer *>( w )
+             || w->objectName() == QLatin1String( "playerHeader" ) )
                 return true;
         return false;
     }
@@ -190,6 +191,7 @@ MainInterface::MainInterface( intf_thread_t *_p_intf, bool customFrame ) : QVLCM
     controls             = NULL;
     inputC               = NULL;
     pausedBadge          = NULL;
+    playerHeader         = NULL;
     buffering            = NULL;
     immersiveBar         = NULL;
 
@@ -370,10 +372,12 @@ MainInterface::MainInterface( intf_thread_t *_p_intf, bool customFrame ) : QVLCM
                             && stackCentralW->currentWidget() == videoWidget ); } );
     dropOverlay = new DropOverlay( this );
     buffering = new BufferingOverlay( p_intf, this, stackCentralW );
-    createPausedBadge();
+    createVideoOverlays();
     if( var_InheritBool( p_intf, "qt-immersive" ) )
         immersiveBar = new ImmersiveBar( p_intf, this, stackCentralW,
                                          getControlsVisibilityStatus() & CONTROLS_ADVANCED );
+    if( immersiveBar )
+        immersiveBar->setHeader( playerHeader );
     connect( stackCentralW, &QStackedWidget::currentChanged,
              this, &MainInterface::updateDeckPlacement );
     updateDeckPlacement();
@@ -1104,7 +1108,7 @@ void MainInterface::getVideoSlot( struct vout_window_t *p_wnd,
         videoWidget = new VideoWidget( p_intf, stackCentralW );
         videoWidget->setAttribute( Qt::WA_DontCreateNativeAncestors );  /* see createMainWidget */
         stackCentralW->addWidget( videoWidget );
-        createPausedBadge();
+        createVideoOverlays();
     }
     *res = videoWidget->request( p_wnd );
     if( *res ) /* The videoWidget is available */
@@ -1309,11 +1313,18 @@ void MainInterface::setVideoOnTop( bool on_top )
     }
 }
 
-/* The paused badge follows the video widget, which may be created late */
-void MainInterface::createPausedBadge()
+/* The paused badge and the header follow the video widget, which may be
+ * created late */
+void MainInterface::createVideoOverlays()
 {
-    if( videoWidget && !pausedBadge )
-        pausedBadge = new PausedBadge( p_intf, this, videoWidget );
+    if( !videoWidget || pausedBadge )
+        return;
+    pausedBadge = new PausedBadge( p_intf, this, videoWidget );
+    playerHeader = new PlayerHeader( p_intf, this, videoWidget, nowPlayingInfo );
+    connect( playerHeader->backButton(), &QAbstractButton::clicked,
+             this, [this]() { sidebar->showPage( Sidebar::Home ); } );
+    if( immersiveBar )
+        immersiveBar->setHeader( playerHeader );
 }
 
 bool MainInterface::onPlayerPage() const
@@ -1340,6 +1351,9 @@ void MainInterface::updateDeckPlacement()
         setDeckVisible( true );
     if( immersiveBar )
         immersiveBar->setActive( floats );
+    if( playerHeader )
+        playerHeader->setActive( stackCentralW->currentWidget() == videoWidget
+                                 && !b_videoFullScreen && !b_minimalView );
 }
 
 void MainInterface::setImmersive( bool on )
@@ -1348,8 +1362,11 @@ void MainInterface::setImmersive( bool on )
     if( on == ( immersiveBar != NULL ) )
         return;
     if( on )
+    {
         immersiveBar = new ImmersiveBar( p_intf, this, stackCentralW,
                                          getControlsVisibilityStatus() & CONTROLS_ADVANCED );
+        immersiveBar->setHeader( playerHeader );
+    }
     else
     {
         delete immersiveBar;
