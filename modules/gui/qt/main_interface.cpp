@@ -194,6 +194,7 @@ MainInterface::MainInterface( intf_thread_t *_p_intf, bool customFrame ) : QVLCM
     playerHeader         = NULL;
     buffering            = NULL;
     immersiveBar         = NULL;
+    i_resumePanelGrowth  = 0;
 
     b_hideAfterCreation  = false; // --qt-start-minimized
     playlistVisible      = false;
@@ -599,8 +600,16 @@ void MainInterface::showResumePanel( int64_t _time ) {
         resumePlayback();
     else
     {
-        if( !isFullScreen() && !isMaximized() && !b_isWindowTiled )
-            resizeWindow( width(), height() + resumePanel->height() );
+        /* the window grows once by the panel (not by the size a widget
+         * never laid out has, nor again for the next item while it shows),
+         * within the work area; hideResumePanel() takes back what it got */
+        if( resumePanel->isHidden() && !isFullScreen() && !isMaximized() && !b_isWindowTiled )
+        {
+            const int room = QApplication::desktop()->availableGeometry( this ).bottom()
+                           - frameGeometry().bottom();
+            i_resumePanelGrowth = qBound( 0, resumePanel->sizeHint().height(), room );
+            resizeWindow( width(), height() + i_resumePanelGrowth );
+        }
         resumePanel->setVisible(true);
         resumeTimer->start();
     }
@@ -608,10 +617,12 @@ void MainInterface::showResumePanel( int64_t _time ) {
 
 void MainInterface::hideResumePanel()
 {
-    if( resumePanel->isVisible() )
+    /* isHidden(): the panel of a minimised window is not visible either */
+    if( !resumePanel->isHidden() )
     {
         if( !isFullScreen() && !isMaximized() && !b_isWindowTiled )
-            resizeWindow( width(), height() - resumePanel->height() );
+            resizeWindow( width(), height() - i_resumePanelGrowth );
+        i_resumePanelGrowth = 0;
         resumePanel->hide();
         resumeTimer->stop();
     }

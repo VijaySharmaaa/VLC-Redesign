@@ -217,6 +217,7 @@ protected:
     QWidget             *resumePanel;
     QTimer              *resumeTimer;
     int64_t             i_resumeTime;
+    int                 i_resumePanelGrowth; /* what showing it added to the height */
 
     /* Status Bar */
     QLabel              *nameLabel;

@@ -228,7 +228,7 @@ void PausedBadge::place()
  * Buffering
  **********************************************************************/
 BufferingOverlay::BufferingOverlay( intf_thread_t *_p_intf, QWidget *owner, QWidget *area )
-    : OverlayWindow( owner ), p_intf( _p_intf ), level( 0.f ), onPlayer( false )
+    : OverlayWindow( owner ), p_intf( _p_intf ), onPlayer( false )
 {
     host = new OverlayHost( area, this );
     connect( host, &OverlayHost::changed, this, &BufferingOverlay::place );
@@ -246,7 +246,7 @@ BufferingOverlay::BufferingOverlay( intf_thread_t *_p_intf, QWidget *owner, QWid
 
     InputManager *im = THEMIM->getIM();
     connect( im, &InputManager::cachingChanged, this,
-             [this]( float f ) { level = f; refresh(); } );
+             [this]( float ) { refresh(); } );
     connect( im, &InputManager::playingStatusChanged, this, [this]() { refresh(); } );
 }
 
@@ -256,12 +256,20 @@ void BufferingOverlay::setOnPlayer( bool b )
     refresh();
 }
 
+/* The input's own "cache" variable, not the last cachingChanged(): that one
+ * is dropped when a new input starts with the old one's value. It is 0 from
+ * the start of an input (and of a seek) until the first data, then rises to
+ * 1, so a slow stream waits at 0. */
+float BufferingOverlay::level() const
+{
+    input_thread_t *input = THEMIM->getInput();
+    return input ? var_GetFloat( input, "cache" ) : 1.f;
+}
+
 bool BufferingOverlay::buffering() const
 {
-    InputManager *im = THEMIM->getIM();
-    const int status = im->playingStatus();
-    return onPlayer && level > 0.f && level < 1.f && im->hasInput()
-        && status != END_S && status != ERROR_S;
+    const int status = THEMIM->getIM()->playingStatus();
+    return onPlayer && ( status == OPENING_S || status == PLAYING_S ) && level() < 1.f;
 }
 
 void BufferingOverlay::refresh()
@@ -280,7 +288,7 @@ void BufferingOverlay::refresh()
         url = qfu( uri );
         free( uri );
     }
-    setAccessibleName( qtr( "Buffering… %1%" ).arg( qRound( level * 100 ) ) );
+    setAccessibleName( qtr( "Buffering… %1%" ).arg( qRound( level() * 100 ) ) );
     if( isVisible() )
         update();
     else if( !delay.isActive() )
