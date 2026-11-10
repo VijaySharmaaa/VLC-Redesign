@@ -868,6 +868,12 @@ int MainInterface::windowWidthFor( int stackWidth, int otherWidth, bool withSide
 {
     if( !withSidebar )
         return otherWidth + stackWidth;
+    /* the current breakpoint first: when two fit (a narrow sidebar with a
+     * wide stack, or the reverse), the window must not jump to the other */
+    const BreakpointWatcher::Size current = BreakpointWatcher::fromWidth( width() );
+    const int same = otherWidth + stackWidth + Sidebar::widthAt( current );
+    if( BreakpointWatcher::fromWidth( same ) == current )
+        return same;
     for( int bp = BreakpointWatcher::XS; bp <= BreakpointWatcher::L; bp++ )
     {
         const BreakpointWatcher::Size size = static_cast<BreakpointWatcher::Size>( bp );
