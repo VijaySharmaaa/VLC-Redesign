@@ -126,3 +126,18 @@ Light theme on every screen (3.7); XS behaviour (3.6); keyboard focus rings, tab
 6. **Reviews:** code review of the diff, edge-case rows recorded (pass / fixed / deferred with reason), and a final readiness review.
 
 **Not available here:** Windows 10 and high-DPI monitors aren't on this machine. Windows 10 paths are tested by forcing the fallback; 150 % is tested with `QT_SCALE_FACTOR=1.5`, which approximates it but isn't the same as system scaling.
+
+## 10. Design update: Preferences uses one sidebar (2026-11-10)
+Source: `DESIGN_SPEC.md` §8, `SCREEN_INVENTORY.md` 2.5.P1–2.5.P6, references `11-flows-library-menus-settings__2.5.*`. The in-window Preferences page (Phase 5) is already built, so this changes existing code. **Owner decision: Save / Cancel stays**; the "Changes apply immediately" line is not added.
+
+**Change set** (no new files; no QSettings keys involved):
+| File | Change |
+|---|---|
+| `components/sidebar.cpp/.hpp` | A `QStackedWidget` inside the sidebar: library navigation \| preferences navigation (back row 32 px, "Preferences" heading 22/600, the 7 sections as the existing `SidebarButton` items, 36 px / 20 px icons, in their own exclusive group). Swapped in `Sidebar::setCurrentWidget` when the Preferences page becomes current, which every entry path already reaches. The active item gets a 3 px accent bar (inset 9 px) painted from tokens. Rail mode (< 1200 px) reuses `setRail`: back arrow + section icons with tooltips, heading hidden. The sidebar remembers the page it left (`currentPage`) as the return target. |
+| `components/prefs_page.cpp/.hpp` | Its own section list, rail handling and resize code go; `showSection` becomes public and is driven by the sidebar (one source of truth). The section name becomes the page title (26/600); Advanced's duplicate title goes. Tab order: back row → sections → content. |
+| `main_interface.cpp` | Esc goes back (after the Effects sheet and before minimal view in the existing `handleKeyPress` chain; menus, combo pop-ups and dialogs close first because they're separate windows). `showPreferences` falls back to the dialog in minimal view too (the sidebar is hidden there). Back to a video that ended meanwhile goes to the art/Home page instead of a blank view. |
+| `util/theme.cpp`, `util/theme_tokens.hpp` (+ `design/tokens.json`, `design/v3/redesign_tokens.hpp`) | New tokens: back row 32, heading 22/600, accent bar 3 / inset 9 / radius 2. Dead `prefsList`/`prefsSections` QSS and `Prefs::List*` tokens removed. |
+
+**Behaviour:** Back/Esc return to the view Preferences was opened from (library page, player or audio mode) — playback, the playlist panel and library scroll positions are untouched because only the content stack switches. The back label reads "Back to library" for a library page, else "Back to player". Ctrl+P, Tools › Preferences and the dialog fallback (minimised, fullscreen, mini player, `qt-advanced-pref`) are unchanged. RTL: the back arrow glyph is mirrored. Accessibility: the active section is the checked radio item (Qt 5.6 has no "current" state; UIA reports selection), verified with pywinauto.
+
+**Verification:** 2.5.P1–P6 in dark and light at 1920/1280/1024/800, 100 % and 150 % (`QT_SCALE_FACTOR=1.5`); edge cases: open during playback and return (playback and deck unchanged), from minimal view and the separate playlist window, fast section switching, a long section name (ellipsis), RTL (`--qt-…` layout direction / `-reverse`), Narrator names of the back row and current section, Esc with a select drop-down open. Then code review, design review, accessibility audit and the readiness review.
