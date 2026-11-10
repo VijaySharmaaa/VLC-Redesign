@@ -40,6 +40,7 @@
 
 #include "components/interface_widgets.hpp"     // bgWidget, videoWidget
 #include "components/controller.hpp"            // controllers
+#include "components/title_bar.hpp"             // titleBar
 #include "components/playlist/playlist.hpp"     // plWidget
 #include "dialogs/firstrun.hpp"                 // First Run
 #include "dialogs/playlist.hpp"                 // PlaylistDialog
@@ -95,7 +96,7 @@ static int IntfRaiseMainCB( vlc_object_t *p_this, const char *psz_variable,
 const QEvent::Type MainInterface::ToolbarsNeedRebuild =
         (QEvent::Type)QEvent::registerEventType();
 
-MainInterface::MainInterface( intf_thread_t *_p_intf ) : QVLCMW( _p_intf )
+MainInterface::MainInterface( intf_thread_t *_p_intf, bool customFrame ) : QVLCMW( _p_intf )
 {
     /* Variables initialisation */
     bgWidget             = NULL;
@@ -117,6 +118,7 @@ MainInterface::MainInterface( intf_thread_t *_p_intf ) : QVLCMW( _p_intf )
     i_kc_offset          = false;
     b_maximizedView      = false;
     b_isWindowTiled      = false;
+    b_altAlone           = false;
 
     /* Ask for Privacy */
     FirstRun::CheckAndRun( this, p_intf );
@@ -161,7 +163,13 @@ MainInterface::MainInterface( intf_thread_t *_p_intf ) : QVLCMW( _p_intf )
     /************
      * Menu Bar *
      ************/
+    titleBar = new TitleBar( this );
+    titleBar->setCaptionButtonsVisible( customFrame );
+    setMenuWidget( titleBar );
     VLCMenuBar::createMenuBar( this, p_intf );
+    /* Shortcuts of a hidden menu bar's actions die (minimal view, full
+     * screen): the window keeps the menus' actions to keep them alive */
+    addActions( menuBar()->actions() );
     connect( THEMIM->getIM(), &InputManager::voutListChanged,
              THEDP, &DialogsProvider::destroyPopupMenu );
 
@@ -256,7 +264,8 @@ MainInterface::MainInterface( intf_thread_t *_p_intf ) : QVLCMW( _p_intf )
     if( settings->value( "MainWindow/playlist-visible", false ).toBool() )
         togglePlaylist();
 
-    QVLCTools::restoreWidgetPosition( settings, this, QSize(600, 420) );
+    QVLCTools::restoreWidgetPosition( settings, this,
+            QSize( RedesignTokens::Breakpoint::XSMinW, RedesignTokens::Breakpoint::XSMinH ) );
 
     b_interfaceFullScreen = isFullScreen();
 
@@ -266,7 +275,7 @@ MainInterface::MainInterface( intf_thread_t *_p_intf ) : QVLCMW( _p_intf )
     if( b_minimalView )
         toggleMinimalView( true );
 
-    computeMinimumSize();
+    computeMinimumSize( b_minimalView );
 }
 
 MainInterface::~MainInterface()
@@ -313,13 +322,21 @@ MainInterface::~MainInterface()
     p_intf->p_sys->p_mi = NULL;
 }
 
-void MainInterface::computeMinimumSize()
+/* The design's smallest window; minimal view keeps the old video-only
+ * minimum (a 0 height lets the layout decide it). */
+void MainInterface::computeMinimumSize( bool b_minimal )
 {
-    int minWidth = 80;
-    if( menuBar()->isVisible() )
-        minWidth += controls->sizeHint().width();
+    if( b_minimal )
+        setMinimumSize( 80, 0 );
+    else
+        setMinimumSize( qMax( RedesignTokens::Breakpoint::XSMinW,
+                              80 + controls->sizeHint().width() ),
+                        RedesignTokens::Breakpoint::XSMinH );
+}
 
-    setMinimumWidth( minWidth );
+QMenuBar *MainInterface::menuBar() const
+{
+    return titleBar->menuBar();
 }
 
 /*****************************
@@ -849,10 +866,9 @@ void MainInterface::setVideoSize( unsigned int w, unsigned int h )
             {
                 w = screen.width();
                 h = screen.height();
+                h -= titleBar->barHeight();
                 if( !b_minimalView )
                 {
-                    if( menuBar()->isVisible() )
-                        h -= menuBar()->height();
                     if( controls->isVisible() )
                         h -= controls->height();
 #ifndef QT_NO_STATUSBAR
@@ -862,7 +878,8 @@ void MainInterface::setVideoSize( unsigned int w, unsigned int h )
                     if( inputC->isVisible() )
                         h -= inputC->height();
                 }
-                h -= style()->pixelMetric(QStyle::PM_TitleBarHeight);
+                if( !titleBar->hasCaptionButtons() )
+                    h -= style()->pixelMetric(QStyle::PM_TitleBarHeight);
                 h -= style()->pixelMetric(QStyle::PM_LayoutBottomMargin);
                 h -= 2 * style()->pixelMetric(QStyle::PM_DefaultFrameWidth);
             }
@@ -1128,12 +1145,11 @@ void MainInterface::dockPlaylist( bool p_docked )
 
 /*
  * displayNormalView is the private function used by
- * the SLOT setVideoFullScreen to restore the menuBar
- * if minimal view is off
+ * the SLOT setVideoFullScreen to hide the controls;
+ * setInterfaceFullScreen hides the title bar
  */
 void MainInterface::displayNormalView()
 {
-    menuBar()->setVisible( false );
     controls->setVisible( false );
 #ifndef QT_NO_STATUSBAR
     statusBar()->setVisible( false );
@@ -1147,19 +1163,27 @@ void MainInterface::displayNormalView()
  */
 void MainInterface::setMinimalView( bool b_minimal )
 {
-    bool b_menuBarVisible = menuBar()->isVisible();
     bool b_controlsVisible = controls->isVisible();
 #ifndef QT_NO_STATUSBAR
     bool b_statusBarVisible = statusBar()->isVisible();
 #endif
     bool b_inputCVisible = inputC->isVisible();
 
+    /* The title bar becomes a strip with the window buttons, or nothing
+     * under a native caption: its new height is known right away */
+    int i_titleBarChange = titleBar->barHeight();
+    titleBar->setMinimal( b_minimal );
+    i_titleBarChange -= titleBar->barHeight();
+
+    /* Lower the minimum before shrinking and raise it after growing, or it
+     * would clamp the shrinking and add to the growth */
+    if( b_minimal )
+        computeMinimumSize( true );
+
     if( !isFullScreen() && !isMaximized() && b_minimal && !b_isWindowTiled )
     {
-        int i_heightChange = 0;
+        int i_heightChange = i_titleBarChange;
 
-        if( b_menuBarVisible )
-            i_heightChange += menuBar()->height();
         if( b_controlsVisible )
             i_heightChange += controls->height();
 #ifndef QT_NO_STATUSBAR
@@ -1173,7 +1197,6 @@ void MainInterface::setMinimalView( bool b_minimal )
             resizeWindow( width(), height() - i_heightChange );
     }
 
-    menuBar()->setVisible( !b_minimal );
     controls->setVisible( !b_minimal );
 #ifndef QT_NO_STATUSBAR
     statusBar()->setVisible( !b_minimal && b_statusbarVisible );
@@ -1182,10 +1205,8 @@ void MainInterface::setMinimalView( bool b_minimal )
 
     if( !isFullScreen() && !isMaximized() && !b_minimal && !b_isWindowTiled )
     {
-        int i_heightChange = 0;
+        int i_heightChange = -i_titleBarChange;
 
-        if( !b_menuBarVisible && menuBar()->isVisible() )
-            i_heightChange += menuBar()->height();
         if( !b_controlsVisible && controls->isVisible() )
             i_heightChange += controls->height();
 #ifndef QT_NO_STATUSBAR
@@ -1198,6 +1219,9 @@ void MainInterface::setMinimalView( bool b_minimal )
         if( i_heightChange != 0 )
             resizeWindow( width(), height() + i_heightChange );
     }
+
+    if( !b_minimal )
+        computeMinimumSize( false );
 }
 
 /*
@@ -1219,10 +1243,7 @@ void MainInterface::toggleMinimalView( bool b_minimal )
     }
     b_minimalView = b_minimal;
     if( !b_videoFullScreen )
-    {
         setMinimalView( b_minimalView );
-        computeMinimumSize();
-    }
 
     emit minimalViewToggled( b_minimalView );
 }
@@ -1652,6 +1673,7 @@ void MainInterface::dragLeaveEvent(QDragLeaveEvent *event)
  ************************************************************************/
 void MainInterface::keyPressEvent( QKeyEvent *e )
 {
+    b_altAlone = e->key() == Qt::Key_Alt && e->modifiers() == Qt::AltModifier;
     handleKeyPress( e );
 
     /* easter eggs sequence handling */
@@ -1665,6 +1687,19 @@ void MainInterface::keyPressEvent( QKeyEvent *e )
         i_kc_offset = 0;
         emit kc_pressed();
     }
+}
+
+void MainInterface::keyReleaseEvent( QKeyEvent *e )
+{
+    /* Alt alone shows the menus that minimal view hides (DESIGN_SPEC 2) */
+    if( e->key() == Qt::Key_Alt && b_altAlone && b_minimalView )
+    {
+        titleBar->toggleMenus();
+        e->accept();
+    }
+    else
+        QVLCMW::keyReleaseEvent( e );
+    b_altAlone = false;
 }
 
 void MainInterface::handleKeyPress( QKeyEvent *e )
@@ -1729,10 +1764,17 @@ void MainInterface::toolBarConfUpdated()
 
 void MainInterface::setInterfaceFullScreen( bool fs )
 {
+    titleBar->setFullScreen( fs );
     if( fs )
+    {
+        updateCustomFrame( true );
         setWindowState( windowState() | Qt::WindowFullScreen );
+    }
     else
+    {
         setWindowState( windowState() & ~Qt::WindowFullScreen );
+        updateCustomFrame( false );
+    }
 }
 void MainInterface::toggleInterfaceFullScreen()
 {
