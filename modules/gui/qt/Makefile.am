@@ -99,6 +99,7 @@ libqt_plugin_la_SOURCES = \
 	gui/qt/components/overlay_host.cpp gui/qt/components/overlay_host.hpp \
 	gui/qt/components/toast.cpp gui/qt/components/toast.hpp \
 	gui/qt/components/drop_overlay.cpp gui/qt/components/drop_overlay.hpp \
+	gui/qt/components/video_overlays.cpp gui/qt/components/video_overlays.hpp \
 	gui/qt/components/sidebar.cpp gui/qt/components/sidebar.hpp \
 	gui/qt/components/title_bar.cpp gui/qt/components/title_bar.hpp \
 	gui/qt/components/controller_widget.cpp \
