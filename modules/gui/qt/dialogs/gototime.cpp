@@ -62,15 +62,13 @@ GotoTimeDialog::GotoTimeDialog( intf_thread_t *_p_intf)
     setWindowTitle( qtr( "Go to Time" ) );
     setWindowRole( "vlc-goto-time" );
 
-    /* DESIGN_SPEC 7 (2.1.6): the title, an h:mm:ss field, a hint naming
-     * the media length, then Reset, Cancel and the accent Go */
+    /* DESIGN_SPEC 7 (2.1.6): an h:mm:ss field, a hint naming the media
+     * length, then Reset, Cancel and the accent Go; the caption is the
+     * title, as in the other dialogs */
     QVBoxLayout *mainLayout = new QVBoxLayout( this );
     mainLayout->setSizeConstraint( QLayout::SetFixedSize );
 
     Theme *t = Theme::instance();
-    QLabel *title = new QLabel( qtr( "Go to time" ) );
-    title->setFont( t->font( Theme::PanelTitle ) );
-
     timeEdit = new TimeEdit();
     timeEdit->setDisplayFormat( "H:mm:ss" );
     timeEdit->setButtonSymbols( QAbstractSpinBox::NoButtons );
@@ -82,7 +80,6 @@ GotoTimeDialog::GotoTimeDialog( intf_thread_t *_p_intf)
                                           / RedesignTokens::Type::Mono );
     timeEdit->setFont( mono );
     timeEdit->setMinimumHeight( t->px( RedesignTokens::Dialogs::JumpInputH ) );
-    title->setBuddy( timeEdit );
 
     hint = new QLabel;
     hint->setFont( t->font( Theme::Meta ) );
@@ -102,7 +99,6 @@ GotoTimeDialog::GotoTimeDialog( intf_thread_t *_p_intf)
     foot->addWidget( cancelButton );
     foot->addWidget( gotoButton );
 
-    mainLayout->addWidget( title );
     mainLayout->addWidget( timeEdit );
     mainLayout->addWidget( hint );
     mainLayout->addLayout( foot );
