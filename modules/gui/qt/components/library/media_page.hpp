@@ -23,6 +23,7 @@
 
 #include <QElapsedTimer>
 #include <QPersistentModelIndex>
+#include <QSet>
 #include <QWidget>
 
 class CardView;
@@ -67,6 +68,7 @@ private:
     LibraryEmptyState *empty;
     QTimer *settle;
     int expandingId;   /* a folder being expanded, to browse into */
+    QSet<int> expandRequested;
     bool loaded;
     /* a burst of inserted rows detaches the grid until the scan settles */
     QElapsedTimer burstClock;

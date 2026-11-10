@@ -24,6 +24,7 @@
 
 #include <QListView>
 #include <QPersistentModelIndex>
+#include <QRunnable>
 #include <QSet>
 #include <QSortFilterProxyModel>
 #include <QStyledItemDelegate>
@@ -52,15 +53,20 @@ namespace LibraryData
     bool isFolder( const PLModel *, const QModelIndex &source );
     /* Lists a folder that is not expanded yet (subfolders of the scanned
      * folders, servers, shares) without playing it: the playlist then turns
-     * it into a node (leafBecameParent, with *pendingId). Not twice: a
-     * second listing would add the items again. */
-    void expand( intf_thread_t *, PLModel *, const QModelIndex &source, int *pendingId );
+     * it into a node (leafBecameParent; *browseId is the one to open then).
+     * Not twice: a second listing would add the items again, so `requested`
+     * keeps every id asked for until it became a node. */
+    void expand( intf_thread_t *, PLModel *, const QModelIndex &source,
+                 int *browseId, QSet<int> *requested );
     /* P4-3: appends a copy of the item (a folder: its items) to the
      * playlist and plays the first; returns that input, held, or NULL */
     input_item_t *playInPlaylist( intf_thread_t *, PLModel *, const QModelIndex &source );
     /* Once `item` (held; this takes the reference) plays, leave the library
      * for the video, or audio mode; `video` waits for the video output */
     void revealWhenPlaying( intf_thread_t *, input_item_t *, bool video );
+    /* Background reads (art, file checks): never waited for, so a read
+     * stuck on an offline share cannot hold up quitting */
+    QThreadPool *workerPool();
 }
 
 /* Search for the library grids: filters the rows directly under the browsed
@@ -84,13 +90,31 @@ private:
     QString text;
 };
 
+/* One cover read and scaled on LibraryData::workerPool(); the result goes
+ * through a queued signal, so it is dropped when the loader is gone */
+class ArtJob : public QObject, public QRunnable
+{
+    Q_OBJECT
+public:
+    ArtJob( const QString &_path, const QSize &_size, const QString &_key )
+        : path( _path ), size( _size ), key( _key ) {}
+    void run() Q_DECL_OVERRIDE;
+
+signals:
+    void loaded( const QString &key, const QImage & );
+
+private:
+    QString path;
+    QSize size;
+    QString key;
+};
+
 /* Cover art read and scaled in a worker thread, kept in QPixmapCache */
 class ArtLoader : public QObject
 {
     Q_OBJECT
 public:
     explicit ArtLoader( QObject *parent );
-    ~ArtLoader();
     /* The art scaled to cover `size` (device px), or a null pixmap while it
      * loads or when there is none: ready() follows a successful load */
     QPixmap get( const QString &path, const QSize &size );
@@ -102,7 +126,6 @@ private slots:
     void loaded( const QString &key, const QImage & );
 
 private:
-    QThreadPool *pool;
     QSet<QString> pending, failed;
 };
 
@@ -187,15 +210,21 @@ private:
     QLineEdit *searchEdit;
 };
 
-/* DESIGN_SPEC 4: "Your library is empty", Add a folder (P4-2), Open media */
+/* DESIGN_SPEC 4: "Your library is empty", Add a folder (P4-2), Open media;
+ * Home and the library pages, each with its own text and an optional note */
 class LibraryEmptyState : public QWidget
 {
     Q_OBJECT
 public:
-    explicit LibraryEmptyState( QWidget *parent );
+    LibraryEmptyState( const QString &text, const QString &note, QWidget *parent );
+    void setNoteVisible( bool );
+    QSize sizeHint() const Q_DECL_OVERRIDE;
 
 protected:
     void paintEvent( QPaintEvent * ) Q_DECL_OVERRIDE;
+
+private:
+    QLabel *noteLabel;
 };
 
 #endif

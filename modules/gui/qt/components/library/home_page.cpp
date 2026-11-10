@@ -25,10 +25,11 @@
 
 #include "qt.hpp"
 #include "components/library/home_page.hpp"
-#include "components/now_playing.hpp"   /* timeString, paintStripes, fontAt */
-#include "dialogs_provider.hpp"
+#include "components/library/library_widgets.hpp"
+#include "components/now_playing.hpp"   /* paintStripes, fontAt */
 #include "recents.hpp"
 #include "util/breakpoints.hpp"
+#include "util/customwidgets.hpp"     /* timeString */
 #include "util/redesign_icons.hpp"
 #include "util/theme.hpp"
 
@@ -44,13 +45,12 @@
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QKeyEvent>
-#include <QKeySequence>
 #include <QLabel>
+#include <QLineEdit>
 #include <QLocale>
 #include <QMenu>
 #include <QPainter>
 #include <QPainterPath>
-#include <QPushButton>
 #include <QScrollBar>
 #include <QStyledItemDelegate>
 #include <QTreeWidget>
@@ -203,39 +203,11 @@ protected:
     }
 };
 
-/* The dashed box of the empty state */
-class EmptyBox : public QWidget
-{
-public:
-    explicit EmptyBox( QWidget *parent ) : QWidget( parent ) {}
-protected:
-    void paintEvent( QPaintEvent * ) Q_DECL_OVERRIDE
-    {
-        const Theme *t = Theme::instance();
-        QPainter p( this );
-        p.setRenderHint( QPainter::Antialiasing );
-        QPen pen( t->ink( InkAlpha::EmptyBorder ), Home::EmptyBorderTenths / 10. );
-        pen.setStyle( Qt::DashLine );
-        const qreal inset = pen.widthF() / 2;
-        const qreal radius = t->metric( Theme::RadiusTile );
-        p.setPen( pen );
-        p.setBrush( Qt::NoBrush );
-        p.drawRoundedRect( QRectF( rect() ).adjusted( inset, inset, -inset, -inset ),
-                           radius, radius );
-    }
-};
-
 QLabel *sectionLabel( const QString &text, QWidget *parent )
 {
     QLabel *label = new QLabel( text, parent );
     label->setFont( fontAt( Theme::PanelTitle, Home::SectionTitle, true ) );
     return label;
-}
-
-QString withShortcut( const QString &label, const char *shortcut )
-{
-    return QString( "%1 (%2)" ).arg( label,
-        QKeySequence( QLatin1String( shortcut ) ).toString( QKeySequence::NativeText ) );
 }
 
 } // namespace
@@ -346,7 +318,7 @@ void ResumeCard::paintEvent( QPaintEvent * )
         const QSize s( fm.width( badge ) + 2 * padX, fm.height() + 2 * padY );
         const QRect r( width() - t->px( Home::BadgeInsetX ) - s.width(),
                        thumbH - t->px( Home::BadgeInsetY ) - s.height(), s.width(), s.height() );
-        const int badgeRadius = t->metric( Theme::RadiusXs );
+        const int badgeRadius = t->px( Library::BadgeRadius );   /* as the library cards' */
         p.setPen( Qt::NoPen );
         p.setBrush( QColor::fromRgba( CardBadgeBg ) );
         p.drawRoundedRect( r, badgeRadius, badgeRadius );
@@ -415,9 +387,10 @@ HomePage::HomePage( intf_thread_t *_p_intf, QWidget *parent )
     layout->setContentsMargins( t->px( Size::PagePadX ), t->px( Size::PagePadTop ),
                                 t->px( Size::PagePadX ), t->px( Size::PagePadX ) );
     layout->setSpacing( 0 );
-    QLabel *title = new QLabel( qtr( "Home" ), content );
-    title->setFont( t->font( Theme::PageTitle ) );
-    layout->addWidget( title );
+    /* the library pages' title row: its search filters the cards and the
+     * table, on this page's own list (never PLModel::filter) */
+    header = new LibraryHeader( qtr( "Home" ), content );
+    layout->addWidget( header );
     layout->addSpacing( t->px( Home::TitleBottom ) );
 
     /* Continue watching, then Recent media */
@@ -446,7 +419,7 @@ HomePage::HomePage( intf_thread_t *_p_intf, QWidget *parent )
     cardsSectionLayout->addWidget( cardsArea );
     listsLayout->addWidget( cardsSection );
 
-    QWidget *recentSection = new QWidget( lists );
+    recentSection = new QWidget( lists );
     QVBoxLayout *recentLayout = new QVBoxLayout( recentSection );
     recentLayout->setContentsMargins( 0, 0, 0, 0 );
     recentLayout->setSpacing( t->px( Home::TableTitleBottom ) );
@@ -476,73 +449,17 @@ HomePage::HomePage( intf_thread_t *_p_intf, QWidget *parent )
     listsLayout->addWidget( recentSection );
     layout->addWidget( lists );
 
-    /* inventory 1.1.1: nothing played yet */
-    empty = new EmptyBox( content );
-    empty->setMinimumHeight( t->px( Home::EmptyMinH ) );
-    QVBoxLayout *emptyLayout = new QVBoxLayout( empty );
-    const int pad = t->px( Home::EmptyPad );
-    emptyLayout->setContentsMargins( pad, pad, pad, pad );
-    emptyLayout->setSpacing( t->px( Home::EmptyGap ) );
-    emptyLayout->addStretch( 1 );
-    QLabel *cone = new QLabel( empty );
-    const int coneSize = t->px( Home::EmptyCone );
-    cone->setPixmap( t->icon( RedesignIcons::IconCone, Theme::Text, QSize( coneSize, coneSize ) )
-                         .pixmap( QSize( coneSize, coneSize ) ) );
-    emptyLayout->addWidget( cone, 0, Qt::AlignHCenter );
-    QLabel *head = new QLabel( qtr( "Your library is empty" ), empty );
-    head->setFont( fontAt( Theme::PanelTitle, Home::EmptyTitle, true ) );
-    emptyLayout->addWidget( head, 0, Qt::AlignHCenter );
-    QLabel *body = new QLabel( qtr( "Media you play shows up here, so you can pick up "
-                                    "where you left off." ), empty );
-    offNote = new QLabel( qtr( "Recently played items are not being saved. Turn on "
-                               "\"Save recently played items\" in Preferences, Interface." ),
-                          empty );
-    foreach( QLabel *l, QList<QLabel *>() << body << offNote )
-    {
-        l->setProperty( "role", "hint" );
-        l->setWordWrap( true );
-        l->setAlignment( Qt::AlignHCenter );
-        l->setFixedWidth( t->px( Home::EmptyBodyMaxW ) );
-        /* an aligned layout item gets no height-for-width */
-        l->setFixedHeight( l->heightForWidth( l->width() ) );
-        emptyLayout->addWidget( l, 0, Qt::AlignHCenter );
-    }
-
-    QHBoxLayout *buttons = new QHBoxLayout;
-    buttons->setSpacing( t->px( Home::EmptyButtonGap ) );
-    buttons->addStretch( 1 );
-    QPushButton *addFolder = new QPushButton( qtr( "Add a folder" ), empty );
-    /* P4-2: VLC 3 cannot add folders to its media directories, so the
-     * folder goes to the playlist and plays (Media > Open Folder) */
-    addFolder->setProperty( "role", "primary" );
-    addFolder->setIcon( t->icon( RedesignIcons::IconAddFolder, Theme::OnAccent ) );
-    addFolder->setIconSize( QSize( t->px( Home::EmptyButtonIcon ), t->px( Home::EmptyButtonIcon ) ) );
-    /* shortcut: the keys are copied from menus.cpp (Open Folder, Open
-     * Multiple Files) like the sidebar's, read them from the actions later */
-    addFolder->setToolTip( withShortcut( qtr( "Add a folder to the playlist and play it" ),
-                                         "Ctrl+F" ) );
-    QPushButton *open = new QPushButton( qtr( "Open media..." ), empty );
-    open->setToolTip( withShortcut( qtr( "Open media" ), "Ctrl+Shift+O" ) );
-    foreach( QPushButton *b, QList<QPushButton *>() << addFolder << open )
-    {
-        b->setFixedHeight( t->px( Home::EmptyButtonH ) );
-        b->setFocusPolicy( Qt::TabFocus );
-        b->setCursor( Qt::PointingHandCursor );
-        buttons->addWidget( b );
-    }
-    buttons->addStretch( 1 );
-    connect( addFolder, &QPushButton::clicked, []() { THEDP->PLOpenDir(); } );
-    connect( open, &QPushButton::clicked, []() { THEDP->openDialog(); } );
-    emptyLayout->addSpacing( t->px( Home::EmptyButtonsTop ) );
-    emptyLayout->addLayout( buttons );
-    QLabel *dropHint = new QLabel( qtr( "or drop files anywhere in this window" ), empty );
-    dropHint->setFont( t->font( Theme::Mono ) );
-    dropHint->setProperty( "role", "hint" );
-    emptyLayout->addWidget( dropHint, 0, Qt::AlignHCenter );
-    emptyLayout->addStretch( 1 );
+    /* inventory 1.1.1: nothing played yet; up to its token height, less
+     * in a short window (LibraryEmptyState::sizeHint) */
+    empty = new LibraryEmptyState(
+        qtr( "Media you play shows up here, so you can pick up where you left off." ),
+        qtr( "Recently played items are not being saved. Turn on "
+             "\"Save recently played items\" in Preferences, Interface." ), content );
     layout->addWidget( empty );
     layout->addStretch( 1 );
     setWidget( content );
+
+    connect( header->search(), &QLineEdit::textChanged, this, &HomePage::rebuild );
 
     connect( table, &QAbstractItemView::clicked, this, [this]( const QModelIndex &i ) {
         play( i.sibling( i.row(), TitleCol ).data( MrlRole ).toString(), false );
@@ -591,9 +508,13 @@ void HomePage::rebuild()
     const int currentRow = table->currentIndex().row();
     table->clear();
 
+    const QString search = header->search()->text().trimmed();
     foreach( const QString &mrl, mrls )
     {
         const Entry e = describe( mrl );
+        if( !e.title.contains( search, Qt::CaseInsensitive )
+         && !e.path.contains( search, Qt::CaseInsensitive ) )
+            continue;
         const int64_t timeMs = recents->time( mrl );
         const int64_t lengthMs = recents->length( mrl );
         if( timeMs > 0 )
@@ -635,9 +556,11 @@ void HomePage::rebuild()
         table->setCurrentItem( table->topLevelItem( qMin( currentRow, count - 1 ) ) );
 
     cardsSection->setVisible( !cards.isEmpty() );
-    lists->setVisible( count > 0 );
-    empty->setVisible( count == 0 );
-    offNote->setVisible( !enabled );
+    recentSection->setVisible( count > 0 );
+    lists->setVisible( !mrls.isEmpty() );
+    empty->setVisible( mrls.isEmpty() );
+    empty->setNoteVisible( !enabled );
+    header->setStatus( !mrls.isEmpty() && count == 0 ? qtr( "No results" ) : QString() );
 
     applyMissing();
     layoutForWidth();
@@ -667,8 +590,9 @@ void HomePage::startCheck()
         return;
     checking = true;
     ExistsCheck *check = new ExistsCheck( mrls, paths );
+    /* queued: a result that comes after this page is gone is dropped */
     connect( check, &ExistsCheck::done, this, &HomePage::setMissing, Qt::QueuedConnection );
-    QThreadPool::globalInstance()->start( check );
+    LibraryData::workerPool()->start( check );
 }
 
 void HomePage::setMissing( const QStringList &mrls )
@@ -733,9 +657,13 @@ void HomePage::layoutForWidth()
         t->px( small ? Home::PathColS : Home::PathColL ) + cellPad );
     table->header()->resizeSection( DurationCol,
         t->px( small ? Home::DurationColS : Home::DurationColL ) + cellPad );
-    /* a 12-hour clock ("Today, 11:00 AM") is wider than the design's */
-    int when = t->px( small ? Home::WhenColS : Home::WhenColL );
+    /* a 12-hour clock ("Today, 10:52 AM") is wider than the design's: fit
+     * that in this locale, and every row's text, in the font it is drawn in
+     * (the stylesheet's, so polished first) */
+    table->ensurePolished();
     const QFontMetrics fm( table->font() );
+    int when = qMax( t->px( small ? Home::WhenColS : Home::WhenColL ),
+                     fm.width( whenText( QDateTime( QDate::currentDate(), QTime( 10, 52 ) ).toUTC() ) ) );
     for( int i = 0; i < table->topLevelItemCount(); i++ )
         when = qMax( when, fm.width( table->topLevelItem( i )->text( WhenCol ) ) );
     /* the delegate's own text margins, as QCommonStyle lays out item text */
@@ -753,16 +681,11 @@ void HomePage::play( const QString &mrl, bool resume )
     sincePlay.start();
 
     RecentsMRL *recents = RecentsMRL::getInstance( p_intf );
-    if( !resume )
-    {
-        recents->playMRL( mrl );
-        return;
-    }
-    /* P4-4: a card always resumes; :start-time also skips the qt-continue
-     * question (InputManager::setInput) */
-    QStringList options( QString( ":start-time=%1" )
-                             .arg( QString::number( recents->time( mrl ) / 1000., 'f', 3 ) ) );
-    Open::openMRLwithOptions( p_intf, mrl, &options );
+    /* P4-4: a card always resumes, without the qt-continue question; not
+     * an option on the item, which would start every replay there too */
+    if( resume )
+        recents->resumeOnce( mrl );
+    recents->playMRL( mrl );
 }
 
 void HomePage::popup( const QString mrl, const QPoint &globalPos )

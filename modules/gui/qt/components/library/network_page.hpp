@@ -99,6 +99,7 @@ private:
     QString topTitle;
     bool topIsItem;              /* a server or share, which can go away */
     int expandingId;
+    QSet<int> expandRequested;
     bool loaded;
 };
 

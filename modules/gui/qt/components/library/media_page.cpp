@@ -48,11 +48,16 @@ MediaPage::MediaPage( intf_thread_t *_p_intf, Kind _kind, QWidget *parent )
     const QString title = kind == Videos ? qtr( "Videos" ) : qtr( "Music" );
     setAccessibleName( title );
     QVBoxLayout *layout = new QVBoxLayout( this );
+    /* the grid keeps room for its scroll bar (CardView::updateGrid): that
+     * room goes into the right padding, so the cards end under the search
+     * field's right edge */
+    const int scrollW = t->px( Size::ScrollBarW );
     layout->setContentsMargins( t->px( Size::PagePadX ), t->px( Size::PagePadTop ),
-                                t->px( Size::PagePadX ), t->px( Library::PagePadBottom ) );
+                                t->px( Size::PagePadX ) - scrollW, t->px( Library::PagePadBottom ) );
     layout->setSpacing( t->px( Library::HeaderBelow ) );
 
     header = new LibraryHeader( title, this );
+    header->setContentsMargins( 0, 0, scrollW, 0 );
     layout->addWidget( header );
 
     body = new QStackedWidget( this );
@@ -63,7 +68,9 @@ MediaPage::MediaPage( intf_thread_t *_p_intf, Kind _kind, QWidget *parent )
     view->setAccessibleName( title );
     view->setModel( filter );
     body->addWidget( view );
-    empty = new LibraryEmptyState( body );
+    empty = new LibraryEmptyState( qtr( "VLC shows the media of your Videos and Music folders here. "
+                                        "Files are never moved or modified." ), QString(), body );
+    empty->setContentsMargins( 0, 0, scrollW, 0 );   /* aligned with the header */
     body->addWidget( empty );
     layout->addWidget( body, 1 );
 
@@ -132,6 +139,7 @@ void MediaPage::load()
     connect( model, &QAbstractItemModel::modelReset, this, &MediaPage::updateState );
     /* a folder expanded by activate(): open it, as StandardPLPanel does */
     connect( THEMIM, &MainInputManager::leafBecameParent, this, [this]( int id ) {
+        expandRequested.remove( id );   /* a node now: never expanded again */
         if( id != expandingId )
             return;
         expandingId = -1;
@@ -162,7 +170,7 @@ void MediaPage::activate( const QModelIndex &index )
     }
     if( LibraryData::isFolder( model, source ) )
     {
-        LibraryData::expand( p_intf, model, source, &expandingId );
+        LibraryData::expand( p_intf, model, source, &expandingId, &expandRequested );
         return;
     }
     input_item_t *input = model->getInputItem( source );

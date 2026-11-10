@@ -98,13 +98,16 @@ bool LibraryData::isFolder( const PLModel *model, const QModelIndex &source )
 }
 
 void LibraryData::expand( intf_thread_t *p_intf, PLModel *model, const QModelIndex &source,
-                          int *pendingId )
+                          int *browseId, QSet<int> *requested )
 {
     input_item_t *input = model->getInputItem( source );
     const int id = model->itemId( source );
-    if( !input || id == *pendingId )
+    if( !input )
         return;
-    *pendingId = id;
+    *browseId = id;   /* the latest pick opens once listed */
+    if( requested->contains( id ) )
+        return;
+    requested->insert( id );
     /* The scan keeps subfolders collapsed (preparse depth 0); a request
      * lists one level. A network folder is the user's own pick here, as
      * when the stock playlist plays it to list it. */
@@ -239,49 +242,36 @@ bool LibraryFilter::filterAcceptsRow( int row, const QModelIndex &sourceParent )
         || takeString( input_item_GetAlbum( input ) ).contains( text, Qt::CaseInsensitive );
 }
 
+QThreadPool *LibraryData::workerPool()
+{
+    /* shortcut: never deleted, so nothing waits for a read stuck on an
+     * offline share (QCoreApplication waits for the global pool on exit,
+     * a QThreadPool's destructor for its own); its threads end with the
+     * process. Give the reads a cancel path if the pages ever get destroyed
+     * and recreated while VLC runs. */
+    static QThreadPool *pool = new QThreadPool;
+    return pool;
+}
+
 /**********************************************************************
  * ArtLoader
  **********************************************************************/
-namespace {
-class ArtJob : public QRunnable
+void ArtJob::run()
 {
-public:
-    ArtJob( ArtLoader *_loader, const QString &_path, const QSize &_size, const QString &_key )
-        : loader( _loader ), path( _path ), size( _size ), key( _key ) {}
-
-    void run() Q_DECL_OVERRIDE
-    {
-        QImageReader reader( path );
-        reader.setDecideFormatFromContent( true );
-        const QSize full = reader.size();
-        if( full.isValid() )   /* decode at the size it is drawn, aspect kept */
-            reader.setScaledSize( full.scaled( size, Qt::KeepAspectRatioByExpanding ) );
-        const QImage image = reader.read();
-        QMetaObject::invokeMethod( loader, "loaded", Qt::QueuedConnection,
-                                   Q_ARG( QString, key ), Q_ARG( QImage, image ) );
-    }
-
-private:
-    ArtLoader *loader; /* outlives the job: its destructor waits for the pool */
-    QString path;
-    QSize size;
-    QString key;
-};
+    QImageReader reader( path );
+    reader.setDecideFormatFromContent( true );
+    const QSize full = reader.size();
+    if( full.isValid() )   /* decode at the size it is drawn, aspect kept */
+        reader.setScaledSize( full.scaled( size, Qt::KeepAspectRatioByExpanding ) );
+    emit loaded( key, reader.read() );
 }
 
-ArtLoader::ArtLoader( QObject *parent ) : QObject( parent ), pool( new QThreadPool( this ) )
+ArtLoader::ArtLoader( QObject *parent ) : QObject( parent )
 {
-    pool->setMaxThreadCount( 2 );
     /* the default 10 MB holds about thirty album covers */
     enum { CacheKB = 64 * 1024 };
     if( QPixmapCache::cacheLimit() < CacheKB )
         QPixmapCache::setCacheLimit( CacheKB );
-}
-
-ArtLoader::~ArtLoader()
-{
-    pool->clear();
-    pool->waitForDone();
 }
 
 QPixmap ArtLoader::get( const QString &path, const QSize &size )
@@ -293,7 +283,10 @@ QPixmap ArtLoader::get( const QString &path, const QSize &size )
     if( failed.contains( key ) || QPixmapCache::find( key, &pixmap ) || pending.contains( key ) )
         return pixmap;
     pending.insert( key );
-    pool->start( new ArtJob( this, path, size, key ) );
+    ArtJob *job = new ArtJob( path, size, key );
+    /* queued: a result that comes after this loader is gone is dropped */
+    connect( job, &ArtJob::loaded, this, &ArtLoader::loaded, Qt::QueuedConnection );
+    LibraryData::workerPool()->start( job );
     return pixmap;
 }
 
@@ -735,14 +728,37 @@ void LibraryHeader::resizeEvent( QResizeEvent *e )
 /**********************************************************************
  * LibraryEmptyState
  **********************************************************************/
-LibraryEmptyState::LibraryEmptyState( QWidget *parent ) : QWidget( parent )
+/* "Label (Ctrl+F)" in the platform's spelling */
+static QString withShortcut( const QString &label, const char *keys )
+{
+    return qtr( "%1 (%2)" ).arg( label,
+        QKeySequence( QLatin1String( keys ) ).toString( QKeySequence::NativeText ) );
+}
+
+namespace {
+/* Wrapped text sized once to its lines (below). It must not tell the
+ * layouts its height depends on its width: a QScrollArea (Home) then sizes
+ * the whole page by height-for-width, past a short window, with a scroll
+ * bar, although the page's minimum fits. */
+class FixedTextLabel : public QLabel
+{
+public:
+    FixedTextLabel( const QString &text, QWidget *parent ) : QLabel( text, parent ) {}
+    bool hasHeightForWidth() const Q_DECL_OVERRIDE { return false; }
+};
+}
+
+LibraryEmptyState::LibraryEmptyState( const QString &text, const QString &note, QWidget *parent )
+    : QWidget( parent ), noteLabel( NULL )
 {
     Theme *t = Theme::instance();
     QVBoxLayout *layout = new QVBoxLayout( this );
     const int pad = t->px( Library::EmptyPad );
-    layout->setContentsMargins( pad, pad, pad, pad );
+    /* the top and bottom padding is a centring spacer each: `pad` tall
+     * when there is room, down to nothing in a short window */
+    layout->setContentsMargins( pad, 0, pad, 0 );
     layout->setSpacing( t->px( Library::EmptyGap ) );
-    layout->addStretch( 1 );
+    layout->addSpacerItem( new QSpacerItem( 0, pad, QSizePolicy::Minimum, QSizePolicy::Expanding ) );
 
     QLabel *cone = new QLabel( this );
     const int conePx = t->px( Library::EmptyCone );
@@ -754,35 +770,46 @@ LibraryEmptyState::LibraryEmptyState( QWidget *parent ) : QWidget( parent )
     title->setFont( fontAt( Theme::PanelTitle, Library::EmptyTitle, true ) );
     layout->addWidget( title, 0, Qt::AlignHCenter );
 
-    QLabel *text = new QLabel( qtr( "VLC shows the media of your Videos and Music folders here. "
-                                    "Files are never moved or modified." ), this );
-    text->setProperty( "role", "hint" );
-    text->setWordWrap( true );
-    text->setAlignment( Qt::AlignCenter );
-    /* an aligned label gets its one-line size hint: give it its wrapped size */
-    text->setFixedWidth( t->px( Library::EmptyTextW ) );
-    text->setFixedHeight( text->heightForWidth( text->width() ) );
-    layout->addWidget( text, 0, Qt::AlignHCenter );
+    QList<QLabel *> texts;
+    texts << new FixedTextLabel( text, this );
+    if( !note.isEmpty() )
+        texts << ( noteLabel = new FixedTextLabel( note, this ) );
+    foreach( QLabel *l, texts )
+    {
+        l->setProperty( "role", "hint" );
+        l->setWordWrap( true );
+        l->setAlignment( Qt::AlignCenter );
+        /* an aligned label gets its one-line size hint: give it its wrapped size */
+        l->setFixedWidth( t->px( Library::EmptyTextW ) );
+        l->setFixedHeight( l->heightForWidth( l->width() ) );
+        layout->addWidget( l, 0, Qt::AlignHCenter );
+    }
 
     QHBoxLayout *buttons = new QHBoxLayout;
     buttons->setSpacing( t->px( Library::EmptyButtonGap ) );
     /* P4-2: the folder goes to the playlist; the scanned folders are the
      * system's Videos and Music folders */
-    QPushButton *add = new QPushButton( Theme::themedIcon( RedesignIcons::IconAddFolder, Theme::OnAccent ),
-                                        qtr( "Add a folder" ), this );
+    QPushButton *add = new QPushButton( qtr( "Add a folder" ), this );
     add->setProperty( "role", "primary" );
-    add->setToolTip( qtr( "Adds a folder to the playlist and plays it" ) );
-    add->setFixedHeight( t->px( Library::EmptyButtonH ) );
+    add->setIcon( t->icon( RedesignIcons::IconAddFolder, Theme::OnAccent ) );
+    /* shortcut: the keys are copied from menus.cpp (Open Folder, Open
+     * Multiple Files) like the sidebar's, read them from the actions later */
+    add->setToolTip( withShortcut( qtr( "Add a folder to the playlist and play it" ), "Ctrl+F" ) );
     connect( add, &QPushButton::clicked, []() { THEDP->PLOpenDir(); } );
-    buttons->addWidget( add );
-    /* shortcut: the key is copied from menus.cpp like the sidebar's */
     QPushButton *open = new QPushButton( qtr( "Open media..." ), this );
     open->setProperty( "role", "outline" );
-    open->setToolTip( qtr( "Open media (%1)" ).arg(
-        QKeySequence( QLatin1String( "Ctrl+Shift+O" ) ).toString( QKeySequence::NativeText ) ) );
-    open->setFixedHeight( t->px( Library::EmptyButtonH ) );
+    open->setToolTip( withShortcut( qtr( "Open media" ), "Ctrl+Shift+O" ) );
     connect( open, &QPushButton::clicked, []() { THEDP->openDialog(); } );
-    buttons->addWidget( open );
+    const int iconPx = t->px( Library::EmptyButtonIcon );
+    foreach( QPushButton *b, QList<QPushButton *>() << add << open )
+    {
+        b->setIconSize( QSize( iconPx, iconPx ) );
+        b->setFixedHeight( t->px( Library::EmptyButtonH ) );
+        b->setFocusPolicy( Qt::TabFocus );
+        b->setCursor( Qt::PointingHandCursor );
+        buttons->addWidget( b );
+    }
+    layout->addSpacing( t->px( Library::EmptyButtonsTop ) );
     layout->addLayout( buttons );
     layout->setAlignment( buttons, Qt::AlignHCenter );
 
@@ -790,7 +817,22 @@ LibraryEmptyState::LibraryEmptyState( QWidget *parent ) : QWidget( parent )
     hint->setFont( t->font( Theme::Mono ) );
     hint->setProperty( "role", "libraryDim" );
     layout->addWidget( hint, 0, Qt::AlignHCenter );
-    layout->addStretch( 1 );
+    layout->addSpacerItem( new QSpacerItem( 0, pad, QSizePolicy::Minimum, QSizePolicy::Expanding ) );
+}
+
+void LibraryEmptyState::setNoteVisible( bool visible )
+{
+    if( noteLabel )
+        noteLabel->setVisible( visible );
+}
+
+QSize LibraryEmptyState::sizeHint() const
+{
+    /* EmptyMinH when there is room; a short window shrinks it down to its
+     * content (minimumSizeHint) instead of scrolling the buttons away */
+    QSize s = QWidget::sizeHint();
+    s.setHeight( qMax( s.height(), Theme::instance()->px( Library::EmptyMinH ) ) );
+    return s;
 }
 
 void LibraryEmptyState::paintEvent( QPaintEvent * )
@@ -803,5 +845,5 @@ void LibraryEmptyState::paintEvent( QPaintEvent * )
     p.setPen( pen );
     p.setBrush( Qt::NoBrush );
     const qreal radius = t->metric( Theme::RadiusTile );
-    p.drawRoundedRect( QRectF( rect() ).adjusted( w / 2, w / 2, -w / 2, -w / 2 ), radius, radius );
+    p.drawRoundedRect( QRectF( contentsRect() ).adjusted( w / 2, w / 2, -w / 2, -w / 2 ), radius, radius );
 }

@@ -268,17 +268,12 @@ namespace RedesignTokens
         static const int DurationColL = 70, DurationColS = 60, WhenColL = 110, WhenColS = 90;
         /* missing files */
         static const int MissingOpacityPercent = 45;
-        /* empty state */
-        static const int EmptyMinH = 420, EmptyPad = 32, EmptyGap = 14, EmptyCone = 56;
-        static const int EmptyTitle = 20, EmptyBodyMaxW = 380, EmptyButtonsTop = 6;
-        static const int EmptyButtonH = 36, EmptyButtonGap = 8, EmptyButtonIcon = 18;
-        static const int EmptyBorderTenths = 15; /* 1.5 px dashed */
+        /* the empty state is the library pages' (Library::Empty*) */
     }
     namespace InkAlpha
     {
         static const int RowLine       = 10; /* 0.04: under each recent row */
         static const int ProgressTrack = 38; /* 0.15: the card's progress track */
-        static const int EmptyBorder   = 36; /* 0.14: the empty state's dashed box */
     }
 
     /* ---- Phase 4: library pages Videos, Music, Network (DESIGN_SPEC 4;
@@ -302,9 +297,10 @@ namespace RedesignTokens
         static const int GroupGap = 28, GroupTitle = 15, GroupTitleBelow = 10;
         static const int TileGap = 12, TilePad = 14, TileInnerGap = 14, TileRadius = 8;
         static const int TileIcon = 40, TileGlyph = 22, TileSubGap = 3;
-        /* empty state */
-        static const int EmptyPad = 32, EmptyGap = 14, EmptyCone = 56;
+        /* empty state (Home too): up to EmptyMinH tall, less in a short window */
+        static const int EmptyMinH = 420, EmptyPad = 32, EmptyGap = 14, EmptyCone = 56;
         static const int EmptyTitle = 20, EmptyTextW = 380, EmptyButtonH = 36, EmptyButtonGap = 8;
+        static const int EmptyButtonsTop = 6, EmptyButtonIcon = 18;
         static const int EmptyBorderAlpha = 36; /* ink 0.14 */
         static const int EmptyBorderTenths = 15; /* 1.5 px dashes */
         /* not in tokens.json: the SDs have no "scan finished" event, so a
