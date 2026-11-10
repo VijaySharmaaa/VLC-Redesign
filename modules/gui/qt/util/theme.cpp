@@ -48,6 +48,7 @@
 #include <QStyle>
 #include <QStyleFactory>
 #include <QStyleOptionMenuItem>
+#include <QVariantAnimation>
 #include <QWidget>
 
 #ifdef _WIN32
@@ -176,6 +177,17 @@ namespace
 
     const char altSeenProperty[] = "vlcAltSeen";
     const char destructiveProperty[] = "vlcDestructive"; /* Theme::setDestructive */
+    /* the knob's place while it slides (0 off, 1 on); unset at rest */
+    const char toggleKnobProperty[] = "vlcToggleKnob";
+    const char toggleHookedProperty[] = "vlcToggleHooked";
+
+    /* DESIGN_SPEC 3: a QCheckBox with role="toggle" is drawn as a switch;
+     * it stays a check box for the keyboard and accessibility */
+    bool isToggle(const QWidget *w)
+    {
+        return qobject_cast<const QCheckBox *>(w)
+            && w->property("role").toString() == QLatin1String("toggle");
+    }
 
     /* What the stylesheet cannot do (DESIGN_SPEC 7, 11): menu items whose
      * check is the accent `check` icon and whose shortcut column is dimmed,
@@ -285,6 +297,12 @@ namespace
                            const QWidget *w) const Q_DECL_OVERRIDE
         {
             Theme *t = Theme::instance();
+            if (t && isToggle(w) && (pe == PE_FrameFocusRect || pe == PE_IndicatorCheckBox))
+            {
+                if (pe == PE_IndicatorCheckBox)
+                    drawToggle(t, opt, p, w);
+                return;  /* the switch draws its own focus ring */
+            }
             if (pe == PE_FrameFocusRect && t
              && (qobject_cast<const QCheckBox *>(w) || qobject_cast<const QRadioButton *>(w)))
             {
@@ -360,7 +378,88 @@ namespace
 #endif
         }
 
+        /* the switch, with room around it for its focus ring */
+        int pixelMetric(PixelMetric m, const QStyleOption *opt, const QWidget *w) const Q_DECL_OVERRIDE
+        {
+            const Theme *t = Theme::instance();
+            if (t && (m == PM_IndicatorWidth || m == PM_IndicatorHeight) && isToggle(w))
+                return t->metric(m == PM_IndicatorWidth ? Theme::ToggleW : Theme::ToggleH)
+                     + 4 * Size::FocusRing;
+            return QProxyStyle::pixelMetric(m, opt, w);
+        }
+
+        using QProxyStyle::polish;
+        /* Motion::Toggle: the knob slides; at once when animations are off */
+        void polish(QWidget *w) Q_DECL_OVERRIDE
+        {
+            QProxyStyle::polish(w);
+            if (!isToggle(w) || w->property(toggleHookedProperty).toBool())
+                return;
+            w->setProperty(toggleHookedProperty, true);
+            QCheckBox *box = static_cast<QCheckBox *>(w);
+            QObject::connect(box, &QAbstractButton::toggled, box, [box](bool on) {
+                const Theme *t = Theme::instance();
+                const int ms = t ? t->duration(Theme::Toggle) : 0;
+                const QVariant from = box->property(toggleKnobProperty);
+                foreach (QVariantAnimation *old, box->findChildren<QVariantAnimation *>(
+                             QString(), Qt::FindDirectChildrenOnly))
+                    delete old;
+                if (ms <= 0)
+                {
+                    box->setProperty(toggleKnobProperty, QVariant());
+                    return;
+                }
+                QVariantAnimation *a = new QVariantAnimation(box);
+                a->setStartValue(from.isValid() ? from.toReal() : on ? 0. : 1.);
+                a->setEndValue(on ? 1. : 0.);
+                a->setDuration(ms);
+                a->setEasingCurve(QEasingCurve::OutCubic);
+                QObject::connect(a, &QVariantAnimation::valueChanged, box, [box](const QVariant &v) {
+                    box->setProperty(toggleKnobProperty, v);
+                    box->update();
+                });
+                QObject::connect(a, &QAbstractAnimation::finished, box, [box]() {
+                    box->setProperty(toggleKnobProperty, QVariant());
+                    box->update();
+                });
+                a->start(QAbstractAnimation::DeleteWhenStopped);
+            });
+        }
+
     private:
+        /* The prototype's switch: off, an outlined track and a Text2 knob;
+         * on, an accent track and an OnAccent knob */
+        static void drawToggle(Theme *t, const QStyleOption *opt, QPainter *p, const QWidget *w)
+        {
+            const bool on = opt->state & (State_On | State_NoChange);
+            const QVariant knob = w->property(toggleKnobProperty);
+            const qreal at = knob.isValid() ? knob.toReal() : on ? 1. : 0.;
+            const QRectF ring = QRectF(opt->rect).adjusted(Size::FocusRing / 2., Size::FocusRing / 2.,
+                                                           -Size::FocusRing / 2., -Size::FocusRing / 2.);
+            const QRectF track = QRectF(opt->rect).adjusted(2 * Size::FocusRing + .5, 2 * Size::FocusRing + .5,
+                                                            -2 * Size::FocusRing - .5, -2 * Size::FocusRing - .5);
+            p->save();
+            p->setRenderHint(QPainter::Antialiasing);
+            if (opt->state & State_HasFocus)
+            {
+                p->setPen(QPen(t->color(strongAccent(t)), Size::FocusRing));
+                p->setBrush(Qt::NoBrush);
+                p->drawRoundedRect(ring, ring.height() / 2, ring.height() / 2);
+            }
+            if (!(opt->state & State_Enabled))
+                p->setOpacity(0.35);  /* DESIGN_SPEC 3: disabled controls */
+            p->setPen(on ? t->color(Theme::Accent) : t->ink(InkAlpha::ToggleOff));
+            p->setBrush(on ? t->color(Theme::Accent) : QColor(Qt::transparent));
+            p->drawRoundedRect(track, track.height() / 2, track.height() / 2);
+            const qreal d = t->px(Size::ToggleKnob);
+            const qreal inset = (track.height() - d) / 2;
+            const qreal x = track.left() + inset + at * (track.width() - d - 2 * inset);
+            p->setPen(Qt::NoPen);
+            p->setBrush(t->color(on ? Theme::OnAccent : Theme::Text2));
+            p->drawEllipse(QRectF(x, track.top() + inset, d, d));
+            p->restore();
+        }
+
         /* The accent is 2.4:1 on the light theme's white: marks and focus
          * rings take the darker accent text colour there (>= 3:1). */
         static Theme::ColorRole strongAccent(const Theme *t)

@@ -308,6 +308,7 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
                 control =  new type ## ConfigControl( VLC_OBJECT(p_intf), \
                            p_config, label, ui.qcontrol, false );         \
                 controls.append( control );                               \
+                ui.qcontrol->setProperty( "vlcOption", option );          \
             }                                                             \
             else {                                                        \
                 ui.qcontrol->setEnabled( false );                         \
@@ -321,6 +322,7 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
                 control =  new BoolConfigControl( VLC_OBJECT(p_intf),     \
                            p_config, NULL, ui.qcontrol );          \
                 controls.append( control );                               \
+                ui.qcontrol->setProperty( "vlcOption", option );          \
             }                                                             \
             else { ui.qcontrol->setEnabled( false ); }
 
@@ -332,6 +334,7 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
                 control =  new type ## ConfigControl( VLC_OBJECT(p_intf), \
                            p_config, label, qcontrol, false );            \
                 controls.append( control );                               \
+                qcontrol->setProperty( "vlcOption", option );             \
             }                                                             \
             else {                                                        \
                 QWidget *widget = label;                                  \
@@ -347,6 +350,7 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
                 control =  new type ## ConfigControl( VLC_OBJECT(p_intf), \
                            p_config, label, ui.qcontrol );                \
                 controls.append( control );                               \
+                ui.qcontrol->setProperty( "vlcOption", option );          \
             }
 
 #define CONFIG_GENERIC_FILE( option, type, label, qcontrol, qbutton )     \
@@ -356,6 +360,7 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
                 control =  new type ## ConfigControl( VLC_OBJECT(p_intf), \
                            p_config, label, qcontrol, qbutton );          \
                 controls.append( control );                               \
+                qcontrol->setProperty( "vlcOption", option );             \
             }
 
 #define START_SPREFS_CAT( name , label )    \

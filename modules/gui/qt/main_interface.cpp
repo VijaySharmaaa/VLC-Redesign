@@ -1620,7 +1620,19 @@ void MainInterface::toggleMiniPlayer()
     {
         miniPlayer = new MiniPlayer( p_intf, nowPlayingInfo, NULL );
         connect( miniPlayer, &MiniPlayer::restoreRequested, this, &MainInterface::toggleMiniPlayer );
-        connect( miniPlayer, &MiniPlayer::keyPressed, this, &MainInterface::handleKeyPress );
+        /* the menus' shortcuts too (Ctrl+P, Ctrl+E...): this window is
+         * hidden, so its own don't fire */
+        connect( miniPlayer, &MiniPlayer::keyPressed, this, [this]( QKeyEvent *e ) {
+            const QKeySequence key( int( e->modifiers() & ~Qt::KeypadModifier ) + e->key() );
+            foreach( QAction *action, findChildren<QAction *>() )
+                if( action->isEnabled() && action->shortcuts().contains( key ) )
+                {
+                    action->trigger();
+                    e->accept();
+                    return;
+                }
+            handleKeyPress( e );
+        } );
     }
     const bool b_mini = !miniPlayer->isVisible();
     if( b_mini )
