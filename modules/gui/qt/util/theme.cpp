@@ -872,7 +872,7 @@ QPushButton:focus { padding: @menuPadFocus@px @buttonPadXFocus@px; }
 QTabWidget::pane { background: @panel@; border: 1px solid @divider@; border-radius: @radiusLg@px; top: -1px; }
 /* a transparent ring on every tab, so focus only colours it */
 QTabBar::tab { background: transparent; color: @mute@; border: 2px solid transparent;
-    padding: @tabPadY@px @tabPadX@px @menuItemPadY@px; }
+    padding: @tabPadTop@px @tabPadX@px @tabPadBottom@px; }
 QTabBar::tab:hover { color: @tx@; }
 QTabBar::tab:selected { color: @tx@; border-bottom-color: @fill@; }
 QTabBar::tab:focus { color: @tx@; background: @hoverFill@; border-color: @focusRing@; border-radius: @radiusSm@px; }
@@ -988,6 +988,9 @@ QLabel[role="libraryDim"] { color: @dim@; }
 /* Phase 5: effects (dialogs/extended.cpp, components/extended_panels.cpp) */
 #effectsSheet QTabWidget::pane { background: transparent; border: none; }
 #effectsSheet QTabWidget#effectsTabs::pane { border-top: 1px solid @divider@; }
+/* the corner sits on the pane, which overlaps the bar by its 1 px line:
+   up by that line, "More" is on the tabs' line */
+#effectsSheet QTabWidget#effectsTabs::right-corner { top: -1px; }
 QToolButton#effectsMore { padding-right: @iconGlyph@px; }
 QToolButton#effectsMore::menu-indicator { image: url("@arrowDown@"); subcontrol-origin: padding; subcontrol-position: center right;
     width: @iconGlyph@px; height: @iconGlyph@px; }
@@ -1059,6 +1062,9 @@ PrefsPage QComboBox { min-height: @prefsSelectInner@px; }
 #endif
     const int lineH = QFontMetrics(font(Body)).height();
     const int metaH = QFontMetrics(font(Meta)).height();
+    /* the tab's ring takes 2 px at the top and the bottom: the padding
+     * shares the rest evenly, the tab keeps its height */
+    const int tabPadY = qMax(0, 2 * qMax(0, (px(Size::MenuItemH) - lineH) / 2) - Size::FocusRing);
     const struct { const char *name; QString value; } vars[] = {
         { "chrome", css(QColor::fromRgb(p.chrome)) },
         { "panel", css(QColor::fromRgb(p.panel)) },
@@ -1101,9 +1107,8 @@ PrefsPage QComboBox { min-height: @prefsSelectInner@px; }
         { "menuMinW", QString::number(px(Size::MenuMinW)) },
         { "menuTitlePadX", QString::number(px(Size::MenuTitlePadX)) },
         { "menuTitlePadY", QString::number(qMax(0, (px(Size::MenuTitleH) - lineH) / 2)) },
-        { "menuItemPadY", QString::number(qMax(0, (px(Size::MenuItemH) - lineH) / 2)) },
-        /* the tab's ring adds 2 px at the top and sides: keep the old size */
-        { "tabPadY", QString::number(qMax(0, (px(Size::MenuItemH) - lineH) / 2 - Size::FocusRing)) },
+        { "tabPadTop", QString::number(tabPadY / 2) },
+        { "tabPadBottom", QString::number(tabPadY - tabPadY / 2) },
         { "tabPadX", QString::number(px(Size::ButtonPadX) - Size::FocusRing) },
         { "buttonPadX", QString::number(px(Size::ButtonPadX)) },
         { "buttonPadXFocus", QString::number(px(Size::ButtonPadX) - 1) },
