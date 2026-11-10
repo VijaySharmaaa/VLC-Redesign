@@ -247,6 +247,37 @@ namespace RedesignTokens
         static const int Separator  = 26;  /* 0.10: deck separators */
         static const int VolumeTick = 64;  /* 0.25: the 100 % tick */
     }
+    /* Phase 4: home */
+    /* ---- Library home (DESIGN_SPEC 4; sizes from the prototype markup) ---- */
+    static const QRgb CardBadgeBg = 0xBF000000; /* "9:37 left": black 0.75 */
+    namespace Home
+    {
+        static const int TitleBottom = 24, SectionGap = 32;
+        static const int SectionTitle = 15, CardsTitleBottom = 12, TableTitleBottom = 8;
+        /* continue watching: 16:9 cards, L / M / S / XS cards per row */
+        static const int ColsL = 5, ColsM = 4, ColsS = 3, ColsXS = 2;
+        static const int CardGap = 16, CardStripe = 20, CardGlyph = 32;
+        static const int CardTextGap = 8, CardMetaGap = 2, CardTitle = 14;
+        static const int BadgeInsetX = 8, BadgeInsetY = 10, BadgePadX = 6, BadgePadY = 2;
+        static const int Progress = 3;
+        /* recent media: icon · title · path · duration · when */
+        static const int RowH = 44, RowIcon = 20, RowPadX = 10, ColumnGap = 12, IconCol = 28;
+        static const int PathColL = 300, PathColS = 200; /* hidden at XS */
+        static const int DurationColL = 70, DurationColS = 60, WhenColL = 110, WhenColS = 90;
+        /* missing files */
+        static const int MissingOpacityPercent = 45;
+        /* empty state */
+        static const int EmptyMinH = 420, EmptyPad = 32, EmptyGap = 14, EmptyCone = 56;
+        static const int EmptyTitle = 20, EmptyBodyMaxW = 380, EmptyButtonsTop = 6;
+        static const int EmptyButtonH = 36, EmptyButtonGap = 8, EmptyButtonIcon = 18;
+        static const int EmptyBorderTenths = 15; /* 1.5 px dashed */
+    }
+    namespace InkAlpha
+    {
+        static const int RowLine       = 10; /* 0.04: under each recent row */
+        static const int ProgressTrack = 38; /* 0.15: the card's progress track */
+        static const int EmptyBorder   = 36; /* 0.14: the empty state's dashed box */
+    }
 }
 
 #endif

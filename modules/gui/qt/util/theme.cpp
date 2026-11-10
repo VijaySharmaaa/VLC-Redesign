@@ -791,6 +791,15 @@ QPushButton[role="popoverLink"] { background: transparent; color: @accTx@; borde
     border-radius: 0; text-align: left; padding: @menuPad@px; }
 QPushButton[role="popoverLink"]:hover { background: @hoverFill@; }
 QPushButton[role="popoverLink"]:focus { border: 2px solid @focusRing@; border-radius: @radiusMd@px; }
+/* Phase 4: home (components/library/home_page.cpp); the delegate draws the row focus ring */
+QTreeView[role="homeRecent"] { background: transparent; border: none; outline: 0; }
+QTreeView[role="homeRecent"]::item { padding: 0 @homeCellPad@px; border-bottom: 1px solid @homeRowLine@; }
+QTreeView[role="homeRecent"]::item:first { padding-left: @homeRowPad@px; }
+QTreeView[role="homeRecent"]::item:last { padding-right: @homeRowPad@px; }
+/* not :default, which also names the button "... Enter" to screen readers */
+QPushButton[role="primary"] { background: @accent@; color: @onAccent@; border-color: @accent@; font-weight: 600; }
+QPushButton[role="primary"]:hover { background: @accentHover@; }
+QPushButton[role="primary"]:focus { border-color: @onAccent@; }
 )QSS";
 
     const Palette &p = palette();
@@ -870,6 +879,10 @@ QPushButton[role="popoverLink"]:focus { border: 2px solid @focusRing@; border-ra
         { "deckSepMargin", QString::number(px(Deck::SeparatorMargin)) },
         { "playRadius", QString::number(px(Size::PlayDeck) / 2) },
         { "speedPadX", QString::number(px(Deck::SpeedPadX)) },
+        /* Phase 4: home */
+        { "homeCellPad", QString::number(px(Home::ColumnGap) / 2) },
+        { "homeRowPad", QString::number(px(Home::RowPadX)) },
+        { "homeRowLine", css(ink(InkAlpha::RowLine)) },
     };
 
     QString out = QString::fromLatin1(qss);

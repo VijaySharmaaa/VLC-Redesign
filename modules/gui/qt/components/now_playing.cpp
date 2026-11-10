@@ -63,6 +63,7 @@ QString withKey( intf_thread_t *p_intf, const QString &label, const char *hotkey
     free( psz );
     return key.isEmpty() ? label : qtr( "%1 (%2)" ).arg( label, key );
 }
+}
 
 QString timeString( int64_t secs )
 {
@@ -92,6 +93,7 @@ QFont fontAt( Theme::TypeRole role, int tokenPx, bool semibold )
     return f;
 }
 
+namespace {
 /* Short codec names for the format chip; others show their fourcc */
 QString codecName( const QString &fourcc )
 {

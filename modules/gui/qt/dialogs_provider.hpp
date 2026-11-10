@@ -90,6 +90,8 @@ public:
                                 EXT_FILTER_PLAYLIST,
                                 const QUrl& path = QUrl() );
     bool isDying() { return b_isDying; }
+    /* for widgets made where no p_intf is passed down */
+    intf_thread_t *intf() const { return p_intf; }
     static QString getDirectoryDialog( intf_thread_t *p_intf);
     static QStringList getOpenURL(QWidget *parent = NULL,
                                   const QString &caption = QString(),

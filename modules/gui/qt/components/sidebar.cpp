@@ -22,6 +22,7 @@
 
 #include "qt.hpp"
 #include "components/sidebar.hpp"
+#include "components/library/home_page.hpp"
 #include "dialogs_provider.hpp"
 #include "util/theme.hpp"
 #include "util/redesign_icons.hpp"
@@ -193,7 +194,7 @@ Sidebar::Sidebar( QWidget *parent ) : QWidget( parent )
     for( int i = 0; i < PageCount; i++ )
     {
         const QString label = qtr( nav[i].label );
-        pages[i] = createPage( label );
+        pages[i] = i == Home ? new HomePage( THEDP->intf() ) : createPage( label );
         SidebarButton *b = new SidebarButton( label, nav[i].icon, false, this );
         b->setCheckable( true );
         b->setAutoExclusive( true ); /* screen readers: a radio button; the group rules */
