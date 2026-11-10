@@ -16,11 +16,20 @@
   </property>
   <layout class="QVBoxLayout">
    <item>
-    <widget class="QGroupBox" name="groupBox">
-     <property name="title">
-      <string>Network Protocol</string>
-     </property>
-     <layout class="QGridLayout">
+    <widget class="QWidget" name="groupBox">
+     <layout class="QGridLayout" name="netLayout">
+      <property name="leftMargin">
+       <number>0</number>
+      </property>
+      <property name="topMargin">
+       <number>0</number>
+      </property>
+      <property name="rightMargin">
+       <number>0</number>
+      </property>
+      <property name="bottomMargin">
+       <number>0</number>
+      </property>
       <item row="0" column="0">
        <widget class="QLabel" name="label_1">
         <property name="sizePolicy">
@@ -48,12 +57,6 @@ rtp://@:1234
 mms://mms.examples.com/stream.asx
 rtsp://server.example.org:8080/test.sdp
 http://www.yourtube.com/watch?v=gg64x</string>
-        </property>
-        <property name="margin">
-         <number>5</number>
-        </property>
-        <property name="indent">
-         <number>10</number>
         </property>
        </widget>
       </item>

@@ -58,6 +58,7 @@ enum
 
 class QWidget;
 class QLineEdit;
+class QListWidget;
 class QString;
 class QEvent;
 
@@ -156,6 +157,7 @@ public:
 private:
     Ui::OpenNetwork ui;
     bool b_recentList;
+    QListWidget *recentView; /* the combo's items, shown under the field */
 public slots:
     void updateMRL() Q_DECL_OVERRIDE;
 };
