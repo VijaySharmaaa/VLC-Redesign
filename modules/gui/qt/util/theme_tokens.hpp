@@ -129,6 +129,16 @@ namespace RedesignTokens
         static const int ImmersiveIdle = 2500, ImmersiveFade = 300;
         static const int SlideOffset = 28, RiseOffset = 8, DropOffset = 6, ToastOffset = 12;
     }
+
+    /* ---- Toast and drop target (DESIGN_SPEC 7; sizes from the prototype markup) ---- */
+    namespace Overlay
+    {
+        static const int ToastPadX = 16, ToastPadY = 10, ToastGap = 10, ToastIcon = 18;
+        static const int ToastMargin = 24;      /* above the bottom of the content area */
+        static const int ToastBorderAlpha = 26; /* ink 0.10 */
+        static const int DropInset = 8, DropBorder = 2, DropFillAlpha = 26; /* accent 0.10 */
+        static const int DropCardPadX = 36, DropCardPadY = 28, DropGap = 10, DropIcon = 40;
+    }
 }
 
 #endif

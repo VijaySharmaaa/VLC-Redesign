@@ -54,6 +54,7 @@ class QSize;
 class QScreen;
 class QTimer;
 class StandardPLPanel;
+class DropOverlay;
 struct vout_window_t;
 
 class MainInterface : public QVLCMW
@@ -150,6 +151,7 @@ protected:
 
     /* Widgets */
     QStackedWidget      *stackCentralW;
+    DropOverlay         *dropOverlay;
 
     VideoWidget         *videoWidget;
     BackgroundWidget    *bgWidget;
