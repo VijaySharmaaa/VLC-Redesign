@@ -183,12 +183,9 @@ OpenDialog::OpenDialog( QWidget *parent,
     const int glyph = t->px( RedesignTokens::Dialogs::TabTileGlyph );
     QHBoxLayout *tileRow = new QHBoxLayout;
     tileRow->setSpacing( t->px( RedesignTokens::Dialogs::TabTileGap ) );
-    static bool accessibleInstalled = false;
-    if( !accessibleInstalled )
-    {
-        QAccessible::installFactory( openButtonAccessible );
-        accessibleInstalled = true;
-    }
+    /* every time: Qt skips a factory it has, and forgets them all when the
+     * application object goes (the interface closed and opened again) */
+    QAccessible::installFactory( openButtonAccessible );
     tiles = new QButtonGroup( this );
     for( int i = 0; i < OPEN_TAB_MAX; i++ )
     {
@@ -261,6 +258,19 @@ OpenDialog::OpenDialog( QWidget *parent,
     /* Add the three Buttons */
     ui.buttonsBox->addButton( selectButton, QDialogButtonBox::AcceptRole );
     ui.buttonsBox->addButton( cancelButton, QDialogButtonBox::RejectRole );
+
+    /* Tab order: tiles, the open panel, the options, the buttons. The tiles
+     * and the box's buttons are made after the .ui and its panels, so they
+     * came last: Tab from the checked tile skipped the panel */
+    QWidget::setTabOrder( ui.advancedLineInput, selectButton );
+    QWidget::setTabOrder( selectButton, cancelButton );
+    QWidget::setTabOrder( cancelButton, playButton );
+    QWidget *prev = playButton;
+    foreach( QAbstractButton *tile, tiles->buttons() )
+    {
+        QWidget::setTabOrder( prev, tile );
+        prev = tile;
+    }
 
     /* At creation time, modify the default buttons */
     setMenuAction();

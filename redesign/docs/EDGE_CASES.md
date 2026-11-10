@@ -40,6 +40,13 @@ Check every changed area against the relevant rows before a phase is closed. Rec
 - [ ] A side panel (Effects sheet, docked playlist) that has once been the XS drawer, back at S or wider: it must paint again (open while resizing, or reopened after), not stay a blank native child.
 - [ ] Esc in video fullscreen with the Effects sheet open: closes the sheet first, then leaves fullscreen.
 - [ ] Ctrl+P (and other menu shortcuts) while only the mini player is shown: Preferences must stay reachable.
+- [ ] Player header in the normal layout: hides with the mouse cursor while a video plays and comes back on a mouse move, pause or stop, and Shift+Tab to its back button; it never stays over top-positioned subtitles.
+- [ ] Immersive layout turned off while its bar is up: the space kept for the bar (subtitle lift, audio page bottom) is given back at once.
+- [ ] Qt interface closed and opened again in one process (`-I skins2`, then the Qt interface): the accessibility overrides (now-playing seek, title bar, Open media tiles) still apply.
+- [ ] Open media: an Alt mnemonic shared by two tiles (Alt+D, Disc and Capture Device) focuses the unchecked tile without opening it; Tab from the checked tile goes into its panel.
+- [ ] The deck's expert row hidden by the window width while Advanced Controls is on: its controls stay reachable and come back when the window widens.
+- [ ] Help open while the theme switches: the text keeps its scroll position.
+- [ ] VLC's interface language differs from the Windows locale: numbers, times and dates follow one of them consistently, not a mix.
 
 ## Media & playback
 - [ ] Nothing loaded (idle): controls disabled sensibly, no division by zero in time/seek code.
@@ -51,6 +58,12 @@ Check every changed area against the relevant rows before a phase is closed. Rec
 - [ ] Audio-only, video-only, no art, huge art, transparent PNG art.
 - [ ] No audio tracks, no subtitle tracks, 20+ tracks (popover scrolls), tracks added mid-playback (an .srt dropped in).
 - [ ] A toast (e.g. "Loaded subtitle") must not cover the subtitle line it announces.
+- [ ] A toast showing while the immersive bar comes up or hides: it moves with the lifted subtitles.
+- [ ] Subtitle position hotkeys (`key-subpos-up` / `key-subpos-down`) while the subtitles are lifted over the immersive bar: the user's offset stays after the bar hides.
+- [ ] Two video outputs (clone filter, a second video track in its own window): only the one under the immersive bar has its subtitles lifted.
+- [ ] A video output reused by the next item: the subtitle lift doesn't add up (creep) from item to item.
+- [ ] Go to time while the media changes with the dialog open, and with media longer than 24 h.
+- [ ] Aspect badge for a video whose size only the decoder knows (no size from the demuxer).
 - [ ] Speed at the extremes (0.25×, 4×, and values typed via hotkeys that aren't presets).
 - [ ] Volume 0, 100, 125, and `qt-max-volume` set to 200/300 (tick and boost colour scale correctly); mute → unmute restores the level.
 - [ ] Buffering that never finishes; the network dropping mid-stream; an unreachable URL (error dialog, Retry works, Show log opens messages).
@@ -66,6 +79,7 @@ Check every changed area against the relevant rows before a phase is closed. Rec
 - [ ] Switching library pages (Home → Videos → Home) on an L-size window: the window width must not change (stack sizes remembered per page vs. the sidebar rail breakpoint).
 - [ ] A Continue-watching card resumes with `:start-time`; replaying the same playlist item later (Stop → Play, double-click in the playlist) must not jump back to that old position.
 - [ ] Recents config shared with stock VLC 3: stock rewrites `RecentsMRL/list`/`times` but not `lengths`/`dates`, so the parallel lists can shift against each other.
+- [ ] A failed open of a recent item must not overwrite its known length with 0.
 - [ ] Quit while a slow internet discovery (Icecast directory, podcasts) is still loading: VLC must exit within a few seconds; the list shows a loading state, not a blank page.
 - [ ] Quit while the Home page's existence check is blocked on an offline share: Qt waits for the global thread pool at exit.
 - [ ] First visit to the Network page loads every LAN discovery (UPnP, mDNS, SAP) at once, so the Windows Firewall prompt appears then and never at startup; Home/Videos/Music must not load them.
@@ -82,3 +96,4 @@ Check every changed area against the relevant rows before a phase is closed. Rec
 - [ ] Open media "Show more options" kept across a restart (`OpenDialog/advanced`), also when VLC quits with the dialog open or closed.
 - [ ] Open media at XS (800 × 600) with "Show more options": the dialog stays on screen and usable.
 - [ ] Accessible names on dialog fields: the Open media network URL, the Media information metadata fields.
+- [ ] Translated preferences: an option description whose first line is a lead-in ending in a colon, also the full-width colon (：) of CJK translations, is kept with the text that follows.

@@ -49,6 +49,7 @@ signals:
 
 protected:
     void paintEvent( QPaintEvent * ) Q_DECL_OVERRIDE;
+    bool eventFilter( QObject *, QEvent * ) Q_DECL_OVERRIDE;
 
 private:
     void place();

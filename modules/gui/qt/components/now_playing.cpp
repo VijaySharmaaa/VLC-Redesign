@@ -202,10 +202,9 @@ ThinSeekBar::ThinSeekBar( intf_thread_t *_p_i, QWidget *parent )
     : QSlider( Qt::Horizontal, parent ), p_intf( _p_i )
 {
     enum { RANGE = 1000 };
-    static bool factory = false;
-    if( !factory )
-        QAccessible::installFactory( thinSeekFactory );
-    factory = true;
+    /* every time: Qt skips a factory it has, and forgets them all when the
+     * application object goes (the interface closed and opened again) */
+    QAccessible::installFactory( thinSeekFactory );
     /* the time runs left to right in every language, as on the deck */
     RTL_UNAFFECTED_WIDGET
     setRange( 0, RANGE );

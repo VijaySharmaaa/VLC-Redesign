@@ -140,7 +140,8 @@ private:
  * the title and the meta line on a scrim that fades into the picture. The
  * strip lets the mouse through to the video; the back button takes it in a
  * small window of its own, reached with Shift+Tab from the player. In the
- * immersive layout it sleeps and wakes with the deck. */
+ * immersive layout it sleeps and wakes with the deck, in the normal one with
+ * the mouse cursor while a video plays. */
 class PlayerHeader : public OverlayWindow
 {
 public:
@@ -150,6 +151,7 @@ public:
     QAbstractButton *backButton() const { return back; }
     void setActive( bool );    /* the video page, neither full screen nor minimal */
     void setAsleep( bool );    /* the immersive deck's idle hide */
+    void setCursorHidden( bool );  /* the normal layout's: VLC hid the cursor */
     bool hovered() const;      /* the mouse on its back button */
 
 protected:
@@ -159,6 +161,7 @@ protected:
 private:
     void refresh();
     void place();
+    void followCursor();
     void setOpacity( qreal );
     void raiseDrawers();
     QFont titleFont() const;
@@ -173,7 +176,7 @@ private:
     QAbstractButton *back;
     QVariantAnimation *fade;
     QString meta;
-    bool active, asleep;
+    bool active, asleep, cursorHidden;
 };
 
 #endif
