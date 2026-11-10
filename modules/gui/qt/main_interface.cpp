@@ -1561,7 +1561,8 @@ void MainInterface::setMinimalView( bool b_minimal )
 #endif
     bool b_inputCVisible = inputC->isVisible();
     const bool b_barVisible = nowPlayingBar->isVisible();
-    /* the sidebar goes too: its width, and the stack's for the way back */
+    /* the sidebar goes too (setDeckVisible): its width, and the stack's
+     * for the way back */
     const bool b_sidebarShown = !sidebar->isHidden();
     const int i_stackWidth = stackCentralW->width();
     const int i_otherWidth = width() - i_stackWidth - ( b_sidebarShown ? sidebar->width() : 0 );
@@ -1597,7 +1598,6 @@ void MainInterface::setMinimalView( bool b_minimal )
             resizeWindow( width() - i_widthChange, height() - i_heightChange );
     }
 
-    sidebar->setVisible( !b_minimal );
     if( b_plDocked )   /* back from full screen; minimal view keeps it */
         showPlaylistPanel( playlistVisible );
     setDeckVisible( !b_minimal );
@@ -1620,7 +1620,9 @@ void MainInterface::setMinimalView( bool b_minimal )
         if( !b_barVisible && nowPlayingBar->isVisible() )
             i_heightChange += nowPlayingBar->height();
 
-        const int i_width = b_sidebarShown ? width()
+        /* the player pages have no sidebar to bring back */
+        const bool withSidebar = !onPlayerPage();
+        const int i_width = b_sidebarShown || !withSidebar ? width()
                           : windowWidthFor( i_stackWidth, i_otherWidth, true );
         if( i_heightChange != 0 || i_width != width() )
             resizeWindow( i_width, height() + i_heightChange );
@@ -1636,6 +1638,10 @@ void MainInterface::setDeckVisible( bool visible )
     /* a library page has the now-playing bar once something played, and
      * no deck before (inventory 1.1.1): the hotkeys work without it */
     const bool library = isLibraryPage( stackCentralW->currentWidget() );
+    /* the player pages take the sidebar's width (renders 1.2.x): hidden
+     * before the stack resizes (showTab runs this from currentChanged),
+     * so the window keeps its width */
+    sidebar->setVisible( visible && !onPlayerPage() );
     nowPlayingBar->setVisible( visible && library && b_nowPlayingSeen );
     /* in the immersive layout the deck floats over the video instead */
     controls->setVisible( visible && !library && !deckFloats() );
