@@ -596,7 +596,10 @@ QToolButton::menu-arrow:disabled { image: url("@arrowDownDim@"); }
 QLineEdit, QAbstractSpinBox, QComboBox, QTextEdit, QPlainTextEdit {
     background: @surface@; color: @tx@; border: 1px solid @outline@; border-radius: @radiusMd@px;
     selection-background-color: @accent@; selection-color: @onAccent@; }
-QLineEdit, QAbstractSpinBox, QComboBox { padding: 1px @menuPad@px; }
+QLineEdit, QAbstractSpinBox { padding: 1px @menuPad@px; }
+/* a combo's vertical padding becomes its pop-up's PM_MenuVMargin, which Qt 5.6
+   leaves out of the pop-up height (one row short, with a scroller): use margin */
+QComboBox { margin: 1px 0; padding: 0 @menuPad@px; }
 QLineEdit:hover, QAbstractSpinBox:hover, QComboBox:hover { border-color: @toggleOff@; }
 QLineEdit:disabled, QAbstractSpinBox:disabled, QComboBox:disabled { background: @panel@; color: @dim@; border-color: @divider@; }
 QComboBox::drop-down, QAbstractSpinBox::up-button, QAbstractSpinBox::down-button { border: none; background: transparent; width: @iconGlyph@px; }
@@ -609,6 +612,7 @@ QAbstractSpinBox::up-arrow:disabled, QAbstractSpinBox::up-arrow:off { image: url
 QComboBox QAbstractItemView { background: @raised@; border: @popupBorder@; selection-background-color: @hoverFill@; selection-color: @tx@; outline: 0; }
 
 QLineEdit:focus, QAbstractSpinBox:focus, QComboBox:focus { border: 2px solid @accent@; padding: 0px @menuPadFocus@px; }
+QComboBox:focus { margin: 0; }
 QTextEdit:focus, QPlainTextEdit:focus, QPushButton:focus { border: 2px solid @accent@; }
 QToolButton:focus { border-color: @accent@; }
 QPushButton:focus { padding: @menuPadFocus@px @buttonPadXFocus@px; }
