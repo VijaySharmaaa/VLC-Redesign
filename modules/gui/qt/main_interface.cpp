@@ -114,10 +114,22 @@ const QEvent::Type MainInterface::ToolbarsNeedRebuild =
 
 namespace
 {
-    /* Space is the player's (play/pause) in its windows, never a focused
-     * button's; buttons there click on Enter instead. One filter for the
-     * deck, its immersive and FSC copies, the now-playing bar, audio mode,
-     * the sidebar and the mini player. Dialogs and pop-ups keep Space. */
+    /* A button of the player controls: the deck and its immersive and FSC
+     * copies, the now-playing bar, the mini player */
+    bool inPlayerControls( const QWidget *w )
+    {
+        for( ; w; w = w->parentWidget() )
+            if( qobject_cast<const AbstractController *>( w )
+             || qobject_cast<const NowPlayingBar *>( w )
+             || qobject_cast<const MiniPlayer *>( w ) )
+                return true;
+        return false;
+    }
+
+    /* Buttons in the player's windows click on Enter too. Space on one of
+     * the player controls is the player's (play/pause), as if nothing had
+     * focus; anywhere else (sidebar, pages, sheets) it presses the focused
+     * button, as Windows does. Dialogs and pop-ups keep their own keys. */
     class ButtonKeys : public QObject
     {
     public:
@@ -138,7 +150,7 @@ namespace
             QKeyEvent *ke = static_cast<QKeyEvent *>( e );
             if( ke->modifiers() & ~Qt::KeypadModifier )
                 return false;
-            if( ke->key() == Qt::Key_Space )
+            if( ke->key() == Qt::Key_Space && inPlayerControls( button ) )
             {
                 e->ignore();    /* on to the window, whose hotkeys get it */
                 return true;
