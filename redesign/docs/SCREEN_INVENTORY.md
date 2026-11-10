@@ -100,10 +100,21 @@ Every frame on the design's flow boards. Each row is an **acceptance target**: w
 |---|---|---|---|
 
 ### 2.4 Menu bar — every menu
-`view=player;menu=<Name>` for Media, Playback, Audio, Video, Subtitle, Tools, View, Help. Item lists and shortcuts are in the prototype's `M` object — keep them identical to VLC's existing menus (see `modules/gui/qt/menus.cpp`).
+`view=player;menu=<Name>` for Media, Playback, Audio, Video, Subtitle, Tools, View, Help. Item lists and shortcuts are in the prototype's `M` object — keep them identical to VLC's existing menus (see `modules/gui/qt/menus/menus.cpp`).
 
 ### 2.5 Preferences (Ctrl+P)
 `view=settings;sec=<Section>` for Interface, Audio, Video, Subtitles / OSD, Input / Codecs, Hotkeys, Advanced. Rows per section are in the prototype's `SETTINGS` object. Simple prefs by default; Advanced → "Show all settings" reveals the full module tree (existing expert prefs).
+
+**Layout (updated 2026-11-10): one sidebar.** The app sidebar swaps to the Preferences navigation; there is no second section column. See DESIGN_SPEC §8.
+
+| ID | State | scene | Notes |
+|---|---|---|---|
+| 2.5.P1 | Prefs from library | `view=library` → Ctrl+P | Sidebar shows "Back to library", Preferences title, 7 sections; library nav, Open media and Folders are hidden. |
+| 2.5.P2 | Prefs from player | `view=player` → Tools › Preferences | Back row says "Back to player"; Back or Esc returns to the player at the same state. |
+| 2.5.P3 | Active section | `view=settings;sec=Audio` | Accent tint, accent text and a 3 px left accent bar; accessible "current" state. |
+| 2.5.P4 | Esc priority | prefs with a select dropdown open → Esc | The first Esc closes the dropdown only; the second returns to the previous view. |
+| 2.5.P5 | Icon rail | prefs at 1024 × 700 and 800 × 600 | Back arrow and section icons only, with tooltips; content title still shows the section name. |
+| 2.5.P6 | Light theme | prefs, light theme | Same structure with light tokens. |
 
 ### 2.6 System feedback
 | 2.6.1 | Snapshot saved toast | `view=player;playlistOpen=0;toast=Snapshot saved to Pictures\vlcsnap-….png` | Rises in, auto-dismiss 2.4 s. |

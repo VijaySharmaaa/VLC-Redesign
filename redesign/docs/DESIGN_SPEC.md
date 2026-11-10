@@ -89,7 +89,13 @@ Header: "Playlist" + count · add (+) · close. 32 px filter field. Rows 40 px: 
 
 ## 8. Preferences (in-window view, Ctrl+P)
 
-Left section list (Interface, Audio, Video, Subtitles / OSD, Input / Codecs, Hotkeys, Advanced; 34 px items). Right: card of rows (min 60 px): label 13/500 + description 12 muted on the left; control on the right (toggle 40×20, select 32 px, keycap, or outline button). Advanced → "Show all settings" opens the existing complete/expert prefs tree. Exact rows: prototype `SETTINGS` object.
+**One sidebar only.** When Preferences opens, the app sidebar swaps its contents instead of a second column appearing next to it:
+- Top: a back row (arrow_back + "Back to library" / "Back to player", 32 px) that returns to the view Preferences was opened from. **Esc** does the same when no menu, popover or dialog is open.
+- A "Preferences" title (22/600), then the sections (Interface, Audio, Video, Subtitles / OSD, Input / Codecs, Hotkeys, Advanced) as 36 px items with 20 px icons. The active item has the accent tint, `--accTx` text and a 3 px accent bar on its left edge (`aria-current="page"`).
+- Open media, the library nav, Folders and the Preferences entry are hidden while you're in Preferences.
+- Below 1200 px the sidebar is the icon rail as usual: back arrow plus section icons with tooltips.
+
+Content: section title as the page title (26/600) with "Changes apply immediately" on the right, then a card of rows (min 60 px): label 13/500 + description 12 muted on the left, control on the right (toggle 40×20, select 32 px, keycap, or outline button). Advanced → "Show all settings" opens the existing complete/expert prefs tree. Exact rows: prototype `SETTINGS` object.
 
 ## 9. Mini player
 

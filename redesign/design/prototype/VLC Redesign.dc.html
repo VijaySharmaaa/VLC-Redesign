@@ -55,6 +55,21 @@
   <div style="flex:1;min-height:0;display:flex">
     <sc-if value="{{ showSidebar }}" hint-placeholder-val="{{ false }}">
       <div style="width:{{ sbW }};flex:none;display:flex;flex-direction:column;gap:4px;padding:14px 10px;background:var(--chrome);border-right:1px solid rgba(var(--ink),0.06)">
+        <sc-if value="{{ isSettings }}" hint-placeholder-val="{{ false }}">
+          <nav aria-label="Preferences sections" style="display:flex;flex-direction:column;gap:2px">
+            <button type="button" onClick="{{ goBack }}" title="{{ backLabel }} (Esc)" aria-label="{{ backLabel }}" style="appearance:none;border:0;background:transparent;font:inherit;text-align:left;white-space:nowrap;height:32px;display:flex;align-items:center;gap:10px;padding:0 12px;border-radius:6px;font-size:13px;color:var(--tx2);cursor:pointer;margin-bottom:6px" style-hover="background:rgba(var(--ink),0.06);color:var(--tx)">
+              <span aria-hidden="true" style="display:inline-flex;align-items:center;justify-content:center;width:1em;height:1em;flex:none;overflow:hidden;font:20px/1 'Material Symbols Rounded'">arrow_back</span><span style="display:{{ labelDisp }}">{{ backLabel }}</span>
+            </button>
+            <div style="display:{{ labelDisp }};font-size:22px;font-weight:600;padding:4px 12px 14px;letter-spacing:-0.01em">Preferences</div>
+            <sc-for list="{{ secs }}" as="s" hint-placeholder-count="7">
+              <button type="button" onClick="{{ s.onClick }}" title="{{ s.label }}" aria-label="{{ s.label }}" aria-current="{{ s.current }}" style="appearance:none;border:0;font:inherit;text-align:left;white-space:nowrap;height:36px;display:flex;align-items:center;gap:12px;padding:0 12px;border-radius:6px;font-size:13px;background:{{ s.bg }};color:{{ s.color }};cursor:pointer;position:relative" style-hover="background:rgba(var(--ink),0.06)">
+                <span aria-hidden="true" style="position:absolute;left:0;top:9px;bottom:9px;width:3px;border-radius:2px;background:#ff8a1f;opacity:{{ s.barOp }}"></span>
+                <span aria-hidden="true" style="display:inline-flex;align-items:center;justify-content:center;width:1em;height:1em;flex:none;overflow:hidden;font:20px/1 'Material Symbols Rounded'">{{ s.icon }}</span><span style="display:{{ labelDisp }}">{{ s.label }}</span>
+              </button>
+            </sc-for>
+          </nav>
+        </sc-if>
+        <sc-if value="{{ sbMain }}" hint-placeholder-val="{{ true }}">
         <div onClick="{{ openDialog }}" title="Open media (Ctrl+O)" style="white-space:nowrap;height:38px;display:flex;align-items:center;justify-content:center;gap:8px;border-radius:7px;background:#ff8a1f;color:#1c1206;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:10px" style-hover="background:#ff9a3c">
           <span style="display:inline-flex;align-items:center;justify-content:center;width:1em;height:1em;flex:none;overflow:hidden;font:20px/1 'Material Symbols Rounded'">add</span><span style="display:{{ labelDisp }}">Open media</span>
         </div>
@@ -73,6 +88,7 @@
         <div onClick="{{ goSettings }}" style="white-space:nowrap;height:36px;display:flex;align-items:center;gap:12px;padding:0 12px;border-radius:6px;font-size:13px;background:{{ prefsBg }};color:{{ prefsColor }};cursor:pointer" style-hover="background:rgba(var(--ink),0.06)">
           <span style="display:inline-flex;align-items:center;justify-content:center;width:1em;height:1em;flex:none;overflow:hidden;font:20px/1 'Material Symbols Rounded'">settings</span><span style="display:{{ labelDisp }}">Preferences</span>
         </div>
+        </sc-if>
       </div>
     </sc-if>
 
@@ -194,18 +210,10 @@
 
       <sc-if value="{{ isSettings }}" hint-placeholder-val="{{ false }}">
         <div data-screen-label="Preferences" style="animation:vlcView .24s cubic-bezier(0.2,0.8,0.2,1);flex:1;min-height:0;display:flex">
-          <div style="width:{{ secW }};flex:none;padding:28px 10px;display:flex;flex-direction:column;gap:2px;border-right:1px solid rgba(var(--ink),0.06)">
-            <div style="display:{{ labelDisp }};font-size:26px;font-weight:600;padding:0 12px 18px">Preferences</div>
-            <sc-for list="{{ secs }}" as="s" hint-placeholder-count="7">
-              <div onClick="{{ s.onClick }}" title="{{ s.label }}" style="white-space:nowrap;height:34px;display:flex;align-items:center;gap:10px;padding:0 12px;border-radius:6px;font-size:13px;background:{{ s.bg }};color:{{ s.color }};cursor:pointer" style-hover="background:rgba(var(--ink),0.06)">
-                <span style="display:inline-flex;align-items:center;justify-content:center;width:1em;height:1em;flex:none;overflow:hidden;font:18px/1 'Material Symbols Rounded'">{{ s.icon }}</span><span style="display:{{ labelDisp }}">{{ s.label }}</span>
-              </div>
-            </sc-for>
-          </div>
           <div style="flex:1;overflow:auto;scrollbar-width:thin;scrollbar-color:rgba(var(--ink),0.22) transparent;padding:28px 32px">
             <div style="max-width:720px">
-              <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:16px;padding-top:8px">
-                <div style="font-size:18px;font-weight:600">{{ secTitle }}</div>
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin-bottom:18px">
+                <h1 style="margin:0;font-size:26px;font-weight:600;letter-spacing:-0.01em;line-height:1.2">{{ secTitle }}</h1>
                 <div style="font-size:12px;color:var(--dim)">Changes apply immediately</div>
               </div>
               <div style="border-radius:8px;background:var(--surface);border:1px solid rgba(var(--ink),0.06)">
@@ -866,7 +874,7 @@ class Component extends DCLogic {
       else if (e.key === 'ArrowRight') this.jump(e.shiftKey ? 10 : 3);
       else if (e.key === 'ArrowLeft') this.jump(e.shiftKey ? -10 : -3);
       else if (e.key === 'm') this.setState(s => ({ muted: !s.muted }));
-      else if (e.key === 'Escape') this.setState({ menu: null, pop: null, dlg: false });
+      else if (e.key === 'Escape') { const s = this.state; if (s.view === 'settings' && !s.menu && !s.pop && !s.dlg && !s.modal) this.go(s.prevView && s.prevView !== 'settings' ? s.prevView : 'library'); else this.setState({ menu: null, pop: null, dlg: false }); }
     };
     window.addEventListener('keydown', this.onKey);
   }
@@ -890,7 +898,7 @@ class Component extends DCLogic {
   }
   jump(d) { this.setState(s => { const L = this.list(s); const dur = L[s[this.idxKey(s)]].dur; return { t: { ...s.t, [s.mode]: Math.min(dur - 1, Math.max(0, s.t[s.mode] + d)) } }; }); }
   step(d) { this.setState(s => { const L = this.list(s), k = this.idxKey(s); return { [k]: (s[k] + d + L.length) % L.length, t: { ...s.t, [s.mode]: 0 }, playing: true }; }); }
-  go(view) { const p = { view, menu: null, pop: null, mini: false }; if (view === 'player') p.mode = 'video'; if (view === 'audio') p.mode = 'music'; this.setState(p); }
+  go(view) { const p = { view, menu: null, pop: null, mini: false }; if (view === 'settings' && this.state.view !== 'settings') p.prevView = this.state.view; if (view === 'player') p.mode = 'video'; if (view === 'audio') p.mode = 'music'; this.setState(p); }
   play(mode, i) { this.setState(s => ({ mode, [mode === 'video' ? 'vIdx' : 'mIdx']: i, t: { ...s.t, [mode]: 0 }, playing: true, view: mode === 'video' ? 'player' : 'audio' })); }
   flash(msg) { clearTimeout(this.tt); this.setState({ toast: msg, menu: null, pop: null }); this.tt = setTimeout(() => this.setState({ toast: null }), 2400); }
   startStream() {
@@ -976,7 +984,7 @@ class Component extends DCLogic {
       { title: 'Streams', items: [['podcasts', 'Open network stream', 'http, rtsp, hls, dash…'], ['radio', 'Icecast directory', 'Internet radio · 2,400 stations'], ['rss_feed', 'Podcasts', '3 subscriptions']] },
     ].map(g => ({ title: g.title, items: g.items.map(([icon, name, sub]) => ({ icon, name, sub, onClick: name === 'Open network stream' ? openNet : () => this.flash('Browsing ' + name + '…') })) }));
 
-    const secs = Object.keys(SETTINGS).map(k => ({ label: k, icon: SETTINGS[k].icon, bg: s.sec === k ? ACTIVE_BG : 'transparent', color: s.sec === k ? 'var(--accTx)' : 'var(--tx2)', onClick: () => this.setState({ sec: k }) }));
+    const secs = Object.keys(SETTINGS).map(k => ({ label: k, icon: SETTINGS[k].icon, bg: s.sec === k ? ACTIVE_BG : 'transparent', color: s.sec === k ? 'var(--accTx)' : 'var(--tx2)', current: s.sec === k ? 'page' : 'false', barOp: s.sec === k ? 1 : 0, onClick: () => this.setState({ sec: k }) }));
     const rows = SETTINGS[s.sec].rows.map(([id, label, desc, type, def], i) => {
       const on = s.tg[id] ?? def;
       return {
@@ -1042,7 +1050,9 @@ class Component extends DCLogic {
       windowTitle: bp === 'XS' ? '' : item.title + ' — VLC media player',
       showSidebar: s.view === 'library' || s.view === 'settings', isLibrary: s.view === 'library', isSettings: s.view === 'settings', isPlayer: s.view === 'player', isAudio: s.view === 'audio',
       showDeck: s.view === 'player' || s.view === 'audio', showNowBar: (s.view === 'library' || s.view === 'settings') && !s.empty,
-      goLibrary: () => this.go('library'), goSettings: () => this.go('settings'), expand: () => this.go(isVideo ? 'player' : 'audio'),
+      goLibrary: () => this.go('library'), goSettings: () => this.go('settings'),
+      sbMain: s.view !== 'settings', goBack: () => this.go(s.prevView && s.prevView !== 'settings' ? s.prevView : 'library'),
+      backLabel: ({ player: 'Back to player', audio: 'Back to player', library: 'Back to library' })[s.prevView] || 'Back to library', expand: () => this.go(isVideo ? 'player' : 'audio'),
       prefsBg: s.view === 'settings' ? ACTIVE_BG : 'transparent', prefsColor: s.view === 'settings' ? 'var(--accTx)' : 'var(--tx2)',
       navItems, folders: ['Videos', 'Downloads', 'D:\\Movies'], navTitle: s.nav,
       isHome: s.nav === 'Home' && !s.empty, isVideos: s.nav === 'Videos', isMusic: s.nav === 'Music', isNetwork: s.nav === 'Network',
