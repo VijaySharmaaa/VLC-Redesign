@@ -23,7 +23,7 @@ import re
 import win32con
 import win32gui
 import win32process
-from pywinauto import Application
+from pywinauto import Application, keyboard
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 MEDIA = os.path.join(HERE, '..', '.local', 'media')
@@ -125,12 +125,21 @@ class Vlc:
     def keys(self, k):
         # Never type into another app: keys go to whatever window is in front.
         # Focus returns asynchronously after a dialog closes, so ask until VLC has it.
-        def ours():
-            self.main.set_focus()
+        def front():
             fg = win32gui.GetForegroundWindow()
             return fg and win32process.GetWindowThreadProcessId(fg)[1] == self.proc.pid
+        def ours():
+            self.main.set_focus()
+            return front()
         self.wait_for(ours, 'VLC to become the foreground window before sending ' + k, timeout=5)
-        self.main.type_keys(k)
+        # The user may click another app at any moment: check again right before every key.
+        for action in keyboard.parse_keys(k):
+            if not front():
+                # Don't leave a modifier held down in the user's app.
+                for vk in (win32con.VK_SHIFT, win32con.VK_CONTROL, win32con.VK_MENU):
+                    keyboard.VirtualKeyAction(vk, down=False).run()
+                raise RuntimeError('VLC lost the foreground; not sending the rest of ' + k)
+            action.run()
 
     def wait_for(self, cond, what, timeout=8):
         deadline = time.time() + timeout
