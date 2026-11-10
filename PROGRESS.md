@@ -44,3 +44,13 @@ Each spike is a throwaway branch. Full reports and evidence are in `D:\Projects\
 - **Root cause:** setting `APPDATA` doesn't redirect VLC's config dir on Windows (`SHGetFolderPath`, `src/win32/dirs.c:282`), so test runs wrote the developer's real `vlc-qt-interface.ini`.
 - **Fix:** the harness now uses VLC's portable mode (`dirs.c:260-275`) with a fresh `portable\` folder per session, and refuses any vlc.exe outside the project.
 - **Verified:** a full baseline left the real `%APPDATA%\vlc` byte-for-byte unchanged.
+
+## Phase 1: review fixes (2026-11-10)
+Evidence and scripts: `D:\Projects\VLC\spike-results\p1-fix\` (not committed).
+
+### Manual test steps
+- Simple Preferences > Interface: open the Language, Theme and "Force window style" combos with the mouse in light and dark. Each list opens next to the combo, at item height, with every item visible and no scroller (the Language list is long and scrolls).
+- Start with `MainWindow/QtStyle=NoSuchStyle` or `=System's default` in `vlc-qt-interface.ini`: the main window keeps the themed look. Save Simple Preferences: the key becomes `QtStyle=`.
+- Open Media, Tab to "Show more options": an accent ring (>= 3:1) surrounds the label. The Play split button shows a themed arrow, not a black block.
+- Windows high contrast (cannot be automated here): start VLC with a high-contrast theme on. The time tooltip, seek and volume sliders and round buttons use the system colours (text, window, highlight), not orange or grey tokens.
+- Plugins and extensions with add-ons installed: rows of different types show different corner tints in both themes; all category labels and "Find more addons online" are fully visible.
