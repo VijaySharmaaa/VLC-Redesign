@@ -20,6 +20,7 @@
 
 #include "qt.hpp"
 #include "info_widgets.hpp"
+#include "util/theme.hpp"
 
 #include <QLabel>
 #include <QGraphicsView>
@@ -38,9 +39,11 @@ layout->addWidget( label, row, 0, 1, 1, 0 );
 
 VLCStatsView::VLCStatsView( QWidget *parent ) : QGraphicsView( parent )
 {
-    QColor history(0, 0, 0, 255),
-        total(237, 109, 0, 160),
-        content(109, 237, 0, 160);
+    /* "Last 60 seconds" in the accent, "Overall" in the text colour; shortcut:
+     * read once, a theme change shows after a restart, upgrade with the dialog redesign */
+    const Theme *theme = Theme::instance();
+    QColor history = theme->color( Theme::Text ),
+        total = theme->color( Theme::AccentBorder50 );
 
     scale( 1.0, -1.0 ); /* invert our Y axis */
     setOptimizationFlags( QGraphicsView::DontAdjustForAntialiasing );
@@ -57,7 +60,7 @@ VLCStatsView::VLCStatsView( QWidget *parent ) : QGraphicsView( parent )
 
     QPen linepen( Qt::DotLine );
     linepen.setCosmetic( true );
-    linepen.setBrush( QBrush( QColor( 33, 33, 33 ) ) );
+    linepen.setBrush( QBrush( theme->ink( RedesignTokens::InkAlpha::ToggleOff ) ) );
     for ( int i=0; i<3; i++ )
         rulers[i] = viewScene->addLine( QLineF(), linepen );
 }

@@ -25,6 +25,7 @@
 #include "components/playlist/vlc_model.hpp"      /* VLCModel */
 #include "components/playlist/sorting.h"          /* Columns List */
 #include "input_manager.hpp"                      /* THEMIM */
+#include "util/theme.hpp"
 
 #include <QPainter>
 #include <QPainterPath>
@@ -62,8 +63,8 @@ void AbstractPlViewItemDelegate::paintBackground(
     }
     else if( index.data( VLCModel::CURRENT_ITEM_ROLE ).toBool() )
     {
-        painter->setBrush( QBrush( Qt::lightGray ) );
-        painter->setPen( QColor( Qt::darkGray ) );
+        painter->setBrush( Theme::instance()->color( Theme::AccentTint14 ) );
+        painter->setPen( Theme::instance()->color( Theme::AccentBorder50 ) );
         painter->drawRect( r );
     }
     if( option.state & QStyle::State_MouseOver )
@@ -104,7 +105,7 @@ void PlIconViewItemDelegate::paint( QPainter * painter, const QStyleOptionViewIt
     // Draw the drop shadow
     painter->save();
     painter->setOpacity( 0.7 );
-    painter->setBrush( QBrush( Qt::darkGray ) );
+    painter->setBrush( Theme::instance()->color( Theme::PausedBadgeBg ) ); /* black shadow, both themes */
     painter->setPen( Qt::NoPen );
     painter->drawRoundedRect( artRect.adjusted( 0, 0, 2, 2 ), ART_RADIUS, ART_RADIUS );
     painter->restore();

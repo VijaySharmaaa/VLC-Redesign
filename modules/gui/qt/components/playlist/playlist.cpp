@@ -33,6 +33,7 @@
 #include "components/interface_widgets.hpp"       /* CoverArtLabel */
 
 #include "util/searchlineedit.hpp"
+#include "util/theme.hpp"
 
 #include "input_manager.hpp"                      /* art signal */
 #include "main_interface.hpp"                     /* DropEvent TODO remove this*/
@@ -376,11 +377,11 @@ void LocationButton::paintEvent ( QPaintEvent * )
     {
         p.save();
         p.setRenderHint( QPainter::Antialiasing, true );
-        QColor c = palette().color( QPalette::Highlight );
-        p.setPen( c );
-        p.setBrush( c.lighter( 150 ) );
-        p.setOpacity( 0.2 );
-        p.drawRoundedRect( option.rect.adjusted( 0, 2, 0, -2 ), 5, 5 );
+        const Theme *theme = Theme::instance();
+        p.setPen( Qt::NoPen );
+        p.setBrush( theme->ink( RedesignTokens::InkAlpha::HoverFill ) );
+        p.drawRoundedRect( option.rect.adjusted( 0, 2, 0, -2 ),
+                           theme->metric( Theme::RadiusSm ), theme->metric( Theme::RadiusSm ) );
         p.restore();
     }
 

@@ -30,6 +30,7 @@
 #include "components/playlist/selector.hpp"
 #include "playlist_model.hpp"                /* plMimeData */
 #include "input_manager.hpp"                 /* MainInputManager, for podcast */
+#include "util/theme.hpp"
 
 #include <QApplication>
 #include <QInputDialog>
@@ -50,11 +51,10 @@
 void SelectorActionButton::paintEvent( QPaintEvent *event )
 {
     QPainter p( this );
-    QColor color = palette().color( QPalette::HighlightedText );
-    color.setAlpha( 80 );
+    const Theme *theme = Theme::instance();
     if( underMouse() )
-        p.fillRect( rect(), color );
-    p.setPen( color );
+        p.fillRect( rect(), theme->ink( RedesignTokens::InkAlpha::HoverFill ) );
+    p.setPen( theme->ink( RedesignTokens::InkAlpha::Divider ) );
     int frame = style()->pixelMetric( QStyle::PM_DefaultFrameWidth, 0, this );
     p.drawLine( rect().topLeft() + QPoint( 0, frame ),
                 rect().bottomLeft() - QPoint( 0, frame ) );
@@ -427,16 +427,9 @@ PLSelItem * PLSelector::addItem (
 
 
   if ( bold ) {
-      auto updateStyle = [selItem]() {
-          selItem->setStyleSheet( "font-weight: bold;" );
-      };
-      updateStyle();
-//same as Qt::AA_UseStyleSheetPropagationInWidgetStyles
-#if !HAS_QT57
-      connect(qApp, &QApplication::paletteChanged, selItem, [updateStyle](){
-          updateStyle();
-      });
-#endif
+      QFont font = selItem->font();
+      font.setBold( true );
+      selItem->setFont( font );
   }
   setItemWidget( item, 0, selItem );
   item->setData( 0, TYPE_ROLE, (int)type );

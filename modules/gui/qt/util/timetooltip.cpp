@@ -20,6 +20,7 @@
  *****************************************************************************/
 
 #include "timetooltip.hpp"
+#include "util/theme.hpp"
 
 #include <QApplication>
 #include <QPainter>
@@ -155,11 +156,13 @@ void TimeTooltip::paintEvent( QPaintEvent * )
     QPainter p( this );
     p.setRenderHints( QPainter::TextAntialiasing );
 
-    p.setPen( Qt::black );
-    p.setBrush( qApp->palette().base() );
+    /* same colours as QToolTip in the theme's stylesheet */
+    const Theme *theme = Theme::instance();
+    p.setPen( theme->ink( RedesignTokens::InkAlpha::Border ) );
+    p.setBrush( theme->color( Theme::Raised ) );
     p.drawPath( mPainterPath );
 
     p.setFont( mFont );
-    p.setPen( QPen( qApp->palette().text(), 1 ) );
+    p.setPen( QPen( theme->color( Theme::Text ), 1 ) );
     p.drawText( mBox, Qt::AlignCenter, mDisplayedText );
 }

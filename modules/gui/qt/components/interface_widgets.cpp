@@ -34,6 +34,7 @@
 #include "util/customwidgets.hpp"               // qtEventToVLCKey, QVLCStackedWidget
 
 #include "menus.hpp"             /* Popup menu on bgWidget */
+#include "util/theme.hpp"
 
 #include <QDate>
 #include <QLabel>
@@ -126,7 +127,7 @@ bool VideoWidget::request( struct vout_window_t *p_wnd )
     stable = new QWidget();
     stable->setContextMenuPolicy( Qt::PreventContextMenu );
     QPalette plt = palette();
-    plt.setColor( QPalette::Window, Qt::black );
+    plt.setColor( QPalette::Window, Theme::instance()->color( Theme::VideoSurface ) );
     stable->setPalette( plt );
     stable->setAutoFillBackground(true);
     /* Force the widget to be native so that it gets a winId() */
@@ -408,11 +409,12 @@ void VideoWidget::release( bool forced )
 BackgroundWidget::BackgroundWidget( intf_thread_t *_p_i )
     :QWidget( NULL ), p_intf( _p_i ), b_expandPixmap( false ), b_withart( true )
 {
-    /* A dark background */
+    /* The video surface: black in both themes */
     setAutoFillBackground( true );
     QPalette plt = palette();
-    plt.setColor( QPalette::Active, QPalette::Window , Qt::black );
-    plt.setColor( QPalette::Inactive, QPalette::Window , Qt::black );
+    const QColor surface = Theme::instance()->color( Theme::VideoSurface );
+    plt.setColor( QPalette::Active, QPalette::Window, surface );
+    plt.setColor( QPalette::Inactive, QPalette::Window, surface );
     setPalette( plt );
 
     /* Init the cone art */
