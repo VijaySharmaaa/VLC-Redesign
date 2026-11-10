@@ -138,6 +138,7 @@ libqt_plugin_la_SOURCES = \
 	gui/qt/util/qt_dirs.cpp gui/qt/util/qt_dirs.hpp \
 	gui/qt/util/pictureflow.cpp gui/qt/util/pictureflow.hpp \
 	gui/qt/util/validators.cpp gui/qt/util/validators.hpp \
+	gui/qt/util/redesign_icons.hpp \
 	gui/qt/util/buttons/BrowseButton.cpp \
 	gui/qt/util/buttons/BrowseButton.hpp \
 	gui/qt/util/buttons/DeckButtonsLayout.cpp \
