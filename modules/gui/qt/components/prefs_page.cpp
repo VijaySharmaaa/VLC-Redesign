@@ -23,7 +23,6 @@
 #include "qt.hpp"
 #include "components/prefs_page.hpp"
 #include "dialogs/preferences.hpp"
-#include "util/breakpoints.hpp"
 #include "util/theme.hpp"
 #include "util/redesign_icons.hpp"
 
@@ -38,10 +37,8 @@
 #include <QGridLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
-#include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
-#include <QListWidget>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QStackedWidget>
@@ -51,8 +48,7 @@
 
 using namespace RedesignTokens;
 
-/* the SPrefs categories in their order, then Advanced */
-static const struct { const char *label; const char *icon; } sectionList[] = {
+const PrefsPage::Section PrefsPage::sections[] = {
     { N_( "Interface" ), RedesignIcons::IconPrefInterface },
     { N_( "Audio" ),     RedesignIcons::IconPrefAudio },
     { N_( "Video" ),     RedesignIcons::IconPrefVideo },
@@ -254,9 +250,16 @@ static QFrame *buildRow( const Row &r, const QString &orphan, bool first, QList<
         }
         if( w->focusPolicy() & Qt::TabFocus )
         {
-            /* buttons with their own text (radio choices) keep it */
+            /* buttons with their own text (radio choices) keep it; a value
+             * beside a switch (the days between update checks) has its
+             * option's own name, not the switch's */
             QAbstractButton *b = qobject_cast<QAbstractButton *>( w );
-            if( w->accessibleName().isEmpty() && !( b && !b->text().isEmpty() ) )
+            const QByteArray option = w->property( "vlcOption" ).toByteArray();
+            module_config_t *p_config = toggle && w != toggle && !option.isEmpty()
+                                      ? config_FindConfig( option.constData() ) : NULL;
+            if( w->accessibleName().isEmpty() && p_config && p_config->psz_text )
+                w->setAccessibleName( qtr( p_config->psz_text ) );
+            else if( w->accessibleName().isEmpty() && !( b && !b->text().isEmpty() ) )
                 w->setAccessibleName( plainName );
             if( w->accessibleDescription().isEmpty() )
                 w->setAccessibleDescription( desc );
@@ -365,59 +368,26 @@ static void toRows( QWidget *box, const QString &orphan, bool inCard, bool place
         layout->addStretch( 1 );
 }
 
-PrefsPage::PrefsPage( intf_thread_t *_p_intf, QWidget *parent )
-    : QWidget( parent ), p_intf( _p_intf ), rail( false )
+PrefsPage::PrefsPage( intf_thread_t *_p_intf, QWidget *_tabAnchor )
+    : QWidget( NULL ), p_intf( _p_intf ), tabAnchor( _tabAnchor ), section( SPrefsDefaultCat )
 {
-    static_assert( sizeof( sectionList ) / sizeof( sectionList[0] ) == SectionCount,
-                   "one list entry per section" );
+    static_assert( sizeof( sections ) / sizeof( sections[0] ) == SectionCount,
+                   "one entry per section" );
     const Theme *t = Theme::instance();
     setAccessibleName( qtr( "Preferences" ) );
     for( int i = 0; i < SPrefsMax; i++ )
         panels[i] = NULL;
 
-    QHBoxLayout *layout = new QHBoxLayout( this );
-    layout->setContentsMargins( 0, 0, 0, 0 );
-    layout->setSpacing( 0 );
-
-    /* the section list */
-    QFrame *listPane = new QFrame;
-    listPane->setProperty( "role", "prefsList" );
-    listPane->setFixedWidth( t->px( Prefs::ListW ) );
-    QVBoxLayout *listLayout = new QVBoxLayout( listPane );
-    listLayout->setContentsMargins( t->px( Prefs::ListPadX ), t->px( Prefs::ListPadY ),
-                                    t->px( Prefs::ListPadX ), t->px( Prefs::ListPadY ) );
-    listLayout->setSpacing( 0 );
-    title = new QLabel( qtr( "Preferences" ) );
-    title->setFont( t->font( Theme::PageTitle ) );
-    title->setContentsMargins( t->px( Prefs::ItemPadX ), 0, 0, t->px( Prefs::TitleBelow ) );
-    listLayout->addWidget( title );
-
-    sections = new QListWidget;
-    sections->setProperty( "role", "prefsSections" );
-    sections->setAccessibleName( qtr( "Preferences sections" ) );
-    sections->setFrameShape( QFrame::NoFrame );
-    sections->setHorizontalScrollBarPolicy( Qt::ScrollBarAlwaysOff );
-    sections->setIconSize( QSize( t->px( Prefs::ItemIcon ), t->px( Prefs::ItemIcon ) ) );
-    for( int i = 0; i < SectionCount; i++ )
-    {
-        const QString label = qtr( sectionList[i].label );
-        QListWidgetItem *item = new QListWidgetItem( label, sections );
-        item->setData( Qt::ToolTipRole, label );
-        item->setData( Qt::AccessibleTextRole, label );
-        /* the stylesheet's item height paints but doesn't size the item:
-         * the height, its gap and the 2 px focus border (the width fills) */
-        item->setSizeHint( QSize( 0, t->px( Prefs::ItemH ) + t->px( Prefs::ItemGap )
-                                     + 2 * Size::FocusRing ) );
-    }
-    updateIcons();
-    listLayout->addWidget( sections, 1 );
-    layout->addWidget( listPane );
-
-    /* the section, then Cancel and Save */
-    QVBoxLayout *right = new QVBoxLayout;
+    /* the section's name, the section, then Cancel and Save */
+    QVBoxLayout *right = new QVBoxLayout( this );
     right->setContentsMargins( t->px( Prefs::ContentPadX ), t->px( Prefs::ContentPadY ),
                                t->px( Prefs::ContentPadX ), t->px( Prefs::ContentPadY ) );
     right->setSpacing( t->px( Prefs::HeaderBelow ) );
+    title = new QLabel;
+    QFont titleFont = t->font( Theme::PageTitle );
+    titleFont.setLetterSpacing( QFont::PercentageSpacing, Type::TitleTracking );
+    title->setFont( titleFont );
+    right->addWidget( title );
     stack = new QStackedWidget;
     right->addWidget( stack, 1 );
 
@@ -426,20 +396,17 @@ PrefsPage::PrefsPage( intf_thread_t *_p_intf, QWidget *parent )
     QVBoxLayout *advLayout = new QVBoxLayout( advanced );
     advLayout->setContentsMargins( 0, 0, 0, 0 );
     advLayout->setSpacing( t->px( Prefs::HeaderBelow ) );
-    QLabel *advTitle = new QLabel( qtr( "Advanced" ) );
-    advTitle->setFont( t->font( Theme::PanelTitle ) );
-    advLayout->addWidget( advTitle );
     QFrame *card = new QFrame;
     card->setProperty( "role", "prefsCard" );
     QVBoxLayout *cardLayout = new QVBoxLayout( card );
     cardLayout->setContentsMargins( 0, 0, 0, 0 );
     cardLayout->setSpacing( 0 );
-    QPushButton *showAll = new QPushButton( qtr( "Open..." ) );
+    showAll = new QPushButton( qtr( "Open..." ) );
     showAll->setProperty( "role", "outline" );
     connect( showAll, &QPushButton::clicked, this, &PrefsPage::showAllSettings );
     cardLayout->addWidget( cardRow( qtr( "Show all settings" ),
                                     qtr( "The full module tree, for power users." ), showAll, true ) );
-    QPushButton *resetButton = new QPushButton( qtr( "Reset..." ) );
+    resetButton = new QPushButton( qtr( "Reset..." ) );
     resetButton->setProperty( "role", "outline" );
     connect( resetButton, &QPushButton::clicked, this, &PrefsPage::reset );
     cardLayout->addWidget( cardRow( qtr( "Reset preferences" ),
@@ -451,22 +418,17 @@ PrefsPage::PrefsPage( intf_thread_t *_p_intf, QWidget *parent )
     QHBoxLayout *buttons = new QHBoxLayout;
     buttons->setSpacing( t->px( Prefs::ButtonGap ) );
     buttons->addStretch( 1 );
-    QPushButton *cancelButton = new QPushButton( qtr( "&Cancel" ) );
+    cancelButton = new QPushButton( qtr( "&Cancel" ) );
     cancelButton->setToolTip( qtr( "Discard the changes not saved yet" ) );
     connect( cancelButton, &QPushButton::clicked, this, &PrefsPage::cancel );
     buttons->addWidget( cancelButton );
-    QPushButton *saveButton = new QPushButton( qtr( "&Save" ) );
+    /* no mnemonic: Alt+S is the Tools menu's */
+    saveButton = new QPushButton( qtr( "Save" ) );
     saveButton->setProperty( "role", "primary" );
     saveButton->setToolTip( qtr( "Save the preferences" ) );
     connect( saveButton, &QPushButton::clicked, this, &PrefsPage::save );
     buttons->addWidget( saveButton );
     right->addLayout( buttons );
-    layout->addLayout( right, 1 );
-
-    /* the panels are built when first seen, not with the window */
-    sections->setCurrentRow( SPrefsDefaultCat );
-    connect( sections, &QListWidget::currentRowChanged, this, &PrefsPage::showSection );
-    connect( Theme::instance(), &Theme::changed, this, &PrefsPage::updateIcons );
 
     /* where config_SaveConfigFile() writes */
     char *path = var_InheritString( p_intf, "config" );
@@ -489,59 +451,59 @@ PrefsPage::PrefsPage( intf_thread_t *_p_intf, QWidget *parent )
 
 void PrefsPage::showEvent( QShowEvent *e )
 {
-    showSection( sections->currentRow() );
+    if( tabAnchor )
+    {
+        /* the page joined the window's focus chain at its end: its buttons
+         * go after the sections, once (the panels go before them) */
+        setTabOrder( tabAnchor, showAll );
+        setTabOrder( showAll, resetButton );
+        setTabOrder( resetButton, cancelButton );
+        setTabOrder( cancelButton, saveButton );
+        tabAnchor = NULL;
+    }
+    showSection( section );
     QWidget::showEvent( e );
-}
-
-void PrefsPage::resizeEvent( QResizeEvent *e )
-{
-    /* an icon rail where the sidebar is one */
-    setRail( BreakpointWatcher::fromWidth( window()->width() ) < BreakpointWatcher::M );
-    QWidget::resizeEvent( e );
 }
 
 void PrefsPage::showSection( int i )
 {
+    if( i < 0 || i >= SectionCount )
+        return;
+    section = i;
+    title->setText( qtr( sections[i].label ) );
     if( i == Advanced )
     {
         stack->setCurrentWidget( advanced );
         return;
     }
-    if( i < 0 || i >= SPrefsMax )
-        return;
     if( !panels[i] )
     {
         panels[i] = new SPrefsPanel( p_intf, stack, i );
         stack->addWidget( panels[i] );
-        /* the form as cards of rows; its scroll area stays a Tab stop */
+        /* the page's title names the section: the panel's own goes */
+        QLayoutItem *panelTitle = panels[i]->layout()->itemAt( 0 );
+        if( panelTitle && panelTitle->widget() )
+            panelTitle->widget()->hide();
+        /* the form as cards of rows; its scroll area is no Tab stop (it has
+         * no focus ring), Tab scrolls to the control it reaches */
         QScrollArea *scroller = panels[i]->findChild<QScrollArea *>();
+        scroller->setFocusPolicy( Qt::NoFocus );
         QList<QWidget *> order;
-        order.append( scroller );
         toRows( scroller->widget(), QString(), false, false, order );
         /* built after the page, its widgets end the window's focus chain:
-         * move them after the list, before Cancel and Save, in row order */
-        QWidget *prev = sections;
+         * move them after the sections and before Advanced's buttons,
+         * Cancel and Save, in row order */
+        QWidget *prev = showAll->previousInFocusChain();
         foreach( QWidget *w, order )
-            /* setTabOrder() ignores NoFocus widgets */
-            if( w->focusPolicy() & Qt::TabFocus )
+            /* setTabOrder() ignores NoFocus widgets, and refuses those of
+             * another window: a combo box's list is in its pop-up */
+            if( ( w->focusPolicy() & Qt::TabFocus ) && w->window() == window() )
             {
                 setTabOrder( prev, w );
                 prev = w;
             }
     }
     stack->setCurrentWidget( panels[i] );
-}
-
-/* Esc is Cancel, as in the dialogs */
-void PrefsPage::keyPressEvent( QKeyEvent *e )
-{
-    if( e->key() == Qt::Key_Escape && e->modifiers() == Qt::NoModifier )
-    {
-        cancel();
-        e->accept();
-        return;
-    }
-    QWidget::keyPressEvent( e );
 }
 
 void PrefsPage::rebuild()
@@ -554,7 +516,7 @@ void PrefsPage::rebuild()
             panels[i] = NULL;
         }
     if( isVisible() )
-        showSection( sections->currentRow() );
+        showSection( section );
 }
 
 /* PrefsDialog::save for the simple panels */
@@ -601,30 +563,4 @@ void PrefsPage::configSaved()
         return;
     configTime = saved;
     rebuild();
-}
-
-void PrefsPage::updateIcons()
-{
-    Theme *t = Theme::instance();
-    const int devicePx = qRound( t->px( Prefs::ItemIcon ) * devicePixelRatioF() );
-    const QSize size( devicePx, devicePx );
-    for( int i = 0; i < SectionCount; i++ )
-    {
-        const QLatin1String name( sectionList[i].icon );
-        QIcon icon = t->icon( name, Theme::Text2, size );
-        icon.addPixmap( t->icon( name, Theme::AccentText, size ).pixmap( size ), QIcon::Selected );
-        sections->item( i )->setIcon( icon );
-    }
-}
-
-void PrefsPage::setRail( bool b )
-{
-    if( b == rail )
-        return;
-    rail = b;
-    const Theme *t = Theme::instance();
-    sections->parentWidget()->setFixedWidth( t->px( rail ? Prefs::RailW : Prefs::ListW ) );
-    title->setVisible( !rail );
-    for( int i = 0; i < SectionCount; i++ )
-        sections->item( i )->setText( rail ? QString() : qtr( sectionList[i].label ) );
 }

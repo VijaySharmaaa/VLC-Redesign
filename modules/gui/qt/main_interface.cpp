@@ -114,10 +114,22 @@ const QEvent::Type MainInterface::ToolbarsNeedRebuild =
 
 namespace
 {
-    /* Space is the player's (play/pause) in its windows, never a focused
-     * button's; buttons there click on Enter instead. One filter for the
-     * deck, its immersive and FSC copies, the now-playing bar, audio mode,
-     * the sidebar and the mini player. Dialogs and pop-ups keep Space. */
+    /* A button of the player controls: the deck and its immersive and FSC
+     * copies, the now-playing bar, the mini player */
+    bool inPlayerControls( const QWidget *w )
+    {
+        for( ; w; w = w->parentWidget() )
+            if( qobject_cast<const AbstractController *>( w )
+             || qobject_cast<const NowPlayingBar *>( w )
+             || qobject_cast<const MiniPlayer *>( w ) )
+                return true;
+        return false;
+    }
+
+    /* Buttons in the player's windows click on Enter too. Space on one of
+     * the player controls is the player's (play/pause), as if nothing had
+     * focus; anywhere else (sidebar, pages, sheets) it presses the focused
+     * button, as Windows does. Dialogs and pop-ups keep their own keys. */
     class ButtonKeys : public QObject
     {
     public:
@@ -138,7 +150,7 @@ namespace
             QKeyEvent *ke = static_cast<QKeyEvent *>( e );
             if( ke->modifiers() & ~Qt::KeypadModifier )
                 return false;
-            if( ke->key() == Qt::Key_Space )
+            if( ke->key() == Qt::Key_Space && inPlayerControls( button ) )
             {
                 e->ignore();    /* on to the window, whose hotkeys get it */
                 return true;
@@ -201,8 +213,9 @@ MainInterface::MainInterface( intf_thread_t *_p_intf, bool customFrame ) : QVLCM
      *  Configuration and settings
      *  Pre-building of interface
      **/
-    /* Main settings */
-    setFocusPolicy( Qt::StrongFocus );
+    /* Main settings; the window takes the keys at startup, after Back and
+     * on a click, but is no Tab stop of its own (no ring to show it) */
+    setFocusPolicy( Qt::ClickFocus );
     setAcceptDrops( true );
     setWindowRole( "vlc-main" );
     setWindowIcon( QApplication::windowIcon() );
@@ -296,6 +309,9 @@ MainInterface::MainInterface( intf_thread_t *_p_intf, bool customFrame ) : QVLCM
         if( THEMIM->getIM()->hasVideo() || var_CountChoices( input, "video-es" ) > 0 )
             return;
         QWidget *current = stackCentralW->currentWidget();
+        /* the user is in Preferences: it stays, the audio plays under it */
+        if( current == sidebar->page( Sidebar::Preferences ) )
+            return;
         if( current == bgWidget || ( isLibraryPage( current ) && !b_browsing ) )
             showTab( audioPage );
     } );
@@ -702,12 +718,18 @@ void MainInterface::createMainWidget( QSettings *creationSettings )
     for( int i = 0; i < Sidebar::PageCount; i++ )
         stackCentralW->addWidget( sidebar->page( static_cast<Sidebar::Page>( i ) ) );
     connect( sidebar, &Sidebar::pageRequested, this, [this]( QWidget *page ) {
+        page = backTarget( page );
         /* browsing during playback: the next track keeps the library open */
         b_browsing = THEMIM->getIM()->hasInput();
         showTab( page );
     } );
-    connect( stackCentralW, &QStackedWidget::currentChanged, sidebar,
-             [this]() { sidebar->setCurrentWidget( stackCentralW->currentWidget() ); } );
+    connect( stackCentralW, &QStackedWidget::currentChanged, sidebar, [this]() {
+        sidebar->setCurrentWidget( stackCentralW->currentWidget() );
+        updateBackLabel();
+    } );
+    /* what Back goes to changes with the playback */
+    connect( THEMIM, &MainInputManager::inputChanged, this, &MainInterface::updateBackLabel );
+    connect( THEMIM->getIM(), &InputManager::voutChanged, this, &MainInterface::updateBackLabel );
     connect( stackCentralW, &QStackedWidget::currentChanged,
              this, &MainInterface::updateNowPlayingBar );
     /* the window opens on Home; bgWidget stays for cover art */
@@ -1578,6 +1600,21 @@ bool MainInterface::isLibraryPage( QWidget *w ) const
     return false;
 }
 
+QWidget *MainInterface::backTarget( QWidget *page ) const
+{
+    InputManager *im = THEMIM->getIM();
+    if( !page || ( page == videoWidget && !im->hasVideo() )
+     || ( ( page == audioPage || page == bgWidget ) && !im->hasInput() ) )
+        return sidebar->page( Sidebar::Home );
+    return page;
+}
+
+void MainInterface::updateBackLabel()
+{
+    if( stackCentralW->currentWidget() == sidebar->page( Sidebar::Preferences ) )
+        sidebar->setBackLabel( isLibraryPage( backTarget( sidebar->returnTo() ) ) );
+}
+
 void MainInterface::updateNowPlayingBar()
 {
     if( !isLibraryPage( stackCentralW->currentWidget() ) )
@@ -1604,11 +1641,13 @@ bool MainInterface::isMiniPlayerVisible() const
     return miniPlayer && miniPlayer->isVisible();
 }
 
-/* Hidden (tray, mini player), minimised or in video full screen, the window
- * can't show the page: the caller opens the dialog as before */
+/* Hidden (tray, mini player), minimised, in video full screen or in minimal
+ * view (no sidebar for its sections), the window can't show the page: the
+ * caller opens the dialog as before */
 bool MainInterface::showPreferences()
 {
-    if( !isVisible() || isMinimized() || b_videoFullScreen || isMiniPlayerVisible() )
+    if( !isVisible() || isMinimized() || b_videoFullScreen || isMiniPlayerVisible()
+     || b_minimalView )
         return false;
     sidebar->showPage( Sidebar::Preferences );
     return true;
@@ -1662,6 +1701,10 @@ void MainInterface::toggleMiniPlayer()
  */
 void MainInterface::toggleMinimalView( bool b_minimal )
 {
+    /* its sections are in the sidebar, which minimal view hides: leave it
+     * as Back does (Ctrl+P there opens the dialog) */
+    if( b_minimal && stackCentralW->currentWidget() == sidebar->page( Sidebar::Preferences ) )
+        sidebar->goBack();
     if( !b_minimalView && b_autoresize ) /* Normal mode */
     {
         if( stackCentralW->currentWidget() == bgWidget )
@@ -2152,12 +2195,29 @@ void MainInterface::keyReleaseEvent( QKeyEvent *e )
 
 void MainInterface::handleKeyPress( QKeyEvent *e )
 {
-    /* Esc closes the top-most surface first: the Effects sheet, then
-     * (key-leave-fullscreen) the full screen */
+    /* Esc closes the top-most surface first: the Effects sheet, the
+     * playlist drawer, then Preferences (back), then minimal view or
+     * (key-leave-fullscreen) the full screen. Menus, pop-ups and dialogs
+     * are windows of their own and take it before. */
     if( e->key() == Qt::Key_Escape && e->modifiers() == Qt::NoModifier
      && THEDP->isPanelShown( EXTENDED_ACTION ) )
     {
         ExtendedDialog::getInstance( p_intf )->hide();
+        e->accept();
+        return;
+    }
+    if( e->key() == Qt::Key_Escape && e->modifiers() == Qt::NoModifier
+     && playlistPanel && playlistPanel->isWindow() && playlistPanel->isVisible() )
+    {
+        togglePlaylist();   /* the XS drawer, over the page */
+        e->accept();
+        return;
+    }
+    if( e->key() == Qt::Key_Escape && e->modifiers() == Qt::NoModifier
+     && isVisible() /* not from the mini player */
+     && stackCentralW->currentWidget() == sidebar->page( Sidebar::Preferences ) )
+    {
+        sidebar->goBack();
         e->accept();
         return;
     }

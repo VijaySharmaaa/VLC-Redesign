@@ -26,12 +26,17 @@
 
 class QAbstractButton;
 class QButtonGroup;
+class QLabel;
+class QStackedWidget;
+class PrefsPage;
 class SidebarButton;
 
 /* DESIGN_SPEC 2: "Open media", the library pages and Preferences. It owns
  * one page widget per nav item, Preferences included; the main interface
  * puts them in its stack and shows the one pageRequested() names. Below
- * SidebarRailBelow it is an icon rail whose tooltips carry the labels. */
+ * SidebarRailBelow it is an icon rail whose tooltips carry the labels.
+ * DESIGN_SPEC 8: while Preferences is current it shows the preferences
+ * navigation instead (a back row, then the sections). */
 class Sidebar : public QWidget
 {
     Q_OBJECT
@@ -52,6 +57,15 @@ public slots:
      * none is active when it is not one of the pages */
     void setCurrentWidget( QWidget * );
     void setBreakpoint( BreakpointWatcher::Size );
+    /* Back, or Esc, in Preferences: the view it was opened from, the edits
+     * not saved dropped as Cancel does; the keys go back to the window */
+    void goBack();
+    /* The back row names where it goes: the library or the player */
+    void setBackLabel( bool library );
+
+public:
+    /* The view Preferences was opened from, NULL for none */
+    QWidget *returnTo() const { return returnPage; }
 
 signals:
     void pageRequested( QWidget * );
@@ -60,10 +74,16 @@ protected:
     void paintEvent( QPaintEvent * ) Q_DECL_OVERRIDE;
 
 private:
+    QStackedWidget *navs;   /* the library navigation | the preferences one */
     QButtonGroup *group;
+    QButtonGroup *sections;
     QList<SidebarButton *> buttons;
+    SidebarButton *back;
+    QLabel *heading;
     QWidget *pages[PageCount];
+    PrefsPage *prefsPage;
     QWidget *currentPage;   /* the stack's, from setCurrentWidget() */
+    QWidget *returnPage;    /* the one Preferences was opened from */
 };
 
 #endif

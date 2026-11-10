@@ -254,7 +254,7 @@ Evidence: `D:\Projects\VLC\spike-results\p5-fixA\` (`verify.py`, `shots.py`, scr
 4. Audio: tick "Always reset audio start level to": the slider is the accent slider (track and round knob).
 5. Audio: change Output module: the Device and passthrough rows show and hide with the module.
 6. Change one switch in each section, Save: `vlcrc` gets the same variable names as before (`qt-pause-minimized`, `audio-time-stretch`, `video-deco`, `video-title-show`, `input-fast-seek`, `qt-disable-volume-keys`).
-7. Change a switch, press Esc on the page: it is discarded, as with Cancel.
+7. Change a switch, press Esc on the page: it is discarded, as with Cancel, and the view Preferences was opened from comes back (see "Preferences: one sidebar").
 8. View the Interface section, play a video full screen, Ctrl+P: the Preferences dialog opens; change "Pause playback when minimized", Save. Leave full screen, Ctrl+P: the page shows the new value; change an Audio option and Save on the page: `vlcrc` keeps the dialog's value.
 8b. The same with the dialog's Reset: the page shows the reset values (Window decorations back on) and a page Save keeps them. Any other writer of `vlcrc` (Effects > Save) takes the same path.
 8c. Mini player (deck button), Ctrl+P: the Preferences dialog opens (the main window is hidden). Other menu shortcuts (Ctrl+O, Ctrl+E...) also work from the mini player now.
@@ -282,7 +282,7 @@ Evidence: `D:\Projects\VLC\spike-results\p5-edge\` (audit on the merged build be
 | Simple ↔ all settings; the tree dialog's Save | **pass** | Show all settings opens the complete tree; its Save rewrites `vlcrc`. |
 | Settings saved elsewhere while the page holds old values | **fixed** | The page used to write stale values back after a save in the fallback dialog, a Reset or the Effects sheet; it now rebuilds when `vlcrc` changes behind it (pending edits are then dropped, marked `shortcut:`). |
 | Old stock `vlcrc` (`--config`), portable mode | **pass** | Values show and survive Save; only the portable folder is written; `%APPDATA%\vlc` untouched. |
-| Pending edits across sections and page switches; Esc | **pass** | Kept until Save or Cancel (decision P5-5, confirmed by the owner: changes apply on Save). Esc cancels. |
+| Pending edits across sections and page switches; Esc | **pass** | Kept until Save or Cancel (decision P5-5, confirmed by the owner: changes apply on Save). Back/Esc discard and return (owner decision 2026-11-10, "Preferences: one sidebar"). |
 | `qt-advanced-pref`; Ctrl+P from fullscreen, minimal view, mini player | **pass** / **fixed** | The tree opens directly with `qt-advanced-pref`. Ctrl+P did nothing from the mini player; menu shortcuts now work there. |
 | Reset with the simple panels never built (advanced mode) | **fixed** | `cleanLang()` went through a possibly NULL panel; now static. |
 | Effects Save semantics vs stock | **pass** | Save only on the Audio/Video tabs; `equalizer-preset` and `audio-filter=equalizer` saved; sync never saved. |
@@ -302,3 +302,66 @@ Evidence: `D:\Projects\VLC\spike-results\p5-edge\` (audit on the merged build be
 
 **Known for Phase 6:** the disabled Preferences volume slider still draws a square knob; Hotkeys keeps its action table (no keycaps); the light URL focus ring now uses the contrast-safe colour; Alt+D is shared by "Disc" and "Capture Device" (stock, would change a translated string).
 **Decisions recorded (owner to confirm unless noted):** P5-1 the Effects sheet docks beside the video (floats at XS); P5-2 sync steps of 50 ms; P5-3 Retry replays the failed item; P5-4 prototype rows with no VLC option dropped; P5-5 Preferences changes apply on Save — **confirmed by the owner (2026-11-10)**.
+
+## Preferences: one sidebar (design update, 2026-11-10)
+DESIGN_SPEC 8, SCREEN_INVENTORY 2.5.P1–2.5.P6, PLAN-DETAILED 10. Branch `redesign/prefs-sidebar`.
+
+### What changed
+- The sidebar is a stack of two pages: library navigation | preferences navigation (back row 32 px with arrow_back and "Back to library"/"Back to player", the "Preferences" heading 22/600 at −0.01em, the 7 sections as 36 px sidebar items with 20 px icons). The active section has the accent tint, accTx text and a 3 px accent bar on its leading edge (inset 9, radius 2), painted from tokens. Below 1200 px: back arrow and section icons with tooltips, no heading. RTL: the back arrow is mirrored and the bar moves to the right edge.
+- The page swaps when Preferences becomes the stack's current widget (every entry path), and the sidebar remembers the view it left. Leaving restores the library nav with the item of the page returned to.
+- The Preferences page has no section list, rail or resize code any more; the sidebar drives `showSection` (the page keeps the current section). The section name is the page title (26/600, −0.01em); the panels' own "… Settings" titles and Advanced's duplicate title are hidden.
+- Back and Esc: back to the remembered view (library page, player, audio mode), dropping unsaved edits as Cancel does. A video that ended meanwhile goes to Home. Esc is in `handleKeyPress` after the Effects sheet and before minimal view; menus, pop-ups and dialogs take it first.
+- Ctrl+P in minimal view opens the Simple Preferences dialog, as in full screen and the mini player.
+- Tab: back row → sections (one stop, arrows move and switch) → content → Cancel → Save. Root cause of a split Tab chain found and fixed: each combo box's pop-up list was in the order list, `setTabOrder` refuses widgets of another window, and the chain went on from there, so Cancel/Save landed after the first card (this was already in the Phase 5 build).
+- Tokens: `Size::SidebarBack*`, `SidebarTitlePad*`, `SidebarSectionGap`, `SidebarBar*`, `Type::NavTitle`, `Type::TitleTracking` (mirrored in `design/tokens.json` and `design/v3/redesign_tokens.hpp`). Removed: the `prefsList`/`prefsSections` QSS, its variables and `Prefs::List*`/`RailW`/`Item*`/`TitleBelow`.
+
+### Owner decisions (2026-11-10)
+Save / Cancel stay; "Changes apply immediately" is not added. Back and Esc discard unsaved edits and return to the previous view. Ctrl+P in minimal view opens the classic dialog.
+
+### Deviations
+- No "Changes apply immediately" line (owner decision).
+- The content still ends in Cancel / Save, and the now-playing bar shows under Preferences during playback, as before.
+- Tab enters the section group on its first item, not the checked one (Qt's exclusive-group behaviour, same as the library nav); arrows then move.
+- Ctrl+P in the separate (undocked) playlist window does nothing: that window doesn't carry the main window's shortcuts. Unchanged by this work.
+
+### Evidence (`D:\Projects\VLC\spike-results\prefs-sidebar\`, not committed)
+Desktop 1920×1080 at 125 %: "100 %" is the native scale, "150 %" adds `QT_SCALE_FACTOR=1.5`; widths are physical window widths (narrowest window: 1018 px native, 1518 px at 150 %).
+- Before/after: `before-P1-dark-1280.png`, `before-P3-dark-1280-audio.png`, `before-P5-dark-1024.png` / `after-P1-dark-1280.png`, `after-P3-dark-1280-audio.png`, `after-P5-dark-1024.png`.
+- 2.5.P1/P3/P5/P6: `{dark,light}-{100,150}-{1920,1280,1024,800}-{P1,P3-audio}.png` (32 frames); library nav and Open media hidden, the clicked section checked in every frame.
+- 2.5.P2: `P2-*.png`, `behave-player.log`: Tools › Preferences from the player says "Back to player"; playback keeps running through Preferences (time 4 → 8 → 12 → 14 s) and a paused video stays paused; Esc from audio mode returns to it; a video stopped while in Preferences → Esc → Home.
+- 2.5.P4: `P4-*.png`, `behave-dropdown.log`: the first Esc closes the Output module drop-down only, the second goes back.
+- Back/Esc discard: an edit then Back or Esc leaves vlcrc unchanged and the switch at its old value; Save writes it.
+- Fast switching (21 clicks), UIA (back row and 7 radio buttons named, the current one selected; 0 unnamed in Preferences; `harness.py names` 0 unnamed), Tab order, rail tooltips, minimal view → "Simple Preferences" dialog, playlist window: `behave-misc.log`, `tabprobe-final.log`, `P5-tooltip-*.png`.
+- RTL and a long section name: a throwaway build (not committed) with a test-only env switch, because VLC passes no Qt arguments on Windows and Qt 5.6 ignores LANG: `rtl-*.png`, `long-label-*.png` (ellipsis, no clipping).
+
+### Manual test steps
+1. Library page → Ctrl+P: sidebar shows "Back to library", Preferences and 7 sections; Open media and the library nav are gone. Click Audio: accent bar, title "Audio".
+2. Play a video → Tools › Preferences: "Back to player"; Esc: the video, still playing. Repeat while paused: still paused.
+3. Open the Output module drop-down, Esc, Esc: first closes the list, second goes back.
+4. Change a switch, Back: reopen, the switch is unchanged. Change it, Save: it sticks.
+5. Narrow the window below 1200 px: back arrow and icons only, tooltips "Back to library (Esc)" and section names.
+6. Ctrl+H, Ctrl+P: the Simple Preferences dialog opens.
+7. Library page, Ctrl+P: the current section has the focus. Tab to a switch, Space: it flips. Tab to Save, Space (or Enter): saved. Esc: back, and the next Space is play/pause. Alt+S opens the Tools menu (Save has no mnemonic).
+8. Play an audio file, Tab to the deck's Mute, Space: play/pause (the now-playing bar's Mute the same). Tab to the sidebar's Open media, Space: the Open Media dialog.
+9. Ctrl+P, then start an audio-only file: Preferences stays. Ctrl+H in Preferences: back to the previous view, in minimal view.
+10. Play audio, Ctrl+P ("Back to player"), stop: the label turns to "Back to library" and Esc goes Home. Same from a stopped video or the idle cone.
+11. Window under 800 px, Ctrl+P, Ctrl+L (drawer), click a section, Esc: the drawer closes, Preferences stays; Esc again goes back.
+12. Focus a section, End / Home: Advanced / Interface. Light theme: the active section's bar is the dark accent text colour.
+
+### Review fixes (2026-11-10)
+Accessibility audit, design review and code review of the change above. Evidence: `D:\Projects\VLC\spike-results\prefs-sidebar-fix\` (`repro.py`, `before.log` on the reviewed build, `after.log` on the fixed one; not committed). Note: pywinauto's `send_keys` drops a plain `' '`; Space must be sent as `{SPACE}`.
+
+| Finding | Root cause | Fix |
+|---|---|---|
+| Space never toggled a control in Preferences | `ButtonKeys` (`main_interface.cpp`, from 276186aeea) sent Space on every focused button of the main window to play/pause | Only buttons inside `AbstractController` (deck, immersive, FSC), `NowPlayingBar` or `MiniPlayer` pass Space on; Enter still clicks everywhere (cca7deaeb8) |
+| Alt+S did not save | "&Save" clashed with "Tool&s" in the menu bar, so Alt+S cycled focus | Save uses the existing "Save" string, no mnemonic (d975fbf294) |
+| Focus placement, Tab stops | Nothing set focus on entry or Back; the main window was a `StrongFocus` Tab stop; the panels' scroll area was put in the Tab chain | Focus on the checked section on entry, on the window after Back/Esc; window `ClickFocus`; scroll area `NoFocus` (68c06ac75c) |
+| Light marker 1.78:1 | Bar painted in `Accent` in both themes | `AccentText` in light (deae4b2eb9) |
+| Audio start leaves Preferences | The audio-mode check used `isLibraryPage()`, which includes Preferences | Preferences is skipped (e042faef8e) |
+| Minimal view strands the page | Minimal view hides the sidebar holding the sections | `toggleMinimalView(true)` leaves Preferences as Back does (e042faef8e) |
+| Back label/target | Label from "was it a library page", target fixed only for an ended video | `MainInterface::backTarget()` (player view with nothing to show → Home) drives both, relabelled on input/vout changes (68c06ac75c) |
+| Small | — | Panel-title null check (68c06ac75c); Esc closes the XS drawer first; Home/End in the sections; the update-days box named by its option (bd39a96422); one `setBackLabel()` for text, name and "(Esc)" tooltip (68c06ac75c) |
+
+Results (`after.log`): Space flips a switch (1→0) and presses Back; keyboard-only round trip writes `qt-fs-controller=0` and Esc returns with the focus on the window; Alt+S opens Tools; Tab from Save → Back → sections, Shift+Tab from Save walks the content to the sections with no window stop; audio start keeps Preferences, Esc → Home; Ctrl+H leaves Preferences into minimal view; audio stopped in Preferences relabels to "Back to library" and Esc → Home; drawer closes on the first Esc, Preferences on the second; End/Home → Advanced/Interface; spinner named "Number of days between two update checks"; Phase 3: Space on the deck's Mute and Next and the bar's Mute pauses, on Open media opens the dialog; light bar pixel (154, 72, 0), dark (255, 138, 31).
+
+**Deferred (pre-existing, not Preferences):** when the video view goes away (Ctrl+P from a playing video, or just `stop`), Qt loses keyboard focus for good: for an instant Windows activates the next app's window (seen: VS Code), and the focus widget stays empty though VLC is foreground again (throwaway `focusChanged`/`GetGUIThreadInfo` log, `focusdbg*.py`, `focusdbg*-vlc.log`). So from the player, the section is focused and then loses it; keys still reach the window. Needs a trace of the video widget / vout window activation in Phase 6.

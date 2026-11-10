@@ -96,6 +96,8 @@ namespace RedesignTokens
         static const char * const UiFamilies   = "Segoe UI Variable Text,Segoe UI";
         static const char * const MonoFamilies = "JetBrains Mono,Cascadia Mono,Consolas";
         static const int Display = 48, PageTitle = 26, PanelTitle = 16, Body = 13, Meta = 12, Overline = 11, Mono = 12;
+        static const int NavTitle = 22;       /* "Preferences" over its sections */
+        static const int TitleTracking = 99;  /* % letter spacing: -0.01em */
         static const int WeightRegular = 400, WeightSemibold = 600; /* CSS weights */
     }
 
@@ -115,6 +117,11 @@ namespace RedesignTokens
         static const int SidebarPadY = 14, SidebarPadX = 10, SidebarItemGap = 4, SidebarOpenBelow = 10;
         static const int SidebarIcon = 20, SidebarItemPadX = 12, SidebarIconGap = 12;
         static const int SidebarOpenIconGap = 8, SidebarOpenRadius = 7;
+        /* Preferences in the sidebar (DESIGN_SPEC 8): the back row, the
+         * heading and the sections, the active one's accent bar */
+        static const int SidebarBackH = 32, SidebarBackIconGap = 10, SidebarBackBelow = 6;
+        static const int SidebarTitlePadTop = 4, SidebarTitlePadBottom = 14, SidebarSectionGap = 2;
+        static const int SidebarBarW = 3, SidebarBarInset = 9, SidebarBarRadius = 2;
         static const int PagePadTop = 28, PagePadX = 32;
         static const int IconButton = 36, IconGlyph = 22;
         static const int PlayDeck = 44, PlayNowBar = 36, PausedBadge = 76;
@@ -352,10 +359,6 @@ namespace RedesignTokens
      *      prototype markup) ---- */
     namespace Prefs
     {
-        /* section list: 220 px, an icon rail with the sidebar's (below M) */
-        static const int ListW = 220, RailW = 64, ListPadY = 28, ListPadX = 10;
-        static const int ItemH = 34, ItemPadX = 12, ItemGap = 2, ItemIcon = 18;
-        static const int TitleBelow = 18;            /* "Preferences" over the list */
         static const int ContentPadY = 28, ContentPadX = 32, HeaderBelow = 16;
         /* the card and its rows */
         static const int CardRadius = 8, RowMinH = 60, RowPadX = 18, RowPadY = 12;

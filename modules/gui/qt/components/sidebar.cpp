@@ -32,9 +32,11 @@
 
 #include <QAbstractButton>
 #include <QButtonGroup>
+#include <QKeyEvent>
 #include <QKeySequence>
 #include <QLabel>
 #include <QPainter>
+#include <QStackedWidget>
 #include <QStyle>
 #include <QVBoxLayout>
 
@@ -44,13 +46,17 @@ static_assert( Size::SidebarRailBelow == Breakpoint::M,
                "the sidebar turns into a rail at the M breakpoint" );
 
 /* One sidebar entry, painted from tokens: the stylesheet cannot left-align
- * a tool button's content nor set the 12 px icon-label gap. */
+ * a tool button's content nor set the 12 px icon-label gap. Open is the
+ * accent "Open media" button, Nav a library item, Section a preferences
+ * section (an accent bar when active), Back the preferences' back row. */
 class SidebarButton : public QAbstractButton
 {
 public:
-    SidebarButton( const QString &label, const char *_icon, bool _primary,
+    enum Kind { Open, Nav, Section, Back };
+
+    SidebarButton( const QString &label, const char *_icon, Kind _kind,
                    QWidget *parent )
-        : QAbstractButton( parent ), icon( _icon ), primary( _primary ), rail( false )
+        : QAbstractButton( parent ), icon( _icon ), kind( _kind ), rail( false )
     {
         setText( label );
         setAccessibleName( label );
@@ -63,17 +69,35 @@ public:
 
     QSize sizeHint() const Q_DECL_OVERRIDE
     {
-        const int h = Theme::instance()->metric( primary ? Theme::SidebarOpenBtnH
-                                                         : Theme::SidebarItemH );
+        const Theme *t = Theme::instance();
+        const int h = kind == Open ? t->metric( Theme::SidebarOpenBtnH )
+                    : kind == Back ? t->px( Size::SidebarBackH )
+                                   : t->metric( Theme::SidebarItemH );
         return QSize( h, h );
     }
 
 protected:
+    /* Home and End go to the first and last section, as in a list */
+    void keyPressEvent( QKeyEvent *e ) Q_DECL_OVERRIDE
+    {
+        QButtonGroup *g = group();
+        if( kind == Section && g && e->modifiers() == Qt::NoModifier
+         && ( e->key() == Qt::Key_Home || e->key() == Qt::Key_End ) )
+        {
+            QAbstractButton *b = e->key() == Qt::Key_Home ? g->buttons().first()
+                                                          : g->buttons().last();
+            b->setFocus( Qt::TabFocusReason );
+            b->click();
+            return;
+        }
+        QAbstractButton::keyPressEvent( e );
+    }
+
     void paintEvent( QPaintEvent * ) Q_DECL_OVERRIDE;
 
 private:
     const char *icon;
-    bool primary;
+    Kind kind;
     bool rail;
 };
 
@@ -82,6 +106,7 @@ void SidebarButton::paintEvent( QPaintEvent * )
     Theme *t = Theme::instance();
     QPainter p( this );
     p.setRenderHint( QPainter::Antialiasing );
+    const bool primary = kind == Open;
     const int radius = primary ? t->px( Size::SidebarOpenRadius ) : t->metric( Theme::RadiusMd );
 
     QColor fill( Qt::transparent );
@@ -97,6 +122,18 @@ void SidebarButton::paintEvent( QPaintEvent * )
     p.setBrush( fill );
     p.drawRoundedRect( rect(), radius, radius );
 
+    if( kind == Section && isChecked() )
+    {
+        /* the active section's bar, on its leading edge; the accent is
+         * too faint on light surfaces (as the menus' check marks) */
+        const int inset = t->px( Size::SidebarBarInset );
+        const qreal barRadius = t->px( Size::SidebarBarRadius );
+        p.setBrush( t->color( t->isDark() ? Theme::Accent : Theme::AccentText ) );
+        p.drawRoundedRect( QStyle::visualRect( layoutDirection(), rect(),
+                               QRect( 0, inset, t->px( Size::SidebarBarW ), height() - 2 * inset ) ),
+                           barRadius, barRadius );
+    }
+
     if( hasFocus() )
     {
         /* the accent is 2.4:1 on light surfaces and invisible on the accent */
@@ -110,7 +147,8 @@ void SidebarButton::paintEvent( QPaintEvent * )
     }
 
     const Theme::ColorRole ink = primary ? Theme::OnAccent
-                               : isChecked() ? Theme::AccentText : Theme::Text2;
+                               : isChecked() ? Theme::AccentText
+                               : kind == Back && underMouse() ? Theme::Text : Theme::Text2;
     QFont font = t->font( Theme::Body );
     if( primary )
         font.setWeight( QFont::DemiBold );
@@ -119,7 +157,8 @@ void SidebarButton::paintEvent( QPaintEvent * )
     /* rail: the icon alone, centred; primary: icon and label centred as a
      * group; nav item: icon and label from the left */
     const int iconPx = t->px( Size::SidebarIcon );
-    const int gap = t->px( primary ? Size::SidebarOpenIconGap : Size::SidebarIconGap );
+    const int gap = t->px( primary ? Size::SidebarOpenIconGap
+                         : kind == Back ? Size::SidebarBackIconGap : Size::SidebarIconGap );
     const int padX = t->px( Size::SidebarItemPadX );
     int x;
     if( rail )
@@ -131,8 +170,13 @@ void SidebarButton::paintEvent( QPaintEvent * )
     const QRect iconRect( x, ( height() - iconPx ) / 2, iconPx, iconPx );
     /* QIcon::paint picks the device-pixel size: render the tint at that size */
     const int devicePx = qRound( iconPx * devicePixelRatioF() );
-    t->icon( QLatin1String( icon ), ink, QSize( devicePx, devicePx ) )
-        .paint( &p, QStyle::visualRect( layoutDirection(), rect(), iconRect ) );
+    const QIcon glyph = t->icon( QLatin1String( icon ), ink, QSize( devicePx, devicePx ) );
+    const QRect iconAt = QStyle::visualRect( layoutDirection(), rect(), iconRect );
+    if( kind == Back && isRightToLeft() )
+        /* the arrow points the way back: to the right in RTL */
+        p.drawImage( iconAt, glyph.pixmap( devicePx, devicePx ).toImage().mirrored( true, false ) );
+    else
+        glyph.paint( &p, iconAt );
     if( rail )
         return;
 
@@ -168,20 +212,34 @@ static QString tip( const QString &label, const char *shortcut )
         QKeySequence( QLatin1String( shortcut ) ).toString( QKeySequence::NativeText ) );
 }
 
-Sidebar::Sidebar( intf_thread_t *p_intf, QWidget *parent )
-    : QWidget( parent ), currentPage( NULL )
+/* A page of the sidebar's stack, with the sidebar's padding */
+static QVBoxLayout *navLayout( QStackedWidget *navs, int spacing )
 {
-    setAccessibleName( qtr( "Library" ) );
-    QVBoxLayout *layout = new QVBoxLayout( this );
+    QWidget *nav = new QWidget;
+    navs->addWidget( nav );
+    QVBoxLayout *layout = new QVBoxLayout( nav );
     const Theme *t = Theme::instance();
     layout->setContentsMargins( t->px( Size::SidebarPadX ), t->px( Size::SidebarPadY ),
                                 t->px( Size::SidebarPadX ), t->px( Size::SidebarPadY ) );
-    layout->setSpacing( t->px( Size::SidebarItemGap ) );
+    layout->setSpacing( t->px( spacing ) );
+    return layout;
+}
+
+Sidebar::Sidebar( intf_thread_t *p_intf, QWidget *parent )
+    : QWidget( parent ), currentPage( NULL ), returnPage( NULL )
+{
+    setAccessibleName( qtr( "Library" ) );
+    QVBoxLayout *outer = new QVBoxLayout( this );
+    outer->setContentsMargins( 0, 0, 0, 0 );
+    navs = new QStackedWidget( this );
+    outer->addWidget( navs );
+    QVBoxLayout *layout = navLayout( navs, Size::SidebarItemGap );
+    const Theme *t = Theme::instance();
 
     /* shortcut: the keys are copied from menus.cpp (Open Multiple Files,
      * Preferences), read them from the menu actions once lane A exposes them */
-    SidebarButton *open = new SidebarButton( qtr( "Open media" ),
-                                             RedesignIcons::IconOpenMedia, true, this );
+    SidebarButton *open = new SidebarButton( qtr( "Open media" ), RedesignIcons::IconOpenMedia,
+                                             SidebarButton::Open, this );
     open->setToolTip( tip( qtr( "Open media" ), "Ctrl+Shift+O" ) );
     connect( open, &QAbstractButton::clicked, this, []() { THEDP->openDialog(); } );
     layout->addWidget( open );
@@ -206,7 +264,7 @@ Sidebar::Sidebar( intf_thread_t *p_intf, QWidget *parent )
         case Network: pages[i] = new NetworkPage( p_intf ); break;
         default:      pages[i] = createPage( label ); break;
         }
-        SidebarButton *b = new SidebarButton( label, nav[i].icon, false, this );
+        SidebarButton *b = new SidebarButton( label, nav[i].icon, SidebarButton::Nav, this );
         b->setCheckable( true );
         b->setAutoExclusive( true ); /* screen readers: a radio button; the group rules */
         b->setToolTip( label );
@@ -218,13 +276,12 @@ Sidebar::Sidebar( intf_thread_t *p_intf, QWidget *parent )
     }
 
     layout->addStretch( 1 );
-    SidebarButton *prefs = new SidebarButton( qtr( "Preferences" ),
-                                              RedesignIcons::IconSettings, false, this );
+    SidebarButton *prefs = new SidebarButton( qtr( "Preferences" ), RedesignIcons::IconSettings,
+                                              SidebarButton::Nav, this );
     prefs->setToolTip( tip( qtr( "Preferences" ), "Ctrl+P" ) );
     prefs->setCheckable( true );
     prefs->setAutoExclusive( true );
     group->addButton( prefs, Preferences );
-    pages[Preferences] = new PrefsPage( p_intf );
     /* the menu's way, which opens the complete tree in a dialog when it is
      * asked for: then the item the click checked goes back */
     connect( prefs, &QAbstractButton::clicked, this, [this]() {
@@ -233,6 +290,44 @@ Sidebar::Sidebar( intf_thread_t *p_intf, QWidget *parent )
     } );
     layout->addWidget( prefs );
     buttons.append( prefs );
+
+    /* DESIGN_SPEC 8: the preferences navigation, back, the heading and the
+     * sections; the page shows the section the sidebar picks */
+    QVBoxLayout *prefsNav = navLayout( navs, Size::SidebarSectionGap );
+    prefsNav->parentWidget()->setAccessibleName( qtr( "Preferences sections" ) );
+    back = new SidebarButton( QString(), RedesignIcons::IconBack, SidebarButton::Back, this );
+    setBackLabel( true );
+    connect( back, &QAbstractButton::clicked, this, &Sidebar::goBack );
+    prefsNav->addWidget( back );
+    prefsNav->addSpacing( t->px( Size::SidebarBackBelow ) );
+    buttons.append( back );
+    heading = new QLabel( qtr( "Preferences" ) );
+    QFont font = t->font( Theme::NavTitle );
+    font.setLetterSpacing( QFont::PercentageSpacing, Type::TitleTracking );
+    heading->setFont( font );
+    heading->setContentsMargins( t->px( Size::SidebarItemPadX ), t->px( Size::SidebarTitlePadTop ),
+                                 t->px( Size::SidebarItemPadX ), t->px( Size::SidebarTitlePadBottom ) );
+    prefsNav->addWidget( heading );
+    sections = new QButtonGroup( this );
+    SidebarButton *section = NULL;
+    for( int i = 0; i < PrefsPage::SectionCount; i++ )
+    {
+        const QString label = qtr( PrefsPage::sections[i].label );
+        section = new SidebarButton( label, PrefsPage::sections[i].icon,
+                                     SidebarButton::Section, this );
+        section->setCheckable( true );
+        section->setAutoExclusive( true );
+        section->setChecked( i == SPrefsDefaultCat );
+        section->setToolTip( label );
+        sections->addButton( section, i );
+        connect( section, &QAbstractButton::clicked, this,
+                 [this, i]() { prefsPage->showSection( i ); } );
+        prefsNav->addWidget( section );
+        buttons.append( section );
+    }
+    prefsNav->addStretch( 1 );
+    /* Tab goes from the last section into the page */
+    pages[Preferences] = prefsPage = new PrefsPage( p_intf, section );
 
     connect( Theme::instance(), &Theme::changed, this, [this]() { update(); } );
 }
@@ -245,6 +340,13 @@ void Sidebar::showPage( int i )
 
 void Sidebar::setCurrentWidget( QWidget *w )
 {
+    const bool entering = w == pages[Preferences] && currentPage != w;
+    if( entering )
+        returnPage = currentPage;   /* the way back */
+    navs->setCurrentIndex( w == pages[Preferences] ? 1 : 0 );
+    if( entering )
+        /* the keys start on the section shown */
+        sections->checkedButton()->setFocus( Qt::OtherFocusReason );
     currentPage = w;
     for( int i = 0; i < PageCount; i++ )
         if( pages[i] == w )
@@ -262,6 +364,23 @@ void Sidebar::setCurrentWidget( QWidget *w )
     }
 }
 
+void Sidebar::goBack()
+{
+    /* first away, so the page drops its panels without building them again */
+    emit pageRequested( returnPage ? returnPage : pages[Home] );
+    prefsPage->cancel();
+    /* as at startup: Space is play/pause again, not a stray button's */
+    window()->setFocus( Qt::OtherFocusReason );
+}
+
+void Sidebar::setBackLabel( bool library )
+{
+    const QString label = library ? qtr( "Back to library" ) : qtr( "Back to player" );
+    back->setText( label );
+    back->setAccessibleName( label );
+    back->setToolTip( tip( label, "Esc" ) );
+}
+
 int Sidebar::widthAt( BreakpointWatcher::Size bp )
 {
     static const int widths[] = { Size::SidebarXS, Size::SidebarS, Size::SidebarM, Size::SidebarL };
@@ -273,6 +392,7 @@ void Sidebar::setBreakpoint( BreakpointWatcher::Size bp )
     setFixedWidth( widthAt( bp ) );
     for( SidebarButton *b : buttons )
         b->setRail( bp < BreakpointWatcher::M );
+    heading->setVisible( bp >= BreakpointWatcher::M );
 }
 
 void Sidebar::paintEvent( QPaintEvent * )
