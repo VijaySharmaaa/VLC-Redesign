@@ -173,11 +173,8 @@ private:
     QPixmap pixGradient2; /* Muted Gradient pix storage */
     QPixmap pixOutside; /* OutLine pix storage */
     QPainter painter;
-    QColor background;
-    QColor foreground;
     QFont textfont;
     QRect textrect;
-    bool dark = false;
 
     WheelToVLCConverter wheelEventConverter;
 

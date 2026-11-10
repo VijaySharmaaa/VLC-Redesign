@@ -23,6 +23,7 @@
 #include "seekstyle.hpp"
 #include "util/input_slider.hpp"
 #include "adapters/seekpoints.hpp"
+#include "util/theme.hpp"
 
 #include <QProxyStyle>
 #include <QStyleFactory>
@@ -74,7 +75,7 @@ void SeekStyle::drawComplexControl( ComplexControl cc, const QStyleOptionComplex
              qstyleoption_cast<const SeekStyle::SeekStyleOption *>( option ) )
         {
             /* theme detection */
-            bool dark = isDarkPaletteEnabled(nullptr);
+            bool dark = Theme::instance()->isDark();
             qreal sliderPos = -1;
 
             /* Get the needed subcontrols to draw the slider */

@@ -35,6 +35,7 @@
 #include "util/searchlineedit.hpp"
 #include "util/qvlcframe.hpp"
 #include "main_interface.hpp"
+#include "util/theme.hpp"
 
 #include <QHBoxLayout>
 #include <QGroupBox>
@@ -314,6 +315,7 @@ void PrefsDialog::save()
 
     if( p_intf->p_sys->p_mi )
         p_intf->p_sys->p_mi->reloadPrefs();
+    Theme::instance()->reload();
     accept();
 
     QVLCTools::saveWidgetPosition( p_intf, "Preferences", this );

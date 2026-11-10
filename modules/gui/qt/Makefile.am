@@ -148,10 +148,12 @@ libqt_plugin_la_SOURCES = \
 	gui/qt/util/qvlcapp.hpp \
 	gui/qt/util/singleton.hpp \
 	gui/qt/util/imagehelper.cpp gui/qt/util/imagehelper.hpp \
+	gui/qt/util/theme.cpp gui/qt/util/theme.hpp gui/qt/util/theme_tokens.hpp \
 	gui/qt/styles/seekstyle.cpp gui/qt/styles/seekstyle.hpp
 if HAVE_WIN32
 libqt_plugin_la_SOURCES += \
-	gui/qt/main_interface_win32.cpp gui/qt/main_interface_win32.hpp
+	gui/qt/main_interface_win32.cpp gui/qt/main_interface_win32.hpp \
+	gui/qt/util/win_theme.hpp
 endif
 
 # Meta-object compilation
@@ -230,6 +232,7 @@ nodist_libqt_plugin_la_SOURCES = \
 	gui/qt/util/searchlineedit.moc.cpp \
 	gui/qt/util/qmenuview.moc.cpp \
 	gui/qt/util/qvlcapp.moc.cpp \
+	gui/qt/util/theme.moc.cpp \
 	gui/qt/util/pictureflow.moc.cpp \
 	gui/qt/util/validators.moc.cpp \
 	gui/qt/util/buttons/RoundButton.moc.cpp \
