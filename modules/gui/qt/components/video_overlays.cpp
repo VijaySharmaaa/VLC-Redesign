@@ -432,7 +432,6 @@ void ImmersiveBar::rebuild( bool advanced )
         place();
 }
 
-/* Qt thread: voutListChanged is emitted by InputManager::UpdateVout */
 /* The lift is added to the vout's "sub-margin", never cached: the subtitle
  * position hotkeys (key-subpos-up/down) change the same variable meanwhile */
 static void shiftSubMargin( vout_thread_t *p_vout, int by )
@@ -441,6 +440,7 @@ static void shiftSubMargin( vout_thread_t *p_vout, int by )
         var_SetInteger( p_vout, "sub-margin", var_GetInteger( p_vout, "sub-margin" ) + by );
 }
 
+/* Qt thread: voutListChanged is emitted by InputManager::UpdateVout */
 void ImmersiveBar::setVoutList( vout_thread_t **pp_vout, int i_vout )
 {
     QList<vout_thread_t *> set;
@@ -745,16 +745,14 @@ void PlayerHeader::setAsleep( bool s )
         place();
         return;
     }
-    if( !asleep && !isVisible() )
-    {
-        place();
-        setOpacity( 0. );
-    }
     fade->stop();
     fade->setDuration( ms );
-    fade->setStartValue( windowOpacity() );
+    fade->setStartValue( isVisible() ? windowOpacity() : 0. );
     fade->setEndValue( asleep ? 0. : 1. );
     fade->start();
+    /* after the start: a hidden header shows from transparent */
+    if( !asleep )
+        place();
 }
 
 bool PlayerHeader::hovered() const
@@ -768,11 +766,12 @@ void PlayerHeader::setOpacity( qreal o )
     backWindow->setWindowOpacity( o );
 }
 
+/* Follows the video; a running fade keeps its opacity */
 void PlayerHeader::place()
 {
-    fade->stop();
     if( !active || asleep || !host->targetShown() )
     {
+        fade->stop();
         backWindow->giveFocusBack();
         backWindow->hide();
         hide();
@@ -785,7 +784,8 @@ void PlayerHeader::place()
     const QRect b = backRect( r.width() );
     backWindow->setGeometry( b.translated( r.topLeft() ) );
     back->setGeometry( QRect( QPoint(), b.size() ) );
-    setOpacity( 1. );
+    if( fade->state() != QAbstractAnimation::Running )
+        setOpacity( 1. );
     if( !isVisible() )
     {
         show();
