@@ -286,6 +286,7 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
     number = _number;
     lang = NULL;
     radioGroup = NULL;
+    themeChosen = false;
 
 #define CONFIG_GENERIC( option, type, label, qcontrol )                   \
             p_config =  config_FindConfig( option );                      \
@@ -816,6 +817,9 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
 
             /* applied by Theme::reload() when the preferences are saved */
             CONFIG_GENERIC( "qt-redesign-theme", IntegerList, ui.themeLabel, themeCombo );
+            /* activated: a user choice, even of the current item */
+            connect( ui.themeCombo, QOverload<int>::of(&QComboBox::activated),
+                     this, [this]() { themeChosen = true; } );
 
             connect( ui.minimalviewBox, &QCheckBox::toggled,
                      ui.mainPreview, &InterfacePreviewWidget::setNormalPreview );
@@ -1121,6 +1125,10 @@ void SPrefsPanel::apply()
         if( qobject_cast<QComboBox *>(optionWidgets["styleCB"]) )
             getSettings()->setValue( "MainWindow/QtStyle",
                 qobject_cast<QComboBox *>(optionWidgets["styleCB"])->currentText() );
+        /* an explicit Theme choice supersedes the old dark palette option,
+         * so "Follow the system" really follows it */
+        if( themeChosen )
+            config_PutInt( p_intf, "qt-dark-palette", 0 );
 #ifdef _WIN32
     saveLang();
 #endif
