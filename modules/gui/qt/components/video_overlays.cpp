@@ -681,7 +681,8 @@ void ImmersiveBar::paintEvent( QPaintEvent * )
  **********************************************************************/
 PlayerHeader::PlayerHeader( intf_thread_t *_p_intf, QWidget *owner, QWidget *_video,
                             NowPlayingInfo *_info )
-    : OverlayWindow( owner ), p_intf( _p_intf ), info( _info ), video( _video ), active( false ), asleep( false )
+    : OverlayWindow( owner ), p_intf( _p_intf ), info( _info ), video( _video ), active( false ),
+      asleep( false ), cursorHidden( false )
 {
     /* only the button takes the mouse: the strip leaves it to the video */
     backWindow = new OverlayWindow( owner, TakeInput );
@@ -696,6 +697,7 @@ PlayerHeader::PlayerHeader( intf_thread_t *_p_intf, QWidget *owner, QWidget *_vi
     backWindow->winId();   /* creates its window */
     backWindow->windowHandle()->installEventFilter( this );
     owner->installEventFilter( this );
+    back->installEventFilter( this );   /* its FocusOut */
 
     fade = new QVariantAnimation( this );
     fade->setEasingCurve( enterCurve() );
@@ -710,6 +712,10 @@ PlayerHeader::PlayerHeader( intf_thread_t *_p_intf, QWidget *owner, QWidget *_vi
     connect( host, &OverlayHost::changed, this, &PlayerHeader::place );
     connect( Theme::instance(), &Theme::changed, this, &PlayerHeader::place );
     connect( info, &NowPlayingInfo::changed, this, &PlayerHeader::refresh );
+    connect( THEMIM->getIM(), &InputManager::playingStatusChanged, this, [this]() {
+        if( cursorHidden )
+            followCursor();
+    } );
     refresh();
 }
 
@@ -753,6 +759,21 @@ void PlayerHeader::setAsleep( bool s )
     /* after the start: a hidden header shows from transparent */
     if( !asleep )
         place();
+}
+
+void PlayerHeader::setCursorHidden( bool h )
+{
+    cursorHidden = h;
+    followCursor();
+}
+
+/* The normal layout's idle hide, so the header never stays over the top
+ * subtitles: away with the cursor VLC hides over a playing video, back
+ * with the cursor, a pause or stop, or the keys on its button */
+void PlayerHeader::followCursor()
+{
+    setAsleep( cursorHidden && THEMIM->getIM()->playingStatus() == PLAYING_S
+               && !hovered() && !back->hasFocus() );
 }
 
 bool PlayerHeader::hovered() const
@@ -838,6 +859,8 @@ QRect PlayerHeader::backRect( int width ) const
 
 bool PlayerHeader::eventFilter( QObject *o, QEvent *e )
 {
+    if( o == back && e->type() == QEvent::FocusOut && cursorHidden )
+        followCursor();
     if( e->type() != QEvent::KeyPress )
         return false;
     const QKeyEvent *ke = static_cast<QKeyEvent *>( e );
@@ -846,8 +869,12 @@ bool PlayerHeader::eventFilter( QObject *o, QEvent *e )
         /* Shift+Tab while the window itself or the video has the keys: to
          * the back button, before the deck in the tab order */
         const QWidget *fw = QApplication::focusWidget();
-        if( ke->key() != Qt::Key_Backtab || !backWindow->isVisible() || asleep
+        if( ke->key() != Qt::Key_Backtab
          || ( fw && fw != o && fw != video && !video->isAncestorOf( fw ) ) )
+            return false;
+        if( cursorHidden )
+            setAsleep( false );   /* shows the button: it keeps it up while focused */
+        if( !backWindow->isVisible() || asleep )
             return false;
         back->setFocus( Qt::BacktabFocusReason );
         backWindow->activateWindow();

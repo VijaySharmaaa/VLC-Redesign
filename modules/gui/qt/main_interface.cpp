@@ -1299,6 +1299,9 @@ void MainInterface::setVideoFullScreen( bool fs )
 void MainInterface::setHideMouse( bool hide )
 {
     videoWidget->setCursor( hide ? Qt::BlankCursor : Qt::ArrowCursor );
+    /* the immersive layout's header goes with the deck instead */
+    if( playerHeader && !immersiveBar )
+        playerHeader->setCursorHidden( hide );
 }
 
 /* Slot to change the video always-on-top flag.
@@ -1372,6 +1375,8 @@ void MainInterface::setImmersive( bool on )
         return;
     if( on )
     {
+        if( playerHeader )
+            playerHeader->setCursorHidden( false );
         immersiveBar = new ImmersiveBar( p_intf, this, stackCentralW,
                                          getControlsVisibilityStatus() & CONTROLS_ADVANCED );
         immersiveBar->setHeader( playerHeader );
