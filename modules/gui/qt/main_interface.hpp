@@ -54,6 +54,8 @@ class QSize;
 class QScreen;
 class QTimer;
 class StandardPLPanel;
+class Sidebar;
+class BreakpointWatcher;
 struct vout_window_t;
 
 class MainInterface : public QVLCMW
@@ -98,6 +100,8 @@ public:
     bool isInterfaceFullScreen() { return b_interfaceFullScreen; }
     bool isInterfaceAlwaysOnTop() { return b_interfaceOnTop; }
     StandardPLPanel* getPlaylistView();
+    Sidebar *getSidebar() { return sidebar; }
+    BreakpointWatcher *getBreakpoints() { return breakpoints; }
 
 protected:
     void dropEventPlay( QDropEvent* event, bool b_play ) { dropEventPlay(event, b_play, true); }
@@ -154,6 +158,8 @@ protected:
     VideoWidget         *videoWidget;
     BackgroundWidget    *bgWidget;
     PlaylistWidget      *playlistWidget;
+    Sidebar             *sidebar;
+    BreakpointWatcher   *breakpoints;
     //VisualSelector      *visualSelector;
 
     /* resume panel */
