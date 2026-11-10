@@ -149,9 +149,13 @@ class Vlc:
         return r.width(), r.height()
 
     def toggle_playlist(self):
-        before = self.main_size()
+        # Stock VLC resizes the window for the playlist; the redesign opens a
+        # panel inside it. Either way the window's pixels change.
+        before = self.main.capture_as_image().tobytes()
         self.keys('^l')                   # Ctrl+L is hard-coded in 3.0.x
-        self.wait_for(lambda: self.main_size() != before, 'playlist to toggle')
+        self.wait_for(lambda: self.main.capture_as_image().tobytes() != before,
+                      'playlist to toggle')
+        time.sleep(0.3)                   # the panel slides in
 
     def shot(self, out, title=''):
         cmd = ['powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
