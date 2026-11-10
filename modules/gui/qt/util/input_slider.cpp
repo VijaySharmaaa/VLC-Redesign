@@ -494,7 +494,9 @@ void SeekSlider::paintEvent( QPaintEvent *ev )
         if ( chapters ) foreach( const SeekPoint &point, chapters->getPoints() )
             option.points << point.time;
         QPainter painter( this );
-        style()->drawComplexControl( QStyle::CC_Slider, &option, &painter, this );
+        /* Not style(): with an application stylesheet that is a QStyleSheetStyle,
+         * which forwards a copy sliced to QStyleOptionSlider and loses our fields. */
+        alternativeStyle->drawComplexControl( QStyle::CC_Slider, &option, &painter, this );
     }
     else
         QSlider::paintEvent( ev );
@@ -634,7 +636,6 @@ SoundSlider::SoundSlider( QWidget *_parent, float _i_step,
 
     pixGradient = QPixmap( pixOutside.size() );
     pixGradient2 = QPixmap( pixOutside.size() );
-    dark = isDarkPaletteEnabled(nullptr);
 
 #if HAS_QT56
     pixGradient.setDevicePixelRatio(QApplication::primaryScreen()->devicePixelRatio());
@@ -652,12 +653,6 @@ SoundSlider::SoundSlider( QWidget *_parent, float _i_step,
     if( colorList.count() < 12 )
         for( int i = colorList.count(); i < 12; i++)
             colorList.append( "255" );
-
-    background = palette().color( QPalette::Active, QPalette::Window );
-    foreground = palette().color( QPalette::Active, QPalette::WindowText );
-    foreground.setHsv( foreground.hue(),
-                    ( background.saturation() + foreground.saturation() ) / 2,
-                    ( background.value() + foreground.value() ) / 2 );
 
     textfont.setPointSize( 7 );
     textrect.setRect( 0, 0, 34, 15 );
@@ -819,10 +814,8 @@ void SoundSlider::paintEvent( QPaintEvent *e )
     painter.drawPixmap( 0, 0, offsetDst, height(), *paintGradient, 0, 0, offsetSrc, paintGradient->height() );
     painter.drawPixmap( 0, 0, width(), height(), pixOutside, 0, 0,  pixOutside.width(), pixOutside.height() );
 
-    if (dark)
-        painter.setPen(Qt::white);
-    else
-        painter.setPen(foreground);
+    /* read at paint time: the theme can change while VLC runs */
+    painter.setPen( palette().color( QPalette::WindowText ) );
     painter.setFont( textfont );
     painter.drawText( textrect, Qt::AlignRight | Qt::AlignVCenter,
                       QString::number( value() ) + '%' );

@@ -38,7 +38,6 @@
 #include "dialogs_provider.hpp" /* THEDP creation */
 #ifdef _WIN32
 # include "main_interface_win32.hpp"
-# include "util/qvlcframe.hpp" /* Accent Color */
 #else
 # include "main_interface.hpp"   /* MainInterface creation */
 #endif
@@ -47,6 +46,7 @@
 #include "dialogs/help.hpp"     /* Launch Update */
 #include "recents.hpp"          /* Recents Item destruction */
 #include "util/qvlcapp.hpp"     /* QVLCApplication definition */
+#include "util/theme.hpp"       /* Theme creation */
 #include "components/playlist/playlist_model.hpp" /* for ~PLModel() */
 
 #include <vlc_plugin.h>
@@ -124,6 +124,12 @@ static void ShowDialog   ( intf_thread_t *, int, int, intf_dialog_args_t * );
 
 #define QT_DARK_TEXT N_( "Enable Dark Mode" )
 #define QT_DARK_LONGTEXT N_( "Applies a dark theme to the style." )
+
+#define QT_THEME_TEXT N_( "Theme" )
+#define QT_THEME_LONGTEXT N_( "Colours of the interface. \"Follow the system\" " \
+                              "uses the light or dark app mode of Windows and " \
+                              "follows its changes; it is dark when the dark " \
+                              "mode option is enabled." )
 
 #define UPDATER_TEXT N_( "Activate the updates availability notification" )
 #define UPDATER_LONGTEXT N_( "Activate the automatic notification of new " \
@@ -209,6 +215,12 @@ static const int i_continue_list[] =
 static const char *const psz_continue_list_text[] =
     { N_("Never"), N_("Ask"), N_("Always") };
 
+static const int i_theme_list[] =
+    { 0, 1, 2 };
+
+static const char *const psz_theme_list_text[] =
+    { N_("Follow the system"), N_("Dark"), N_("Light") };
+
 static const int i_raise_list[] =
     { MainInterface::RAISE_NEVER, MainInterface::RAISE_VIDEO, \
       MainInterface::RAISE_AUDIO, MainInterface::RAISE_AUDIOVIDEO,  };
@@ -262,6 +274,8 @@ vlc_module_begin ()
             change_integer_list(i_continue_list, psz_continue_list_text )
     add_bool( "qt-dark-palette", false, QT_DARK_TEXT,
                   QT_DARK_LONGTEXT, false )
+    add_integer( "qt-redesign-theme", 0, QT_THEME_TEXT, QT_THEME_LONGTEXT, false )
+            change_integer_list( i_theme_list, psz_theme_list_text )
 
 #ifdef UPDATE_CHECK
     add_bool( "qt-updates-notif", true, UPDATER_TEXT,
@@ -388,64 +402,6 @@ static bool HasX11( vlc_object_t *obj )
     return true;
 }
 #endif
-
-bool isDarkPaletteEnabled(intf_thread_t *p_intf) {
-    static const bool darkPalette = var_InheritBool( p_intf, "qt-dark-palette" );
-    return darkPalette;
-}
-
-void applyDarkPalette() {
-    QPalette darkPalette;
-    static const QColor darkColor  (33, 33, 33);
-    static const QColor gray       (75,75,75);
-    static const QColor lightGray  (138, 138, 138);
-    static const QColor baseColor  (18, 18, 18);
-    static const QColor linkColor  (255, 168, 81);
-
-#ifdef Q_OS_WIN
-    QColor accentColor = getWindowsAccentColor();
-#else
-    QColor accentColor (42, 130, 218);
-#endif
-
-    // Active group (the currently focused window)
-    darkPalette.setColor(QPalette::Active, QPalette::Window,          darkColor);
-    darkPalette.setColor(QPalette::Active, QPalette::WindowText,      Qt::white);
-    darkPalette.setColor(QPalette::Active, QPalette::Base,            baseColor);
-    darkPalette.setColor(QPalette::Active, QPalette::AlternateBase,   darkColor);
-    darkPalette.setColor(QPalette::Active, QPalette::Button,          darkColor);
-    darkPalette.setColor(QPalette::Active, QPalette::ButtonText,      Qt::white);
-    darkPalette.setColor(QPalette::Active, QPalette::Text,            Qt::white);
-    darkPalette.setColor(QPalette::Active, QPalette::Highlight,       accentColor);
-    darkPalette.setColor(QPalette::Active, QPalette::HighlightedText, Qt::white);
-    darkPalette.setColor(QPalette::Active, QPalette::Link,            linkColor);
-
-    // Inactive group (unfocused window)
-    darkPalette.setColor(QPalette::Inactive, QPalette::Window,          darkColor);
-    darkPalette.setColor(QPalette::Inactive, QPalette::WindowText,      lightGray);
-    darkPalette.setColor(QPalette::Inactive, QPalette::Base,            baseColor);
-    darkPalette.setColor(QPalette::Inactive, QPalette::AlternateBase,   darkColor);
-    darkPalette.setColor(QPalette::Inactive, QPalette::Button,          darkColor);
-    darkPalette.setColor(QPalette::Inactive, QPalette::ButtonText,      lightGray);
-    darkPalette.setColor(QPalette::Inactive, QPalette::Text,            lightGray);
-    darkPalette.setColor(QPalette::Inactive, QPalette::Highlight,       accentColor);
-    darkPalette.setColor(QPalette::Inactive, QPalette::HighlightedText, lightGray);
-
-    // Disabled group (grayed-out widgets)
-    darkPalette.setColor(QPalette::Disabled, QPalette::Window,          darkColor);
-    darkPalette.setColor(QPalette::Disabled, QPalette::WindowText,      lightGray);
-    darkPalette.setColor(QPalette::Disabled, QPalette::Base,            baseColor);
-    darkPalette.setColor(QPalette::Disabled, QPalette::AlternateBase,   darkColor);
-    darkPalette.setColor(QPalette::Disabled, QPalette::Button,          baseColor);
-    darkPalette.setColor(QPalette::Disabled, QPalette::ButtonText,      gray);
-    darkPalette.setColor(QPalette::Disabled, QPalette::Text,            gray);
-    darkPalette.setColor(QPalette::Disabled, QPalette::Highlight,       gray);
-    darkPalette.setColor(QPalette::Disabled, QPalette::HighlightedText, gray);
-    darkPalette.setColor(QPalette::Disabled, QPalette::Light,           darkColor);
-
-    // Apply the dark palette globally
-    QApplication::setPalette(darkPalette);
-}
 
 /* Open Interface */
 static int Open( vlc_object_t *p_this, bool isDialogProvider )
@@ -602,6 +558,10 @@ static void *ThreadPlatform( void *obj, char *platform_name )
     else
         app.setWindowIcon( QIcon::fromTheme( "vlc", QIcon( ":/logo/vlc256.png" ) ) );
 
+    /* Style, palette, font and stylesheet, before the first window */
+    Theme theme( p_intf );
+    theme.apply( app );
+
     /* Initialize the Dialog Provider and the Main Input Manager */
     DialogsProvider::getInstance( p_intf );
     MainInputManager* mim = MainInputManager::getInstance( p_intf );
@@ -676,15 +636,6 @@ static void *ThreadPlatform( void *obj, char *platform_name )
     const QUrl homeUrl = QUrl::fromLocalFile(QVLCUserDir( VLC_HOME_DIR ));
     p_sys->filepath =
          getSettings()->value( "filedialog-path", homeUrl ).toUrl();
-
-    /* Loads and tries to apply the preferred QStyle */
-    QString s_style = getSettings()->value( "MainWindow/QtStyle", "" ).toString();
-    if (!s_style.isEmpty())
-        QApplication::setStyle( s_style );
-
-    // Apply dark palette only if dark palette is enabled
-    if (isDarkPaletteEnabled(p_intf))
-        applyDarkPalette();
 
     /* Launch */
     app.exec();

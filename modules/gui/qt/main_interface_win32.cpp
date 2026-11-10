@@ -32,6 +32,7 @@
 #include "actions_manager.hpp"
 #include "dialogs_provider.hpp"
 #include "components/interface_widgets.hpp"
+#include "util/theme.hpp"
 
 #include <QBitmap>
 
@@ -229,6 +230,12 @@ bool MainInterfaceWin32::nativeEventFilter(const QByteArray &, void *message, lo
         //We received the taskbarbuttoncreated, now we can really create the buttons
         createTaskBarButtons();
     }
+
+    /* Windows light/dark switch: sent to every top-level window, handle it once.
+     * reload() only re-applies when the effective mode changed. */
+    if (msg->message == WM_SETTINGCHANGE && msg->hwnd == WinId(this) && msg->lParam
+        && wcscmp(reinterpret_cast<LPCWSTR>(msg->lParam), L"ImmersiveColorSet") == 0)
+        Theme::instance()->reload();
 
     short cmd;
     bool handled = false;

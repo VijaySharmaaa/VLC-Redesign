@@ -817,18 +817,6 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
             ui.styleStackedWidget->setCurrentIndex( radioGroup->checkedId() );
 
 			CONFIG_BOOL( "qt-dark-palette", qtdark );
-			// Connecting the stateChanged signal of the checkbox
-			connect(ui.qtdark, &QCheckBox::stateChanged, ui.stylesCombo, [combobox = ui.stylesCombo](const int state) {
-				if (state == Qt::CheckState::Checked) {
-					// Set the current style to "Fusion"
-					combobox->setCurrentText(QStringLiteral("Fusion"));
-					// Apply the dark palette
-					applyDarkPalette();
-				} else {
-					// Remove the custom palette and revert to the default
-					QApplication::setPalette(QApplication::style()->standardPalette());
-				}
-			});
 
             connect( ui.minimalviewBox, &QCheckBox::toggled,
                      ui.mainPreview, &InterfacePreviewWidget::setNormalPreview );
