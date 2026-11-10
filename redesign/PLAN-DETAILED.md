@@ -128,7 +128,7 @@ Light theme on every screen (3.7); XS behaviour (3.6); keyboard focus rings, tab
 **Not available here:** Windows 10 and high-DPI monitors aren't on this machine. Windows 10 paths are tested by forcing the fallback; 150 % is tested with `QT_SCALE_FACTOR=1.5`, which approximates it but isn't the same as system scaling.
 
 ## 10. Design update: Preferences uses one sidebar (2026-11-10)
-Source: `DESIGN_SPEC.md` §8, `SCREEN_INVENTORY.md` 2.5.P1–2.5.P6, references `11-flows-library-menus-settings__2.5.*`. The in-window Preferences page (Phase 5) is already built, so this changes existing code. **Owner decision: Save / Cancel stays**; the "Changes apply immediately" line is not added.
+Source: `DESIGN_SPEC.md` §8, `SCREEN_INVENTORY.md` 2.5.P1–2.5.P6, references `11-flows-library-menus-settings__2.5.*`. The in-window Preferences page (Phase 5) is already built, so this changes existing code. **Owner decisions (2026-11-10):** Save / Cancel stays, and the "Changes apply immediately" line is not added. **Back and Esc discard unsaved edits** and return to the previous view (Esc no longer means "Cancel and stay"). **Ctrl+P in minimal view opens the classic Preferences dialog**, as in fullscreen and from the mini player.
 
 **Change set** (no new files; no QSettings keys involved):
 | File | Change |
