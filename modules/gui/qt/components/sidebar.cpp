@@ -107,10 +107,11 @@ void SidebarButton::paintEvent( QPaintEvent * )
 
     if( kind == Section && isChecked() )
     {
-        /* the active section's bar, on its leading edge */
+        /* the active section's bar, on its leading edge; the accent is
+         * too faint on light surfaces (as the menus' check marks) */
         const int inset = t->px( Size::SidebarBarInset );
         const qreal barRadius = t->px( Size::SidebarBarRadius );
-        p.setBrush( t->color( Theme::Accent ) );
+        p.setBrush( t->color( t->isDark() ? Theme::Accent : Theme::AccentText ) );
         p.drawRoundedRect( QStyle::visualRect( layoutDirection(), rect(),
                                QRect( 0, inset, t->px( Size::SidebarBarW ), height() - 2 * inset ) ),
                            barRadius, barRadius );
