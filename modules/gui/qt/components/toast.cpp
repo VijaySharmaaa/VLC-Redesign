@@ -49,6 +49,7 @@ Toast::Toast( intf_thread_t *_p_intf, QWidget *owner, QWidget *_content )
     setFont( Theme::instance()->font( Theme::Body ) );
     host = new OverlayHost( _content, this );
     connect( host, &OverlayHost::changed, this, &Toast::place );
+    _content->installEventFilter( this );   /* its subtitleLift */
 
     fade = new QPropertyAnimation( this, "windowOpacity", this );
     fade->setStartValue( 0. );
@@ -110,6 +111,20 @@ void Toast::showMessage( const QString &message )
     QAccessibleEvent alert( this, QAccessible::Alert );
     QAccessible::updateAccessibility( &alert );
 #endif
+}
+
+/* the immersive bar lifts the subtitles (or drops them) while a toast shows */
+bool Toast::eventFilter( QObject *o, QEvent *e )
+{
+    if( o == content && e->type() == QEvent::DynamicPropertyChange
+     && static_cast<QDynamicPropertyChangeEvent *>( e )->propertyName() == "subtitleLift" )
+    {
+        if( enter->state() == QAbstractAnimation::Running )
+            rise->setEndValue( restingPos() );   /* rises on, to the new place */
+        else
+            place();
+    }
+    return OverlayWindow::eventFilter( o, e );
 }
 
 void Toast::setOverVideo( bool b )
