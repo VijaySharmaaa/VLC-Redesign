@@ -341,3 +341,27 @@ Desktop 1920×1080 at 125 %: "100 %" is the native scale, "150 %" adds `QT_SCALE
 4. Change a switch, Back: reopen, the switch is unchanged. Change it, Save: it sticks.
 5. Narrow the window below 1200 px: back arrow and icons only, tooltips "Back to library (Esc)" and section names.
 6. Ctrl+H, Ctrl+P: the Simple Preferences dialog opens.
+7. Library page, Ctrl+P: the current section has the focus. Tab to a switch, Space: it flips. Tab to Save, Space (or Enter): saved. Esc: back, and the next Space is play/pause. Alt+S opens the Tools menu (Save has no mnemonic).
+8. Play an audio file, Tab to the deck's Mute, Space: play/pause (the now-playing bar's Mute the same). Tab to the sidebar's Open media, Space: the Open Media dialog.
+9. Ctrl+P, then start an audio-only file: Preferences stays. Ctrl+H in Preferences: back to the previous view, in minimal view.
+10. Play audio, Ctrl+P ("Back to player"), stop: the label turns to "Back to library" and Esc goes Home. Same from a stopped video or the idle cone.
+11. Window under 800 px, Ctrl+P, Ctrl+L (drawer), click a section, Esc: the drawer closes, Preferences stays; Esc again goes back.
+12. Focus a section, End / Home: Advanced / Interface. Light theme: the active section's bar is the dark accent text colour.
+
+### Review fixes (2026-11-10)
+Accessibility audit, design review and code review of the change above. Evidence: `D:\Projects\VLC\spike-results\prefs-sidebar-fix\` (`repro.py`, `before.log` on the reviewed build, `after.log` on the fixed one; not committed). Note: pywinauto's `send_keys` drops a plain `' '`; Space must be sent as `{SPACE}`.
+
+| Finding | Root cause | Fix |
+|---|---|---|
+| Space never toggled a control in Preferences | `ButtonKeys` (`main_interface.cpp`, from 276186aeea) sent Space on every focused button of the main window to play/pause | Only buttons inside `AbstractController` (deck, immersive, FSC), `NowPlayingBar` or `MiniPlayer` pass Space on; Enter still clicks everywhere (cca7deaeb8) |
+| Alt+S did not save | "&Save" clashed with "Tool&s" in the menu bar, so Alt+S cycled focus | Save uses the existing "Save" string, no mnemonic (d975fbf294) |
+| Focus placement, Tab stops | Nothing set focus on entry or Back; the main window was a `StrongFocus` Tab stop; the panels' scroll area was put in the Tab chain | Focus on the checked section on entry, on the window after Back/Esc; window `ClickFocus`; scroll area `NoFocus` (68c06ac75c) |
+| Light marker 1.78:1 | Bar painted in `Accent` in both themes | `AccentText` in light (deae4b2eb9) |
+| Audio start leaves Preferences | The audio-mode check used `isLibraryPage()`, which includes Preferences | Preferences is skipped (e042faef8e) |
+| Minimal view strands the page | Minimal view hides the sidebar holding the sections | `toggleMinimalView(true)` leaves Preferences as Back does (e042faef8e) |
+| Back label/target | Label from "was it a library page", target fixed only for an ended video | `MainInterface::backTarget()` (player view with nothing to show → Home) drives both, relabelled on input/vout changes (68c06ac75c) |
+| Small | — | Panel-title null check (68c06ac75c); Esc closes the XS drawer first; Home/End in the sections; the update-days box named by its option (bd39a96422); one `setBackLabel()` for text, name and "(Esc)" tooltip (68c06ac75c) |
+
+Results (`after.log`): Space flips a switch (1→0) and presses Back; keyboard-only round trip writes `qt-fs-controller=0` and Esc returns with the focus on the window; Alt+S opens Tools; Tab from Save → Back → sections, Shift+Tab from Save walks the content to the sections with no window stop; audio start keeps Preferences, Esc → Home; Ctrl+H leaves Preferences into minimal view; audio stopped in Preferences relabels to "Back to library" and Esc → Home; drawer closes on the first Esc, Preferences on the second; End/Home → Advanced/Interface; spinner named "Number of days between two update checks"; Phase 3: Space on the deck's Mute and Next and the bar's Mute pauses, on Open media opens the dialog; light bar pixel (154, 72, 0), dark (255, 138, 31).
+
+**Deferred (pre-existing, not Preferences):** when the video view goes away (Ctrl+P from a playing video, or just `stop`), Qt loses keyboard focus for good: for an instant Windows activates the next app's window (seen: VS Code), and the focus widget stays empty though VLC is foreground again (throwaway `focusChanged`/`GetGUIThreadInfo` log, `focusdbg*.py`, `focusdbg*-vlc.log`). So from the player, the section is focused and then loses it; keys still reach the window. Needs a trace of the video widget / vout window activation in Phase 6.
