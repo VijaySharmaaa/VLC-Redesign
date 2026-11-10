@@ -522,8 +522,9 @@ void PrefsPage::showSection( int i )
          * move them after the list, before Cancel and Save, in row order */
         QWidget *prev = sections;
         foreach( QWidget *w, order )
-            /* setTabOrder() ignores NoFocus widgets */
-            if( w->focusPolicy() & Qt::TabFocus )
+            /* setTabOrder() ignores NoFocus widgets, and refuses those of
+             * another window: a combo box's list is in its pop-up */
+            if( ( w->focusPolicy() & Qt::TabFocus ) && w->window() == window() )
             {
                 setTabOrder( prev, w );
                 prev = w;
