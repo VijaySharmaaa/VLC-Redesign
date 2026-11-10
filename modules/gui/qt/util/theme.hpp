@@ -48,7 +48,7 @@ public:
         Text, Text2, Mute, Dim, AccentText, Ink, Glass, FxBg, Stripe1, Stripe2,
         /* same in both themes */
         Accent, AccentHover, OnAccent, AccentTint12, AccentTint14, AccentBorder50,
-        AccentFocusRing, AccentKnobHalo, VolumeBoost,
+        AccentFocusRing, AccentKnobHalo, VolumeBoost, SeekKnobFill,
         Error, ErrorTint, DestructiveText, WindowCloseHover,
         VideoSurface, PausedBadgeBg, SubtitleBox,
         ColorRoleCount
