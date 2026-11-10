@@ -35,6 +35,7 @@
 #include "dialogs/open.hpp"
 #include "dialogs_provider.hpp" /* Open Subtitle file */
 #include "util/qt_dirs.hpp"
+#include "util/theme.hpp"
 #include "util/validators.hpp"
 #include <vlc_intf_strings.h>
 #include <vlc_modules.h>
@@ -663,9 +664,11 @@ NetOpenPanel::NetOpenPanel( QWidget *_parent, intf_thread_t *_p_intf ) :
     else
         b_recentList = false;
 
-    QFont smallFont = QApplication::font();
-    smallFont.setPointSize( smallFont.pointSize() - 1 );
-    ui.examples->setFont( smallFont );
+    /* DESIGN_SPEC 7: a 38 px mono URL field; the examples are the help */
+    Theme *t = Theme::instance();
+    ui.urlComboBox->setFont( t->font( Theme::Mono ) );
+    ui.urlComboBox->setMinimumHeight( t->metric( Theme::UrlInputH ) );
+    ui.examples->setFont( t->font( Theme::Mono ) );
 
     /* Use a simple validator for URLs */
     ui.urlComboBox->setValidator( new UrlValidator( this ) );

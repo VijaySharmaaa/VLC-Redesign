@@ -28,9 +28,15 @@
 #include "dialogs_provider.hpp"
 #include "recents.hpp"
 #include "util/qt_dirs.hpp"
+#include "util/redesign_icons.hpp"
+#include "util/theme.hpp"
 
 #include <QRegularExpression>
 #include <QMenu>
+#include <QButtonGroup>
+#include <QHBoxLayout>
+#include <QTabBar>
+#include <QToolButton>
 
 #include <cstddef>
 
@@ -87,14 +93,42 @@ OpenDialog::OpenDialog( QWidget *parent,
     captureOpenPanel = new CaptureOpenPanel( this, p_intf );
 
     /* Insert the tabs */
-    ui.Tab->insertTab( OPEN_FILE_TAB, fileOpenPanel, QIcon( ":/type/file-asym.svg" ),
-                       qtr( "&File" ) );
-    ui.Tab->insertTab( OPEN_DISC_TAB, discOpenPanel, QIcon( ":/type/disc.svg" ),
-                       qtr( "&Disc" ) );
-    ui.Tab->insertTab( OPEN_NETWORK_TAB, netOpenPanel, QIcon( ":/type/network.svg" ),
-                       qtr( "&Network" ) );
-    ui.Tab->insertTab( OPEN_CAPTURE_TAB, captureOpenPanel,
-                       QIcon( ":/type/capture-card.svg" ), qtr( "Capture &Device" ) );
+    ui.Tab->insertTab( OPEN_FILE_TAB, fileOpenPanel, qtr( "&File" ) );
+    ui.Tab->insertTab( OPEN_DISC_TAB, discOpenPanel, qtr( "&Disc" ) );
+    ui.Tab->insertTab( OPEN_NETWORK_TAB, netOpenPanel, qtr( "&Network" ) );
+    ui.Tab->insertTab( OPEN_CAPTURE_TAB, captureOpenPanel, qtr( "Capture &Device" ) );
+
+    /* DESIGN_SPEC 7: the tabs are tiles across the sheet, icon over text
+     * (QSS role "openTile"); they drive the tab widget, whose bar is hidden */
+    static const char * const tileIcons[OPEN_TAB_MAX] = {
+        RedesignIcons::IconOpenFile, RedesignIcons::IconOpenDisc,
+        RedesignIcons::IconOpenNetwork, RedesignIcons::IconOpenCapture };
+    Theme *t = Theme::instance();
+    const int glyph = t->px( RedesignTokens::Dialogs::TabTileGlyph );
+    QHBoxLayout *tileRow = new QHBoxLayout;
+    tileRow->setSpacing( t->px( RedesignTokens::Dialogs::TabTileGap ) );
+    QButtonGroup *tiles = new QButtonGroup( this );
+    for( int i = 0; i < OPEN_TAB_MAX; i++ )
+    {
+        QToolButton *tile = new QToolButton;
+        tile->setProperty( "role", "openTile" );
+        tile->setText( ui.Tab->tabText( i ) );
+        tile->setIcon( Theme::themedIcon( tileIcons[i], Theme::Text2 ) );
+        tile->setIconSize( QSize( glyph, glyph ) );
+        tile->setToolButtonStyle( Qt::ToolButtonTextUnderIcon );
+        tile->setCheckable( true );
+        tile->setSizePolicy( QSizePolicy::Expanding, QSizePolicy::Fixed );
+        tile->setFixedHeight( t->px( RedesignTokens::Dialogs::TabTileH ) );
+        tiles->addButton( tile, i );
+        tileRow->addWidget( tile );
+    }
+    tiles->button( ui.Tab->currentIndex() )->setChecked( true );
+    ui.Tab->tabBar()->hide();
+    ui.gridLayout->addLayout( tileRow, 0, 0, 1, 3 );
+    connect( tiles, QOverload<int>::of( &QButtonGroup::buttonClicked ),
+             ui.Tab, &QTabWidget::setCurrentIndex );
+    connect( ui.Tab, &QTabWidget::currentChanged, tiles,
+             [tiles]( int i ) { tiles->button( i )->setChecked( true ); } );
 
     /* Hide the Slave input widgets */
     ui.slaveLabel->hide();

@@ -27,6 +27,7 @@
 #include "dialogs/gototime.hpp"
 
 #include "input_manager.hpp"
+#include "util/theme.hpp"
 
 #include <QLabel>
 #include <QTimeEdit>
@@ -60,9 +61,18 @@ GotoTimeDialog::GotoTimeDialog( intf_thread_t *_p_intf)
     timeEdit->setDisplayFormat( "HH'H':mm'm':ss's'" );
     timeEdit->setAlignment( Qt::AlignRight );
     timeEdit->setSizePolicy( QSizePolicy::Expanding, QSizePolicy::Minimum );
+    timeEdit->setAccessibleName( qtr( "Go to time" ) );
+    /* DESIGN_SPEC 7: a large mono timecode; tokens are px at 96 dpi, fonts points */
+    Theme *t = Theme::instance();
+    QFont mono = t->font( Theme::Mono );
+    mono.setPointSizeF( RedesignTokens::Dialogs::JumpFont * 72.0 / 96.0 );
+    timeEdit->setFont( mono );
+    timeEdit->setMinimumHeight( t->px( RedesignTokens::Dialogs::JumpInputH ) );
 
     QPushButton *resetButton = new QPushButton( QIcon(":/update.svg"), "" );
     resetButton->setToolTip( qtr("Reset") );
+    resetButton->setAccessibleName( qtr("Reset") );
+    resetButton->setAutoDefault( false ); /* Go stays the default button */
 
     mainLayout->addWidget( timeIntro, 0, 0, 1, 1 );
     mainLayout->addWidget( timeEdit, 0, 1, 1, 1 );

@@ -332,6 +332,17 @@ namespace RedesignTokens
         static const int StepperFill = 15;   /* 0.06 */
         static const int StepperHover = 31;  /* 0.12 */
     }
+
+    /* ---- Phase 5: dialogs (DESIGN_SPEC 7; sizes from the prototype markup) ---- */
+    namespace Dialogs
+    {
+        /* Open media: the tab tiles */
+        static const int TabTileH = 58, TabTileGap = 6, TabTileGlyph = 22;
+        /* Error: the round icon left of the title */
+        static const int ErrorIcon = 40, ErrorGlyph = 22;
+        /* Go to time: the timecode field */
+        static const int JumpInputH = 44, JumpFont = 20;
+    }
 }
 
 #endif

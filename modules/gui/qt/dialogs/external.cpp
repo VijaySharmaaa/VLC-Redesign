@@ -178,7 +178,7 @@ void DialogHandler::updateProgress(vlc_dialog_id *p_id, float f_value,
 
 void DialogHandler::displayError(const QString &title, const QString &text)
 {
-    ErrorsDialog::getInstance (p_intf)->addError(title, text);
+    ErrorsDialog::getInstance (p_intf)->addError(title, text, true);
 }
 
 void DialogHandler::displayLogin(vlc_dialog_id *p_id, const QString &title,
