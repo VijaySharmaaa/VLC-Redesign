@@ -69,7 +69,7 @@ Evidence is in `D:\Projects\VLC\spike-results\p1-edge\` (audit), `...\p1-fix\` (
 | `--qt-minimal-view` | **pass** | `p1-edge\t6c-main.png` |
 | First run (privacy dialog) | **pass** | Themed with a dark title bar; Continue works (`t6a-privacy.png`). |
 | Clean profile vs old `vlc-qt-interface.ini` | **pass** | Old ini with custom toolbars, `QtStyle=Windows` and missing recents restores correctly (`t5a-main.png`). |
-| Old config with `qt-dark-palette=1` | **fixed** | The combo showed "Follow the system" while the app was dark; now shows Dark and migrates on save (ce4cd5a34f; `p1-int\t4.py` run). |
+| Old config with `qt-dark-palette=1` | **fixed** | The combo showed "Follow the system" while the app was dark; now shows Dark and migrates on save (ce4cd5a34f; `p1-edge\t5c`, `t5d` runs). |
 | "Force window style: System's default" saved / unknown style | **fixed** | Fell back to the Vista style; now Fusion (a89919df99, `p1-fix\s2-compare.png`). |
 | Every combo drop-down opens at a normal size | **fixed** | Popups were screen-high and blank (`p1-edge\t2c-popup.png`); fixed in f3fbe93595 + c661414531 (`p1-fix\s1-after-montage.png`). |
 | Translations (German, RTL, CJK) | **deferred** | The package is built without NLS (`build.sh` without `-i` passes `--disable-nls`), so no `.mo` files exist to test with. To check with an installer build in Phase 6. |
