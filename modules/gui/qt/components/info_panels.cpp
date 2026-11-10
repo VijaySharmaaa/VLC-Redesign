@@ -166,6 +166,7 @@ MetaPanel::MetaPanel( QWidget *parent,
     description_text->setAccessibleName( qtr( "Comments" ) );
     label->setBuddy( description_text );
     description_text->setAcceptRichText( false );
+    description_text->setTabChangesFocus( true ); /* Tab leaves, as in a field */
     metaLayout->addWidget( description_text, line, 0, 1, 7 );
     connect( description_text, &QTextEdit::textChanged, this, &MetaPanel::enterEditMode );
     line++;

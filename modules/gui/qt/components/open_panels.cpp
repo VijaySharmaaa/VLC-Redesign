@@ -93,6 +93,7 @@ FileOpenPanel::FileOpenPanel( QWidget *_parent, intf_thread_t *_p_intf ) :
     /* Subtitles */
     /* Deactivate the subtitles control by default. */
     ui.subGroupBox->setEnabled( false );
+    ui.fileListWidg->setAccessibleName( qtr( "Selected files" ) );
 
     /* Connects  */
     BUTTONACT( ui.fileBrowseButton, browseFile );

@@ -38,6 +38,8 @@
 #include <QTabBar>
 #include <QToolButton>
 #include <QKeySequence>
+#include <QKeyEvent>
+#include <QAccessibleWidget>
 
 #include <cstddef>
 
@@ -46,6 +48,76 @@
 #endif
 
 OpenDialog *OpenDialog::instance = NULL;
+
+namespace
+{
+
+/* Qt 5.6 tells assistive tools that a checkable tool button is a check
+ * box and a split button a menu item: the tiles are the tabs of a tab
+ * list, Play is a button (its menu is a second action) */
+class OpenButtonAccessible : public QAccessibleWidget
+{
+public:
+    OpenButtonAccessible( QToolButton *b, QAccessible::Role r ) : QAccessibleWidget( b, r ) {}
+
+    QString text( QAccessible::Text t ) const Q_DECL_OVERRIDE
+    {
+        if( t == QAccessible::Name )
+            return QString( button()->text() ).remove( QLatin1Char( '&' ) );
+        if( t == QAccessible::Accelerator )
+            return button()->shortcut().toString( QKeySequence::NativeText );
+        return QAccessibleWidget::text( t );
+    }
+    QAccessible::State state() const Q_DECL_OVERRIDE
+    {
+        QAccessible::State s = QAccessibleWidget::state();
+        if( role() == QAccessible::PageTab )
+        {
+            s.selectable = true;
+            s.selected = button()->isChecked();
+        }
+        s.pressed = button()->isDown();
+        return s;
+    }
+    QStringList actionNames() const Q_DECL_OVERRIDE
+    {
+        QStringList names;
+        if( button()->isEnabled() )
+        {
+            names << pressAction();
+            if( button()->menu() )
+                names << showMenuAction();
+        }
+        return names + QAccessibleWidget::actionNames();
+    }
+    void doAction( const QString &action ) Q_DECL_OVERRIDE
+    {
+        if( !button()->isEnabled() )
+            return;
+        if( action == pressAction() )
+            button()->click();
+        else if( action == showMenuAction() )
+            button()->showMenu();
+        else
+            QAccessibleWidget::doAction( action );
+    }
+
+private:
+    QToolButton *button() const { return static_cast<QToolButton *>( widget() ); }
+};
+
+QAccessibleInterface *openButtonAccessible( const QString &, QObject *object )
+{
+    QToolButton *b = qobject_cast<QToolButton *>( object );
+    const QString role = b ? b->property( "role" ).toString() : QString();
+    if( role == QLatin1String( "openTile" ) )
+        return new OpenButtonAccessible( b, QAccessible::PageTab );
+    if( role == QLatin1String( "split" ) )
+        return new OpenButtonAccessible( b, QAccessible::Button );
+    return NULL;
+}
+
+}
 
 OpenDialog* OpenDialog::getInstance( QWidget *parent, intf_thread_t *p_intf,
         bool b_rawInstance, int _action_flag, bool b_selectMode, bool _b_pl )
@@ -86,6 +158,9 @@ OpenDialog::OpenDialog( QWidget *parent,
     setWindowTitle( qtr( "Open Media" ) );
     setWindowRole( "vlc-open-media" );
     setWindowModality( Qt::WindowModal );
+    /* a modal sheet in the design (1.7): Close only, no min/max */
+    setWindowFlags( Qt::Dialog | Qt::WindowTitleHint | Qt::WindowSystemMenuHint |
+                    Qt::WindowCloseButtonHint );
 
     /* Tab definition and creation */
     fileOpenPanel    = new FileOpenPanel( this, p_intf );
@@ -108,7 +183,13 @@ OpenDialog::OpenDialog( QWidget *parent,
     const int glyph = t->px( RedesignTokens::Dialogs::TabTileGlyph );
     QHBoxLayout *tileRow = new QHBoxLayout;
     tileRow->setSpacing( t->px( RedesignTokens::Dialogs::TabTileGap ) );
-    QButtonGroup *tiles = new QButtonGroup( this );
+    static bool accessibleInstalled = false;
+    if( !accessibleInstalled )
+    {
+        QAccessible::installFactory( openButtonAccessible );
+        accessibleInstalled = true;
+    }
+    tiles = new QButtonGroup( this );
     for( int i = 0; i < OPEN_TAB_MAX; i++ )
     {
         QToolButton *tile = new QToolButton;
@@ -117,8 +198,11 @@ OpenDialog::OpenDialog( QWidget *parent,
          * shortcut: Disc and Capture &Device share Alt+D (Qt focuses each in
          * turn), as before; give Capture its own letter in the strings */
         const QString label = ui.Tab->tabText( i );
+        const QKeySequence key = QKeySequence::mnemonic( label );
         tile->setText( QString( label ).remove( QLatin1Char( '&' ) ) );
-        tile->setShortcut( QKeySequence::mnemonic( label ) );
+        tile->setShortcut( key );
+        tile->setToolTip( qtr( "%1 (%2)" ).arg( tile->text(),
+                                               key.toString( QKeySequence::NativeText ) ) );
         tile->setIcon( Theme::themedIcon( tileIcons[i], Theme::Text2 ) );
         tile->setIconSize( QSize( glyph, glyph ) );
         tile->setToolButtonStyle( Qt::ToolButtonTextUnderIcon );
@@ -126,15 +210,17 @@ OpenDialog::OpenDialog( QWidget *parent,
         tile->setSizePolicy( QSizePolicy::Expanding, QSizePolicy::Fixed );
         tile->setFixedHeight( t->px( RedesignTokens::Dialogs::TabTileH ) );
         tiles->addButton( tile, i );
+        tile->installEventFilter( this );
         tileRow->addWidget( tile );
     }
     tiles->button( ui.Tab->currentIndex() )->setChecked( true );
     ui.Tab->tabBar()->hide();
     ui.gridLayout->addLayout( tileRow, 0, 0, 1, 3 );
-    connect( tiles, QOverload<int>::of( &QButtonGroup::buttonClicked ),
-             ui.Tab, &QTabWidget::setCurrentIndex );
+    /* toggled, not clicked: an assistive tool may check a tile without a click */
+    connect( tiles, QOverload<int, bool>::of( &QButtonGroup::buttonToggled ),
+             ui.Tab, [this]( int i, bool on ) { if( on ) ui.Tab->setCurrentIndex( i ); } );
     connect( ui.Tab, &QTabWidget::currentChanged, tiles,
-             [tiles]( int i ) { tiles->button( i )->setChecked( true ); } );
+             [this]( int i ) { tiles->button( i )->setChecked( true ); } );
 
     /* Hide the Slave input widgets */
     ui.slaveLabel->hide();
@@ -228,6 +314,36 @@ OpenDialog::OpenDialog( QWidget *parent,
     resize( getSettings()->value( "OpenDialog/size", QSize( 500, 400 ) ).toSize() );
 }
 
+/* The tiles are a tab list: only the current tile is a Tab stop (Qt's
+ * exclusive group), the arrows, Home and End move to a tile and open it */
+bool OpenDialog::eventFilter( QObject *obj, QEvent *e )
+{
+    QAbstractButton *tile = qobject_cast<QAbstractButton *>( obj );
+    const int current = tile ? tiles->id( tile ) : -1;
+    if( e->type() != QEvent::KeyPress || current < 0 )
+        return QVLCDialog::eventFilter( obj, e );
+    const int count = tiles->buttons().count();
+    const int forward = tile->isRightToLeft() ? -1 : 1;
+    int next;
+    switch( static_cast<QKeyEvent *>( e )->key() )
+    {
+    case Qt::Key_Left:  next = current - forward; break;
+    case Qt::Key_Right: next = current + forward; break;
+    case Qt::Key_Up:    next = current - 1; break;
+    case Qt::Key_Down:  next = current + 1; break;
+    case Qt::Key_Home:  next = 0; break;
+    case Qt::Key_End:   next = count - 1; break;
+    default:
+        return QVLCDialog::eventFilter( obj, e );
+    }
+    /* no wrap, as a tab bar: Left on File doesn't land on Capture */
+    QAbstractButton *target = tiles->button( qBound( 0, next, count - 1 ) );
+    target->setChecked( true );
+    /* after the panel's onFocus(): the keyboard stays on the tiles */
+    target->setFocus( Qt::TabFocusReason );
+    return true;
+}
+
 /* Finish the dialog and decide if you open another one after */
 void OpenDialog::setMenuAction()
 {
@@ -300,6 +416,13 @@ void OpenDialog::showTab( int i_tab )
         OpenPanel *panel = qobject_cast<OpenPanel *>( ui.Tab->currentWidget() );
         assert( panel );
         panel->onFocus();
+        /* start in the panel (its first control), not on "Show more options" */
+        for( QWidget *w = panel->nextInFocusChain();
+             w != panel && !panel->isAncestorOf( focusWidget() );
+             w = w->nextInFocusChain() )
+            if( panel->isAncestorOf( w ) && w->isVisibleTo( panel ) && w->isEnabled()
+             && ( w->focusPolicy() & Qt::TabFocus ) )
+                w->setFocus( Qt::TabFocusReason );
     }
 }
 
