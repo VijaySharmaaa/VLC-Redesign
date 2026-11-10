@@ -242,6 +242,11 @@ ExtendedDialog::ExtendedDialog( intf_thread_t *_p_intf )
     cornerLayout->setContentsMargins( 0, 0, t->px( Effects::TabsPadX ), 0 );
     cornerLayout->addWidget( moreButton, 0, Qt::AlignTop );
     mainTabW->setCornerWidget( corner, Qt::TopRightCorner );
+    /* the left padding as a corner too: a tab-bar offset in the style
+     * sheet moves the bar past the corners, the tabs then ran under "More" */
+    QWidget *leftPad = new QWidget( mainTabW );
+    ( new QHBoxLayout( leftPad ) )->setContentsMargins( t->px( Effects::TabsPadX ), 0, 0, 0 );
+    mainTabW->setCornerWidget( leftPad, Qt::TopLeftCorner );
 
     /* the top tabs lead to each group's first page */
     connect( mainTabW, &QTabWidget::tabBarClicked, this, [this]( int i ) {

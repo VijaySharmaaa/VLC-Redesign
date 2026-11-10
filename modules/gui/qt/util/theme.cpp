@@ -932,7 +932,6 @@ QLabel[role="libraryDim"] { color: @dim@; }
 /* Phase 5: effects (dialogs/extended.cpp, components/extended_panels.cpp) */
 #effectsSheet QTabWidget::pane { background: transparent; border: none; }
 #effectsSheet QTabWidget#effectsTabs::pane { border-top: 1px solid @divider@; }
-#effectsSheet QTabWidget#effectsTabs::tab-bar { left: @fxTabsPadX@px; }
 QToolButton#effectsMore { padding-right: @iconGlyph@px; }
 QToolButton#effectsMore::menu-indicator { image: url("@arrowDown@"); subcontrol-origin: padding; subcontrol-position: center right;
     width: @iconGlyph@px; height: @iconGlyph@px; }
@@ -1081,7 +1080,6 @@ PrefsPage QComboBox { min-height: @prefsSelectInner@px; }
         { "homeRowPad", QString::number(px(Home::RowPadX)) },
         { "homeRowLine", css(ink(InkAlpha::RowLine)) },
         /* Phase 5: effects */
-        { "fxTabsPadX", QString::number(px(Effects::TabsPadX)) },
         { "chipBorder", css(ink(InkAlpha::ChipBorder)) },
         { "chipRadius", QString::number(px(Size::ChipH) / 2) },
         { "fxChipPadX", QString::number(px(Effects::ChipPadX)) },
