@@ -208,6 +208,12 @@ Evidence: `D:\Projects\VLC\spike-results\p4-fix\` (scripts in `scripts\`: `t1_qu
 12. Tab to a primary button (Add a folder): its border shows in both themes.
 13. Videos: open folder A, back, folder B, back, A again before A's listing came in: A's items are listed once.
 
+14. At 1600 px, Home, Videos, Home, Music, Network, Home: the window stays 1600 px and the sidebar stays full (`t_drift.py`; was 1400 px with a rail).
+15. Network > Icecast directory: the header says "Loading..." with an empty list until the stations come; an empty list says "No results" after about 10 s.
+
+### Deferred
+- Quit while the Icecast directory loads takes up to the download time (10-17 s in 4 of 5 runs, `ice-after.txt`, `ice-quit.log`): `modules/lua/services_discovery.c:287` runs the script's `main()` with cancellation off and `Close()` joins it (`:264-265`), so the core waits for the whole download and parse. Stock VLC does the same from its selector. Outside `modules/gui/qt`; the Qt interface has already finished at that point.
+
 ### Deviations
 - Primary button focus uses `@tx@`, like the accent-filled play button, not `@focusRing@`: in the dark theme `@focusRing@` is the accent, the button's own fill, so the ring would not show.
 - The network tile glyph's `+ 1` became exact centring arithmetic (`(TileIcon - TileGlyph) / 2`), not a token: it only made up for `QRect::center()` rounding.
