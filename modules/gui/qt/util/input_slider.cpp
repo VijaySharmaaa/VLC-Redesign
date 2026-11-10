@@ -629,12 +629,12 @@ QBrush SoundSlider::fillBrush() const
         if( b_isMuted )
             return theme->ink( RedesignTokens::InkAlpha::ToggleOff );
         if( value() <= 100 )
-            return theme->color( Theme::Accent );
+            return theme->color( Theme::AccentFill );
         /* DESIGN_SPEC 3: only the part above 100 % (the tick) is the boost */
         const QRect track = trackRect();
         QLinearGradient gradient( track.left(), 0, track.left() + track.width(), 0 );
         const qreal tick = 100.0 / maximum();
-        gradient.setColorAt( tick, theme->color( Theme::Accent ) );
+        gradient.setColorAt( tick, theme->color( Theme::AccentFill ) );
         gradient.setColorAt( qMin( 1.0, tick + 1.0 / track.width() ), theme->color( Theme::VolumeBoost ) );
         return gradient;
     }

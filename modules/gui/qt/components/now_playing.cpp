@@ -298,7 +298,7 @@ void ThinSeekBar::paintEvent( QPaintEvent * )
         done.setWidth( track.width() * sliderPosition() / maximum() );
         if( layoutDirection() == Qt::RightToLeft )
             done.moveRight( track.right() );
-        p.setBrush( t->color( Theme::Accent ) );
+        p.setBrush( t->color( Theme::AccentFill ) );
         p.drawRoundedRect( done, h / 2, h / 2 );
     }
     if( hasFocus() )
