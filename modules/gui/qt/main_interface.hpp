@@ -60,6 +60,10 @@ class DropOverlay;
 class Sidebar;
 class BreakpointWatcher;
 class TitleBar;
+class NowPlayingInfo;
+class NowPlayingBar;
+class AudioModePage;
+class MiniPlayer;
 struct vout_window_t;
 
 class MainInterface : public QVLCMW
@@ -105,6 +109,7 @@ public:
     bool isPlDocked() { return ( b_plDocked != false ); }
     bool isInterfaceFullScreen() { return b_interfaceFullScreen; }
     bool isInterfaceAlwaysOnTop() { return b_interfaceOnTop; }
+    bool isMiniPlayerVisible() const;
     StandardPLPanel* getPlaylistView();
     void showToast( const QString & );
     Sidebar *getSidebar() { return sidebar; }
@@ -152,6 +157,10 @@ protected:
     void setMinimalView( bool );
     void setInterfaceFullScreen( bool );
     void computeMinimumSize( bool b_minimal );
+    /* The deck, or under the library once something played, the
+     * now-playing bar */
+    void setDeckVisible( bool );
+    bool isLibraryPage( QWidget * ) const;
 
     /* */
     QSettings           *settings;
@@ -175,6 +184,10 @@ protected:
     PlaylistWidget      *playlistWidget;
     Sidebar             *sidebar;
     BreakpointWatcher   *breakpoints;
+    NowPlayingInfo      *nowPlayingInfo;
+    NowPlayingBar       *nowPlayingBar;
+    AudioModePage       *audioPage;
+    MiniPlayer          *miniPlayer;
     //VisualSelector      *visualSelector;
 
     /* resume panel */
@@ -214,6 +227,9 @@ protected:
 
     bool                 b_hasPausedWhenMinimized;
     bool                 b_statusbarVisible;
+    bool                 b_nowPlayingSeen;      ///< something played: the bar can show
+    bool                 b_browsing;            ///< library picked during playback
+    bool                 b_audioModeCheck;      ///< new input: audio mode when audio-only
 
     static const Qt::Key kc[10]; /* easter eggs */
     int i_kc_offset;
@@ -229,6 +245,7 @@ public slots:
     void toggleInterfaceFullScreen();
     void toggleFSC();
     void setInterfaceAlwaysOnTop( bool );
+    void toggleMiniPlayer();
 
     void setStatusBarVisibility(bool b_visible);
     void setPlaylistVisibility(bool b_visible);
@@ -273,6 +290,8 @@ protected slots:
     void resumePlayback();
     void onInputChanged( bool );
     void onVOutChanged( bool );
+    void updateNowPlayingBar();
+    void showNowPlaying();
 
 signals:
     void askGetVideo( struct vout_window_t *, unsigned, unsigned, bool,
@@ -284,6 +303,7 @@ signals:
     void askVideoOnTop( bool );
     void minimalViewToggled( bool );
     void fullscreenInterfaceToggled( bool );
+    void miniPlayerToggled( bool );
     void askToQuit();
     void askBoss();
     void askRaise();
