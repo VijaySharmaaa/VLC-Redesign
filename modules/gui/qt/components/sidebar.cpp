@@ -67,7 +67,15 @@ public:
         setAttribute( Qt::WA_Hover );
     }
 
-    void setRail( bool b ) { rail = b; update(); }
+    /* rail: the square sizeHint, centred, so Open and the highlights keep
+     * their shape at every rail width; expanded: the whole row */
+    void setRail( bool b )
+    {
+        rail = b;
+        if( parentWidget() && parentWidget()->layout() )
+            parentWidget()->layout()->setAlignment( this, b ? Qt::AlignHCenter : Qt::Alignment() );
+        update();
+    }
 
     QSize sizeHint() const Q_DECL_OVERRIDE
     {
