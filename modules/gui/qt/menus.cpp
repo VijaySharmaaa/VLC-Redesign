@@ -530,6 +530,12 @@ QMenu *VLCMenuBar::ViewMenu( intf_thread_t *p_intf, QMenu *current, MainInterfac
     action->setCheckable( true );
     action->setChecked( var_InheritBool( p_intf, "qt-immersive" ) );
     connect( action, &QAction::triggered, mi, &MainInterface::setImmersive );
+    /* Mini player: no shortcut, Ctrl+H stays the minimal interface (D3) */
+    action = menu->addAction( qtr( "Mini &Player" ) );
+    action->setCheckable( true );
+    action->setChecked( mi->isMiniPlayerVisible() );
+    connect( action, &QAction::triggered, mi, &MainInterface::toggleMiniPlayer );
+    connect( mi, &MainInterface::miniPlayerToggled, action, &QAction::setChecked );
 
     /* FullScreen View */
     action = menu->addAction( qtr( "&Fullscreen Interface" ), mi,

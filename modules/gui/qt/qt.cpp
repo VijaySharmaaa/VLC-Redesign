@@ -48,6 +48,7 @@
 #include "util/qvlcapp.hpp"     /* QVLCApplication definition */
 #include "util/theme.hpp"       /* Theme creation */
 #include "components/playlist/playlist_model.hpp" /* for ~PLModel() */
+#include "components/spectrum.hpp" /* OpenSpectrumFilter */
 
 #include <vlc_plugin.h>
 #include <vlc_vout_window.h>
@@ -353,6 +354,14 @@ vlc_module_begin ()
     add_submodule ()
         set_capability( "vout window", 0 )
         set_callbacks( WindowOpen, WindowClose )
+
+    /* the audio mode's spectrum: put on the playlist's audio output by
+     * SpectrumWidget::setTap, never by the user (priority 0) */
+    add_submodule ()
+        set_description( "Qt spectrum tap" )
+        set_capability( "audio filter", 0 )
+        add_shortcut( "qt_spectrum" )
+        set_callbacks( OpenSpectrumFilter, NULL )
 
 vlc_module_end ()
 

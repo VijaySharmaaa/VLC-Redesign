@@ -75,6 +75,7 @@ public:
         ViewChange, Toast, ToastHold, PausedBadgeFade, MiniPlayer, DropTarget,
         SeekTick, VolumeFill, EqBand, Toggle, PlayPress, ImmersiveIdle, ImmersiveFade,
         Spinner,    /* one turn of the buffering ring */
+        Spectrum,
         MotionRoleCount
     };
 

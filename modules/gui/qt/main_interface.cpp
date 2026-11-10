@@ -47,6 +47,8 @@
 #include "components/playlist/playlist.hpp"     // plWidget
 #include "components/playlist/playlist_panel.hpp" // PlaylistPanel
 #include "components/sidebar.hpp"               // Sidebar
+#include "components/now_playing.hpp"           // now-playing bar, audio mode, mini player
+#include "components/spectrum.hpp"              // SpectrumWidget::setTap
 #include "util/breakpoints.hpp"                 // BreakpointWatcher
 #include "dialogs/firstrun.hpp"                 // First Run
 #include "dialogs/playlist.hpp"                 // PlaylistDialog
@@ -113,6 +115,10 @@ MainInterface::MainInterface( intf_thread_t *_p_intf, bool customFrame ) : QVLCM
     playlistPanel        = NULL;
     sidebar              = NULL;
     breakpoints          = NULL;
+    nowPlayingInfo       = NULL;
+    nowPlayingBar        = NULL;
+    audioPage            = NULL;
+    miniPlayer           = NULL;
     stackCentralOldWidget= NULL;
     lastWinScreen        = NULL;
     sysTray              = NULL;
@@ -133,6 +139,9 @@ MainInterface::MainInterface( intf_thread_t *_p_intf, bool customFrame ) : QVLCM
     b_maximizedView      = false;
     b_isWindowTiled      = false;
     b_altAlone           = false;
+    b_nowPlayingSeen     = false;
+    b_browsing           = false;
+    b_audioModeCheck     = false;
 
     /* Ask for Privacy */
     FirstRun::CheckAndRun( this, p_intf );
@@ -224,6 +233,29 @@ MainInterface::MainInterface( intf_thread_t *_p_intf, bool customFrame ) : QVLCM
     }
     connect( THEMIM, &MainInputManager::inputChanged, this, &MainInterface::onInputChanged );
     connect( THEMIM->getIM(), &InputManager::voutChanged, this, &MainInterface::onVOutChanged );
+    /* Audio mode in place of the cone for audio-only playback, unless the
+     * user went to the library meanwhile. Decided once the input plays:
+     * its streams are known by then (a TS stream's video can come later,
+     * the video view then takes over as it always did). */
+    connect( THEMIM->getIM(), &InputManager::playingStatusChanged, this, [this]( int state ) {
+        input_thread_t *input = THEMIM->getInput();
+        if( state != PLAYING_S || !b_audioModeCheck || input == NULL )
+            return;
+        b_audioModeCheck = false;
+        if( THEMIM->getIM()->hasVideo() || var_CountChoices( input, "video-es" ) > 0 )
+            return;
+        QWidget *current = stackCentralW->currentWidget();
+        if( current == bgWidget || ( isLibraryPage( current ) && !b_browsing ) )
+            showTab( audioPage );
+    } );
+    /* a cleared playlist has nothing left to show in the bar */
+    connect( THEMIM, &MainInputManager::playlistNotEmpty, this, [this]( bool notEmpty ) {
+        if( !notEmpty && !THEMIM->getIM()->hasInput() )
+        {
+            b_nowPlayingSeen = false;
+            updateNowPlayingBar();
+        }
+    } );
 
     /* END CONNECTS ON IM */
 
@@ -328,6 +360,12 @@ MainInterface::~MainInterface()
     /* Delete the FSC controller */
     delete fullscreenControls;
 
+    /* the mini player saves its place when it hides */
+    if( miniPlayer )
+        miniPlayer->hide();
+    delete miniPlayer;
+    SpectrumWidget::setTap( p_intf, false );
+
     /* Save states */
 
     settings->beginGroup("MainWindow");
@@ -392,8 +430,10 @@ void MainInterface::recreateToolbars()
 
     controls = new ControlsWidget( p_intf, b_adv, this );
     inputC = new InputControlsWidget( p_intf, this );
-    mainLayout->insertWidget( 2, inputC );
-    mainLayout->insertWidget( settings->value( "MainWindow/ToolbarPos", false ).toBool() ? 0: 3,
+    /* below the stack and the now-playing bar, or controls on top */
+    const int deckRow = mainLayout->indexOf( nowPlayingBar ) + 1;
+    mainLayout->insertWidget( deckRow, inputC );
+    mainLayout->insertWidget( settings->value( "MainWindow/ToolbarPos", false ).toBool() ? 0: deckRow + 1,
                               controls );
     if( immersiveBar )
         immersiveBar->rebuild( b_adv );
@@ -498,6 +538,17 @@ void MainInterface::resumePlayback()
 
 void MainInterface::onInputChanged( bool hasInput )
 {
+    if( hasInput )
+    {
+        b_audioModeCheck = true;
+        /* a new audio output (device change) starts without the tap */
+        SpectrumWidget::setTap( p_intf, true );
+        if( !b_nowPlayingSeen )
+        {
+            b_nowPlayingSeen = true;
+            updateNowPlayingBar();
+        }
+    }
     if( hasInput == false )
         return;
     int autoRaise = var_InheritInteger( p_intf, "qt-auto-raise" );
@@ -567,19 +618,31 @@ void MainInterface::createMainWidget( QSettings *creationSettings )
     bodyLayout->addWidget( stackCentralW, 1 );
     mainLayout->insertWidget( 1, body );
 
+    /* Audio mode and the now-playing bar (below the stack) share what
+     * is playing; the bar takes the deck's place under the library */
+    nowPlayingInfo = new NowPlayingInfo( p_intf, this );
+    audioPage = new AudioModePage( p_intf, nowPlayingInfo, stackCentralW );
+    stackCentralW->addWidget( audioPage );
+    /* before the first decoder builds its filters (see onInputChanged) */
+    SpectrumWidget::setTap( p_intf, true );
+    connect( audioPage, &AudioModePage::libraryRequested,
+             this, [this]() { sidebar->showPage( Sidebar::Home ); } );
+    nowPlayingBar = new NowPlayingBar( p_intf, nowPlayingInfo, main );
+    nowPlayingBar->hide();
+    mainLayout->insertWidget( mainLayout->indexOf( body ) + 1, nowPlayingBar );
+    connect( nowPlayingBar, &NowPlayingBar::expandRequested, this, &MainInterface::showNowPlaying );
+
     for( int i = 0; i < Sidebar::PageCount; i++ )
         stackCentralW->addWidget( sidebar->page( static_cast<Sidebar::Page>( i ) ) );
     connect( sidebar, &Sidebar::pageRequested, this, [this]( QWidget *page ) {
-        /* shortcut: until the Phase 3 now-playing bar, clicking the open
-         * page again (or the cone) goes back to what is playing */
-        if( stackCentralW->currentWidget() == page && THEMIM->getIM()->hasInput() )
-            showTab( videoWidget && THEMIM->getIM()->hasVideo()
-                     ? static_cast<QWidget *>( videoWidget ) : bgWidget );
-        else
-            showTab( page );
+        /* browsing during playback: the next track keeps the library open */
+        b_browsing = THEMIM->getIM()->hasInput();
+        showTab( page );
     } );
     connect( stackCentralW, &QStackedWidget::currentChanged, sidebar,
              [this]() { sidebar->setCurrentWidget( stackCentralW->currentWidget() ); } );
+    connect( stackCentralW, &QStackedWidget::currentChanged,
+             this, &MainInterface::updateNowPlayingBar );
     /* the window opens on Home; bgWidget stays for cover art */
     stackCentralW->setCurrentWidget( sidebar->page( Sidebar::Home ) );
 
@@ -587,6 +650,8 @@ void MainInterface::createMainWidget( QSettings *creationSettings )
     breakpoints->addTarget( sidebar );
     sidebar->setBreakpoint( breakpoints->current() );
     connect( breakpoints, &BreakpointWatcher::changed, sidebar, &Sidebar::setBreakpoint );
+    audioPage->setBreakpoint( breakpoints->current() );
+    connect( breakpoints, &BreakpointWatcher::changed, audioPage, &AudioModePage::setBreakpoint );
 
     stackWidgetsSizes[bgWidget] =
         creationSettings->value( "MainWindow/bgSize", QSize( 600, 0 ) ).toSize();
@@ -598,9 +663,10 @@ void MainInterface::createMainWidget( QSettings *creationSettings )
         creationSettings->value( "MainWindow/adv-controls", false ).toBool(), this );
     inputC = new InputControlsWidget( p_intf, this );
 
-    mainLayout->insertWidget( 2, inputC );
+    const int deckRow = mainLayout->indexOf( nowPlayingBar ) + 1;
+    mainLayout->insertWidget( deckRow, inputC );
     mainLayout->insertWidget(
-        creationSettings->value( "MainWindow/ToolbarPos", false ).toBool() ? 0: 3,
+        creationSettings->value( "MainWindow/ToolbarPos", false ).toBool() ? 0: deckRow + 1,
         controls );
 
     /* Visualisation, disabled for now, they SUCK */
@@ -1106,7 +1172,8 @@ void MainInterface::createPausedBadge()
 bool MainInterface::onPlayerPage() const
 {
     QWidget *page = stackCentralW->currentWidget();
-    return page == bgWidget || ( videoWidget && page == videoWidget );
+    return page == bgWidget || ( videoWidget && page == videoWidget )
+        || ( audioPage && page == audioPage );
 }
 
 /* The immersive layout floats the deck over the player view (video or cover
@@ -1123,10 +1190,7 @@ void MainInterface::updateDeckPlacement()
         buffering->setOnPlayer( onPlayerPage() );
     const bool floats = deckFloats();
     if( !b_minimalView && !b_videoFullScreen )
-    {
-        controls->setVisible( !floats );
-        inputC->setVisible( !floats );
-    }
+        setDeckVisible( true );
     if( immersiveBar )
         immersiveBar->setActive( floats );
 }
@@ -1349,6 +1413,7 @@ void MainInterface::setMinimalView( bool b_minimal )
     bool b_statusBarVisible = statusBar()->isVisible();
 #endif
     bool b_inputCVisible = inputC->isVisible();
+    const bool b_barVisible = nowPlayingBar->isVisible();
     /* the sidebar goes too: its width, and the stack's for the way back */
     const bool b_sidebarShown = !sidebar->isHidden();
     const int i_stackWidth = stackCentralW->width();
@@ -1377,6 +1442,8 @@ void MainInterface::setMinimalView( bool b_minimal )
 #endif
         if( b_inputCVisible )
             i_heightChange += inputC->height();
+        if( b_barVisible )
+            i_heightChange += nowPlayingBar->height();
 
         const int i_widthChange = b_sidebarShown ? sidebar->width() : 0;
         if( i_heightChange != 0 || i_widthChange != 0 )
@@ -1386,11 +1453,10 @@ void MainInterface::setMinimalView( bool b_minimal )
     sidebar->setVisible( !b_minimal );
     if( b_plDocked )   /* back from full screen; minimal view keeps it */
         showPlaylistPanel( playlistVisible );
-    controls->setVisible( !b_minimal && !deckFloats() );
+    setDeckVisible( !b_minimal );
 #ifndef QT_NO_STATUSBAR
     statusBar()->setVisible( !b_minimal && b_statusbarVisible );
 #endif
-    inputC->setVisible( !b_minimal && !deckFloats() );
 
     if( !isFullScreen() && !isMaximized() && !b_minimal && !b_isWindowTiled )
     {
@@ -1404,6 +1470,8 @@ void MainInterface::setMinimalView( bool b_minimal )
 #endif
         if( !b_inputCVisible && inputC->isVisible() )
             i_heightChange += inputC->height();
+        if( !b_barVisible && nowPlayingBar->isVisible() )
+            i_heightChange += nowPlayingBar->height();
 
         const int i_width = b_sidebarShown ? width()
                           : windowWidthFor( i_stackWidth, i_otherWidth, true );
@@ -1414,6 +1482,79 @@ void MainInterface::setMinimalView( bool b_minimal )
     if( !b_minimal )
         computeMinimumSize( false );
     updateDeckPlacement();
+}
+
+void MainInterface::setDeckVisible( bool visible )
+{
+    const bool bar = visible && b_nowPlayingSeen
+                  && isLibraryPage( stackCentralW->currentWidget() );
+    nowPlayingBar->setVisible( bar );
+    /* in the immersive layout the deck floats over the video instead */
+    controls->setVisible( visible && !bar && !deckFloats() );
+    inputC->setVisible( visible && !bar && !deckFloats() );
+}
+
+bool MainInterface::isLibraryPage( QWidget *w ) const
+{
+    for( int i = 0; i < Sidebar::PageCount; i++ )
+        if( w == sidebar->page( static_cast<Sidebar::Page>( i ) ) )
+            return true;
+    return false;
+}
+
+void MainInterface::updateNowPlayingBar()
+{
+    if( !isLibraryPage( stackCentralW->currentWidget() ) )
+        b_browsing = false;
+    /* not before the deck exists, and full screen keeps everything hidden */
+    if( !controls || !inputC || b_videoFullScreen )
+        return;
+    setDeckVisible( !b_minimalView );
+    /* now, so a resizeStack() right after sees the new stack height */
+    centralWidget()->layout()->activate();
+}
+
+/* The bar's expand: the video when there is one, else audio mode */
+void MainInterface::showNowPlaying()
+{
+    if( videoWidget && THEMIM->getIM()->hasVideo() )
+        showVideo();
+    else
+        showTab( audioPage );
+}
+
+bool MainInterface::isMiniPlayerVisible() const
+{
+    return miniPlayer && miniPlayer->isVisible();
+}
+
+/* DESIGN_SPEC 9 / D3: the mini player stands in for the main window, which
+ * hides (the video keeps playing in it, unseen); restore brings it back. */
+void MainInterface::toggleMiniPlayer()
+{
+    if( !miniPlayer )
+    {
+        miniPlayer = new MiniPlayer( p_intf, nowPlayingInfo, NULL );
+        connect( miniPlayer, &MiniPlayer::restoreRequested, this, &MainInterface::toggleMiniPlayer );
+        connect( miniPlayer, &MiniPlayer::keyPressed, this, &MainInterface::handleKeyPress );
+    }
+    const bool b_mini = !miniPlayer->isVisible();
+    if( b_mini )
+    {
+        miniPlayer->popIn();
+        hide();
+    }
+    else
+    {
+        miniPlayer->hide();
+        if( isMinimized() )
+            showNormal();
+        else
+            show();
+        raise();
+        activateWindow();
+    }
+    emit miniPlayerToggled( b_mini );
 }
 
 /*
