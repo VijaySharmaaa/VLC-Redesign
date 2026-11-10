@@ -933,11 +933,13 @@ void PlayerHeader::paintEvent( QPaintEvent * )
 
     p.setFont( title );
     p.setPen( QColor::fromRgb( RedesignTokens::Dark.tx ) );
-    p.drawText( QStyle::visualRect( dir, rect(), QRect( x, y, w, titleFm.height() ) ), align,
+    p.drawText( QStyle::visualRect( dir, rect(), QRect( x, y - t->textNudge( p.font() ), w, titleFm.height() ) ),
+                align,
                 titleFm.elidedText( info->title, Qt::ElideRight, w ) );
     y += titleFm.height();
     p.setFont( metaFont );
     p.setPen( QColor::fromRgb( RedesignTokens::Dark.tx2 ) );
-    p.drawText( QStyle::visualRect( dir, rect(), QRect( x, y, w, metaFm.height() ) ), align,
+    p.drawText( QStyle::visualRect( dir, rect(), QRect( x, y - t->textNudge( p.font() ), w, metaFm.height() ) ),
+                align,
                 metaFm.elidedText( meta, Qt::ElideRight, w ) );
 }

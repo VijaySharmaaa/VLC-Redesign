@@ -777,7 +777,8 @@ void SoundSlider::paintEvent( QPaintEvent *e )
 
     painter.setPen( theme->color( Theme::Text2 ) );
     painter.setFont( theme->font( Theme::Meta ) );
-    painter.drawText( QRect( track.right() + 1, 0, width() - track.right() - 1, height() ),
+    painter.drawText( QRect( track.right() + 1, -theme->textNudge( painter.font() ),
+                             width() - track.right() - 1, height() ),
                       Qt::AlignRight | Qt::AlignVCenter, QString::number( value() ) + '%' );
     e->accept();
 }

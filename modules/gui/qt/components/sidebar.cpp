@@ -189,7 +189,7 @@ void SidebarButton::paintEvent( QPaintEvent * )
                           width() - iconRect.right() - 1 - gap - padX, height() );
     p.setFont( font );
     p.setPen( t->color( ink ) );
-    p.drawText( QStyle::visualRect( layoutDirection(), rect(), textRect ),
+    p.drawText( QStyle::visualRect( layoutDirection(), rect(), textRect ).translated( 0, -t->textNudge( p.font() ) ),
                 Qt::AlignVCenter | Qt::AlignLeft,
                 fm.elidedText( text(), Qt::ElideRight, textRect.width() ) );
 }

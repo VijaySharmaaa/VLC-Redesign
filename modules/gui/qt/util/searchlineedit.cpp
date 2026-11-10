@@ -32,6 +32,7 @@
 #include "customwidgets.hpp"
 
 #include "qt.hpp" /*needed for qtr but not necessary */
+#include "util/theme.hpp"
 
 #include <QPainter>
 #include <QRect>
@@ -140,6 +141,9 @@ void SearchLineEdit::paintEvent( QPaintEvent *event )
         .adjusted( 3, 0, clearButton->width() + 1, 0 );
     QPainter painter( this );
     painter.setPen( palette().color( QPalette::Disabled, QPalette::Text ) );
+    /* where the typed text goes (ThemeStyle nudges a line edit's margins) */
+    if( Theme::instance() )
+        rect.translate( 0, -Theme::instance()->textNudge( painter.font() ) );
     painter.drawText( rect, Qt::AlignLeft | Qt::AlignVCenter, messageText );
 }
 

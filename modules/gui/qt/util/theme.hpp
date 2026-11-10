@@ -110,6 +110,10 @@ public:
     int px(int tokenPx) const { return qRound(tokenPx * scale); }
     int metric(SizeRole) const;
     int duration(MotionRole) const;  /* 0 when Windows animations are off */
+    /* How far a vertically centred line of this font must move up so its
+     * capitals, not its line box, sit on the centre: Segoe UI's capitals
+     * are about 0.064 em below the line box's centre. */
+    int textNudge(const QFont &) const;
     /* an empty size means the IconGlyph token */
     QIcon icon(const QString &name, ColorRole, const QSize &size = QSize());
     /* The same icon at any size, tinted with the colour the role has when
@@ -137,6 +141,7 @@ private:
     qreal scale;        /* logical dpi / 96, see px() */
     QString uiFamily, monoFamily;
     QHash<QString, QIcon> icons;
+    mutable QHash<QString, int> nudges;  /* textNudge(), by font and pixel size */
 };
 
 #endif

@@ -33,9 +33,11 @@
 #include <QEvent>
 #include <QFile>
 #include <QFontDatabase>
+#include <QFontInfo>
 #include <QFontMetrics>
 #include <QIconEngine>
 #include <QKeyEvent>
+#include <QLineEdit>
 #include <QMenu>
 #include <QPainter>
 #include <QPalette>
@@ -182,6 +184,7 @@ namespace
     /* the knob's place while it slides (0 off, 1 on); unset at rest */
     const char toggleKnobProperty[] = "vlcToggleKnob";
     const char toggleHookedProperty[] = "vlcToggleHooked";
+    const char editNudgeProperty[] = "vlcTextNudge";  /* the nudge in a line edit's margins */
 
     /* DESIGN_SPEC 3: a QCheckBox with role="toggle" is drawn as a switch;
      * it stays a check box for the keyboard and accessibility */
@@ -295,6 +298,31 @@ namespace
             p->restore();
         }
 
+        /* Labels, buttons, check boxes, tabs, group titles and combo boxes:
+         * the stylesheet style hands their text to its base style, this one */
+        void drawItemText(QPainter *p, const QRect &rect, int flags, const QPalette &pal,
+                          bool enabled, const QString &text,
+                          QPalette::ColorRole textRole) const Q_DECL_OVERRIDE
+        {
+            const Theme *t = Theme::instance();
+            QRect at = rect;
+            if (t && (flags & Qt::AlignVCenter))
+                at.translate(0, -t->textNudge(p->font()));
+            QProxyStyle::drawItemText(p, at, flags, pal, enabled, text, textRole);
+        }
+
+        /* item view rows (lists, trees, tables, combo pop-ups) */
+        QRect subElementRect(SubElement se, const QStyleOption *opt,
+                             const QWidget *w) const Q_DECL_OVERRIDE
+        {
+            QRect r = QProxyStyle::subElementRect(se, opt, w);
+            const QStyleOptionViewItem *item = qstyleoption_cast<const QStyleOptionViewItem *>(opt);
+            const Theme *t = Theme::instance();
+            if (se == SE_ItemViewItemText && item && t && (item->displayAlignment & Qt::AlignVCenter))
+                r.translate(0, -t->textNudge(item->font));
+            return r;
+        }
+
         void drawPrimitive(PrimitiveElement pe, const QStyleOption *opt, QPainter *p,
                            const QWidget *w) const Q_DECL_OVERRIDE
         {
@@ -395,6 +423,17 @@ namespace
         void polish(QWidget *w) Q_DECL_OVERRIDE
         {
             QProxyStyle::polish(w);
+            QLineEdit *edit = qobject_cast<QLineEdit *>(w);
+            if (edit && Theme::instance())
+            {
+                /* the text up by the nudge, the field's height unchanged;
+                 * a repolish (another scale) replaces the earlier nudge */
+                const int n = Theme::instance()->textNudge(edit->font());
+                const int was = edit->property(editNudgeProperty).toInt();
+                const QMargins m = edit->textMargins();
+                edit->setTextMargins(m.left(), m.top() + was - n, m.right(), m.bottom() - was + n);
+                edit->setProperty(editNudgeProperty, n);
+            }
             if (!isToggle(w) || w->property(toggleHookedProperty).toBool())
                 return;
             w->setProperty(toggleHookedProperty, true);
@@ -584,6 +623,21 @@ void Theme::reload()
             applyWindowFrame(w);
 #endif
     emit changed();
+}
+
+int Theme::textNudge(const QFont &f) const
+{
+    /* at the font's own dpi: a widget's or a painter's font carries its screen's */
+    const QString key = f.key() + QLatin1Char('|') + QString::number(QFontInfo(f).pixelSize());
+    QHash<QString, int>::const_iterator it = nudges.constFind(key);
+    if (it != nudges.constEnd())
+        return it.value();
+    /* capHeight() is Qt 5.8: the tight box of a capital instead */
+    const QFontMetricsF fm(f);
+    const qreal capH = fm.tightBoundingRect(QStringLiteral("H")).height();
+    const int n = qMax(0, qRound((fm.ascent() - fm.descent() - capH) / 2));
+    nudges.insert(key, n);
+    return n;
 }
 
 const Palette &Theme::palette() const
