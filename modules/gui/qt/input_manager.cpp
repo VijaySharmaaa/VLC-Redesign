@@ -267,7 +267,7 @@ void InputManager::customEvent( QEvent *event )
         break;
     case IMEvent::ItemEsChanged:
         UpdateTeletext();
-        // We don't do anything ES related. Why ?
+        emit esChanged();
         break;
     case IMEvent::ItemTeletextChanged:
         UpdateTeletext();

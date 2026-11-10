@@ -31,12 +31,9 @@
 #include <QPainter>
 #include <QDebug>
 
-#define RADIUS 3
-#define CHAPTERSSPOTSIZE 3
 
 SeekStyle::SeekStyleOption::SeekStyleOption()
-    : QStyleOptionSlider(), buffering( 1.0 ), length(0), animate(false), animationopacity( 1.0 ),
-      animationloading(0.0)
+    : QStyleOptionSlider(), buffering( 1.0 ), length(0), animationloading(0.0)
 {
 
 }
@@ -67,128 +64,85 @@ int SeekStyle::pixelMetric( PixelMetric metric, const QStyleOption *option, cons
 
 void SeekStyle::drawComplexControl( ComplexControl cc, const QStyleOptionComplex *option, QPainter *painter, const QWidget *widget ) const
 {
-    if( cc == CC_Slider )
-    {
-        painter->setRenderHints( QPainter::Antialiasing );
-
-        if ( const SeekStyle::SeekStyleOption *slideroptions =
-             qstyleoption_cast<const SeekStyle::SeekStyleOption *>( option ) )
-        {
-            /* colours from the theme (DESIGN_SPEC 3); sizes are still the classic ones */
-            const Theme *theme = Theme::instance();
-            const bool enabled = option->state & QStyle::State_Enabled;
-            qreal sliderPos = -1;
-
-            /* Get the needed subcontrols to draw the slider */
-            QRect groove = subControlRect(CC_Slider, slideroptions, SC_SliderGroove, widget);
-            QRect handle = subControlRect(CC_Slider, slideroptions, SC_SliderHandle, widget);
-
-            /* Adjust the size of the groove so the handle stays centered */
-            groove.adjust( handle.width() / 2, 0, -handle.width() / 2, 0 );
-
-            /* Reduce the height of the groove */
-            // Note: in the original 2.0.0 code, the groove had a height of 9px and to
-            // comply with the original style (but still allow the widget to expand) I
-            // had to remove 1 from the rect bottom.
-            groove.adjust( 0, (qreal)groove.height() / 3.7, 0, (qreal)-groove.height() / 3.7 - 1 );
-
-            if ( ( slideroptions->subControls & SC_SliderGroove ) && groove.isValid() )
-            {
-                sliderPos = ( ( (qreal)groove.width() ) / (qreal)slideroptions->maximum )
-                        * (qreal)slideroptions->sliderPosition;
-
-                /* draw the track */
-                painter->setPen( Qt::NoPen );
-                painter->setBrush( theme->ink( RedesignTokens::InkAlpha::Track ) );
-                painter->drawRoundedRect( groove, RADIUS, RADIUS );
-
-                /* adjusted foreground rectangle */
-                QRect valueRect = groove.adjusted( 1, 1, -1, 0 );
-
-                valueRect.setWidth( sliderPos );
-
-                /* draw the played part */
-                if ( slideroptions->sliderPosition > slideroptions->minimum && slideroptions->sliderPosition <= slideroptions->maximum )
-                {
-                    painter->setBrush( enabled ? theme->color( Theme::Accent )
-                                               : theme->ink( RedesignTokens::InkAlpha::ToggleOff ) );
-                    painter->drawRoundedRect( valueRect, RADIUS, RADIUS );
-                }
-
-                /* loading: a segment bouncing along the track */
-                if ( slideroptions->buffering == 0.0 && slideroptions->animationloading > 0.0 )
-                {
-                    int width = groove.width() - groove.width() / 6;
-                    QRect innerRect = groove.adjusted( slideroptions->animationloading * width + 1, 1,
-                            width * ( -1.0 + slideroptions->animationloading ) - 1, 0);
-                    painter->setBrush( theme->color( Theme::AccentBorder50 ) );
-                    painter->drawRoundedRect( innerRect, RADIUS, RADIUS );
-                }
-
-                /* draw buffering overlay */
-                if ( slideroptions->buffering > 0.0 && slideroptions->buffering < 1.0 )
-                {
-                    QRect innerRect = groove.adjusted( 1, 1,
-                                        groove.width() * ( -1.0 + slideroptions->buffering ) - 1, 0 );
-                    painter->setBrush( theme->ink( RedesignTokens::InkAlpha::Outline ) );
-                    painter->drawRoundedRect( innerRect, RADIUS, RADIUS );
-                }
-            }
-
-            if ( slideroptions->subControls & SC_SliderTickmarks ) {
-                QStyleOptionSlider tmpSlider = *slideroptions;
-                tmpSlider.subControls = SC_SliderTickmarks;
-                QProxyStyle::drawComplexControl(cc, &tmpSlider, painter, widget);
-            }
-
-            if ( slideroptions->subControls & SC_SliderHandle && handle.isValid() )
-            {
-                /* Useful for debugging */
-                //painter->setBrush( QColor( 0, 0, 255, 150 ) );
-                //painter->drawRect( handle );
-
-                if ( option->state & QStyle::State_MouseOver || slideroptions->animate )
-                {
-                    /* draw chapters tickpoints */
-                    if ( slideroptions->points.size() && slideroptions->length && groove.width() )
-                    {
-                        if ( slideroptions->orientation == Qt::Horizontal ) /* TODO: vertical */
-                        {
-                            painter->setPen( theme->color( Theme::Mute ) );
-                            painter->setBrush( Qt::NoBrush );
-                            foreach( int64_t time, slideroptions->points )
-                            {
-                                int x = groove.x() + time / 1000000.0 / slideroptions->length * groove.width();
-                                painter->drawLine( x, slideroptions->rect.height(), x, slideroptions->rect.height() - CHAPTERSSPOTSIZE );
-                            }
-                        }
-                    }
-
-                    /* draw handle: white knob in an accent halo */
-                    if ( enabled && sliderPos != -1 )
-                    {
-                        QSize hSize = QSize( handle.height(), handle.height() ) - QSize( 6, 6 );
-                        QPoint pos = QPoint( handle.center().x() - ( hSize.width() / 2 ), handle.center().y() - ( hSize.height() / 2 ) );
-
-                        QPoint haloPos( pos - QPoint( 2, 2 ) );
-                        QSize haloSize( QSize( handle.height(), handle.height() ) - QSize( 2, 2 ) );
-
-                        painter->setPen( Qt::NoPen );
-                        painter->setOpacity( slideroptions->animationopacity );
-
-                        painter->setBrush( theme->color( Theme::AccentKnobHalo ) );
-                        painter->drawEllipse( haloPos.x(), haloPos.y(), haloSize.width(), haloSize.height() );
-
-                        painter->setBrush( theme->color( Theme::SeekKnobFill ) );
-                        painter->drawEllipse( pos.x(), pos.y(), hSize.width(), hSize.height() );
-                    }
-                }
-            }
-        }
-    }
-    else
+    const SeekStyle::SeekStyleOption *slideroptions =
+        qstyleoption_cast<const SeekStyle::SeekStyleOption *>( option );
+    if( cc != CC_Slider || !slideroptions )
     {
         qWarning() << "SeekStyle: Drawing an unmanaged control";
         QProxyStyle::drawComplexControl( cc, option, painter, widget );
+        return;
+    }
+
+    /* DESIGN_SPEC 3: a 4 px track (6 hovered), the played part in the
+     * accent, chapters as 2 px gaps, a 14 px white knob (16 hovered) in a
+     * 3 px accent halo. Sizes and colours from the theme. */
+    const Theme *theme = Theme::instance();
+    const bool enabled = option->state & QStyle::State_Enabled;
+    const bool hover = enabled && ( option->state & QStyle::State_MouseOver );
+    const int track = theme->metric( hover ? Theme::SeekTrackHover : Theme::SeekTrack );
+    const qreal radius = track / 2.;
+    painter->setRenderHints( QPainter::Antialiasing );
+    painter->setPen( Qt::NoPen );
+
+    /* the handle's half width at both ends keeps the knob inside */
+    QRect groove = subControlRect( CC_Slider, slideroptions, SC_SliderGroove, widget );
+    const QRect handle = subControlRect( CC_Slider, slideroptions, SC_SliderHandle, widget );
+    groove.adjust( handle.width() / 2, 0, -handle.width() / 2, 0 );
+    if( !groove.isValid() || slideroptions->maximum <= 0 )
+        return;
+    const QRectF bar( groove.left(), option->rect.top() + option->rect.height() / 2. - radius,
+                      groove.width(), track );
+    const qreal sliderPos = bar.width() * slideroptions->sliderPosition / slideroptions->maximum;
+
+    /* chapter gaps cut through everything the track shows */
+    if( slideroptions->points.size() && slideroptions->length > 0 )
+    {
+        const int gap = theme->px( RedesignTokens::Deck::ChapterGap );
+        QRegion clip( bar.toAlignedRect() );
+        foreach( int64_t time, slideroptions->points )
+        {
+            const int x = qRound( bar.left() + time / 1000000.0 / slideroptions->length * bar.width() );
+            if( x > bar.left() + gap && x < bar.right() - gap )
+                clip -= QRegion( x - gap / 2, bar.top() - 1, gap, track + 2 ); /* +1 px: antialiasing */
+        }
+        painter->setClipRegion( clip );
+    }
+
+    painter->setBrush( theme->ink( RedesignTokens::InkAlpha::Track ) );
+    painter->drawRoundedRect( bar, radius, radius );
+
+    /* buffering, then the played part over it */
+    if( slideroptions->buffering > 0.0 && slideroptions->buffering < 1.0 )
+    {
+        painter->setBrush( theme->ink( RedesignTokens::InkAlpha::Outline ) );
+        painter->drawRoundedRect( QRectF( bar.left(), bar.top(), bar.width() * slideroptions->buffering,
+                                          track ), radius, radius );
+    }
+    if( sliderPos > 0 )
+    {
+        painter->setBrush( enabled ? theme->color( Theme::Accent )
+                                   : theme->ink( RedesignTokens::InkAlpha::ToggleOff ) );
+        painter->drawRoundedRect( QRectF( bar.left(), bar.top(), sliderPos, track ), radius, radius );
+    }
+
+    /* loading: a segment bouncing along the track */
+    if( slideroptions->buffering == 0.0 && slideroptions->animationloading > 0.0 )
+    {
+        const qreal w = bar.width() / 6;
+        painter->setBrush( theme->color( Theme::AccentBorder50 ) );
+        painter->drawRoundedRect( QRectF( bar.left() + slideroptions->animationloading * ( bar.width() - w ),
+                                          bar.top(), w, track ), radius, radius );
+    }
+    painter->setClipping( false );
+
+    if( ( slideroptions->subControls & SC_SliderHandle ) && enabled )
+    {
+        const qreal knob = theme->metric( hover ? Theme::SeekKnobHover : Theme::SeekKnob ) / 2.;
+        const qreal halo = knob + theme->px( RedesignTokens::Deck::KnobHalo );
+        const QPointF centre( bar.left() + sliderPos, bar.center().y() );
+        painter->setBrush( theme->color( Theme::AccentKnobHalo ) );
+        painter->drawEllipse( centre, halo, halo );
+        painter->setBrush( theme->color( Theme::SeekKnobFill ) );
+        painter->drawEllipse( centre, knob, knob );
     }
 }

@@ -738,6 +738,34 @@ QLabel[role="hint"] { color: @mute@; }
 QToolButton[role="caption"] { border-radius: 0; }
 QToolButton[role="caption"][nchover="true"] { background: @hoverFill@; }
 QToolButton#captionClose:hover, QToolButton#captionClose:pressed { background: @closeHover@; }
+
+/* Phase 3: deck (components/controller.cpp, deck_popover.cpp). Roles:
+   deck = icon button (on = checked, open = [open="true"]), play = accent circle,
+   speed = the speed label, deckSeparator, deckTime, popover, popoverDivider, popoverLink. */
+QToolButton[role="deck"], QToolButton[role="speed"] { background: transparent; border: 2px solid transparent; border-radius: @radiusMd@px; padding: 0; }
+QToolButton[role="deck"]:hover, QToolButton[role="speed"]:hover { background: @hoverFill@; }
+QToolButton[role="deck"]:pressed, QToolButton[role="speed"]:pressed { background: @openFill@; }
+QToolButton[role="deck"]:checked { background: transparent; }
+QToolButton[role="deck"]:checked:hover { background: @hoverFill@; }
+QToolButton[role="deck"][open="true"], QToolButton[role="speed"][open="true"] { background: @openFill@; }
+QToolButton[role="deck"]:focus, QToolButton[role="speed"]:focus { border-color: @focusRing@; }
+QToolButton[role="speed"] { color: @tx2@; font-weight: 600; padding: 0 @speedPadX@px; }
+QToolButton[role="speed"][on="true"], QToolButton[role="speed"][open="true"] { color: @accTx@; }
+QToolButton[role="speed"]:disabled { color: @dim@; }
+QToolButton[role="play"] { background: @accent@; border: 2px solid transparent; border-radius: @playRadius@px; padding: 0; }
+QToolButton[role="play"]:hover { background: @accentHover@; }
+QToolButton[role="play"]:pressed { background: @accent@; }
+QToolButton[role="play"]:focus { border-color: @tx@; }
+QFrame[role="deckSeparator"] { background: @separatorInk@; border: none; margin: 0 @deckSepMargin@px; }
+QLabel[role="deckTime"] { color: @tx2@; }
+QFrame[role="popover"] { background: @raised@; border: @popupBorder@; }
+QFrame[role="popover"] QListView { background: transparent; border: none; }
+QFrame[role="popover"] QLabel { color: @dim@; }
+QFrame[role="popoverDivider"] { background: @divider@; border: none; }
+QPushButton[role="popoverLink"] { background: transparent; color: @accTx@; border: 2px solid transparent; border-top: 1px solid @divider@;
+    border-radius: 0; text-align: left; padding: @menuPad@px; }
+QPushButton[role="popoverLink"]:hover { background: @hoverFill@; }
+QPushButton[role="popoverLink"]:focus { border: 2px solid @focusRing@; border-radius: @radiusMd@px; }
 )QSS";
 
     const Palette &p = palette();
@@ -803,6 +831,12 @@ QToolButton#captionClose:hover, QToolButton#captionClose:pressed { background: @
         { "knob", QString::number(px(Size::SeekKnob)) },
         { "knobRadius", QString::number(px(Size::SeekKnob) / 2) },
         { "knobMargin", QString::number(-(px(Size::SeekKnob) - px(Size::SeekTrack)) / 2) },
+        /* Phase 3: deck */
+        { "accTx", css(QColor::fromRgb(p.accTx)) },
+        { "separatorInk", css(ink(InkAlpha::Separator)) },
+        { "deckSepMargin", QString::number(px(Deck::SeparatorMargin)) },
+        { "playRadius", QString::number(px(Size::PlayDeck) / 2) },
+        { "speedPadX", QString::number(px(Deck::SpeedPadX)) },
     };
 
     QString out = QString::fromLatin1(qss);

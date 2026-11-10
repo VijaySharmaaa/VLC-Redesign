@@ -161,6 +161,28 @@ namespace RedesignTokens
         static const int DropInset = 8, DropBorder = 2, DropFillAlpha = 26; /* accent 0.10 */
         static const int DropCardPadX = 36, DropCardPadY = 28, DropGap = 10, DropIcon = 40;
     }
+
+    /* Phase 3: deck */
+    /* ---- Control deck and its popovers (DESIGN_SPEC 3, 7; sizes from the prototype markup) ---- */
+    namespace Deck
+    {
+        static const int PadX = 16, PadTop = 10, PadBottom = 12, RowGap = 6, Gap = 4;
+        static const int SeekRowH = 20, SeekRowGap = 12, TimeW = 52;
+        static const int SeparatorH = 20, SeparatorMargin = 6;
+        static const int PlayGlyph = 28, KnobHalo = 3, ChapterGap = 2;
+        static const int VolumeH = 24, VolumeTickH = 16, VolumeLabelW = 40;
+        static const int SpeedPadX = 10;
+        static const int DisabledOpacityPercent = 35;
+        static const int TracksPopoverW = 560, SpeedPopoverW = 140, PopoverGap = 12;
+        static const int PopoverPadX = 6, PopoverPadTop = 12, PopoverPadBottom = 8;
+        static const int PopoverRowPadX = 10, PopoverRowPadY = 7, PopoverRowGap = 8;
+        static const int PopoverCheck = 16, PopoverCheckCol = 20, PopoverMaxRows = 8, PopoverAddIcon = 18;
+    }
+    namespace InkAlpha
+    {
+        static const int Separator  = 26;  /* 0.10: deck separators */
+        static const int VolumeTick = 64;  /* 0.25: the 100 % tick */
+    }
 }
 
 #endif

@@ -53,7 +53,6 @@ class QSequentialAnimationGroup;
 class SeekSlider : public QSlider
 {
     Q_OBJECT
-    Q_PROPERTY(qreal handleOpacity READ handleOpacity WRITE setHandleOpacity)
     Q_PROPERTY(qreal loadingProperty READ loading WRITE setLoading)
 public:
     SeekSlider( intf_thread_t *p_intf, Qt::Orientation q, QWidget *_parent = 0,
@@ -80,9 +79,7 @@ protected:
     QSize sizeHint() const Q_DECL_OVERRIDE;
 
     void processReleasedButton();
-    qreal handleOpacity() const;
     qreal loading() const;
-    void setHandleOpacity( qreal opacity );
     void setLoading( qreal loading );
     int handleLength();
 
@@ -106,12 +103,9 @@ private:
 
     QCommonStyle *alternativeStyle;
 
-    /* Handle's animation */
-    qreal mHandleOpacity;
+    /* Loading animation */
     qreal mLoading;
-    QPropertyAnimation *animHandle;
     QSequentialAnimationGroup *animLoading;
-    QTimer *hideHandleTimer;
     QTimer *startAnimLoadingTimer;
 
     WheelToVLCConverter wheelEventConverter;
@@ -120,7 +114,6 @@ public slots:
     void setPosition( float, int64_t, int );
     void setSeekable( bool b ) { b_seekable = b ; }
     void updateBuffering( float );
-    void hideHandle();
 
 private slots:
     void startSeekTimer();
@@ -161,18 +154,13 @@ private:
     float f_step; /* How much do we increase each time we wheel */
     bool b_isMuted;
 
-    QPixmap pixGradient; /* Gradient pix storage */
-    QPixmap pixGradient2; /* Muted Gradient pix storage */
-    QPixmap pixOutside; /* OutLine and track pix storage */
     QStringList colorList; /* qt-slider-colours when customised, else empty */
-    QPainter painter;
-    QFont textfont;
-    QRect textrect;
 
     WheelToVLCConverter wheelEventConverter;
 
     void changeValue( int x ); /* Function to modify the value from pixel x() */
-    void buildPixmaps(); /* from the theme or qt-slider-colours */
+    QRect trackRect() const; /* the 4 px track; the level text is on its right */
+    QBrush fillBrush() const; /* from the theme or qt-slider-colours */
 };
 
 #endif
