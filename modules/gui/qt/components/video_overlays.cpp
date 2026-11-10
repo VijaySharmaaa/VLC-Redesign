@@ -879,15 +879,20 @@ void PlayerHeader::raiseDrawers()
     }
 }
 
-/* Where Tab from the window itself goes, when that is a deck control */
-const QWidget *PlayerHeader::firstDeckStop() const
+/* In the main window: first, where Tab from the window itself goes, when it
+ * is a deck control (the back button comes before it); last, where
+ * Shift+Tab wraps to from the back button */
+QWidget *PlayerHeader::deckStop( bool first ) const
 {
-    const QWidget *owner = parentWidget();
-    for( const QWidget *w = owner->nextInFocusChain(); w != owner; w = w->nextInFocusChain() )
+    QWidget *root = parentWidget();
+    for( QWidget *w = first ? root->nextInFocusChain() : root->previousInFocusChain(); w != root;
+         w = first ? w->nextInFocusChain() : w->previousInFocusChain() )
     {
-        if( w->window() != owner || !w->isVisible() || !w->isEnabled()
+        if( w->window() != root || !w->isVisible() || !w->isEnabled()
          || !( w->focusPolicy() & Qt::TabFocus ) )
             continue;
+        if( !first )
+            return w;
         for( const QWidget *p = w; p; p = p->parentWidget() )
             if( qobject_cast<const AbstractController *>( p ) )
                 return w;
@@ -925,7 +930,7 @@ bool PlayerHeader::eventFilter( QObject *o, QEvent *e )
     if( e->type() != QEvent::KeyPress )
         return false;
     const QKeyEvent *ke = static_cast<QKeyEvent *>( e );
-    if( o == parentWidget() || ( ke->key() == Qt::Key_Backtab && o == firstDeckStop() ) )
+    if( o == parentWidget() || ( ke->key() == Qt::Key_Backtab && o == deckStop( true ) ) )
     {
         /* Shift+Tab while the window itself, the video or the deck's first
          * control has the keys: to the back button, before the deck in the
@@ -944,8 +949,8 @@ bool PlayerHeader::eventFilter( QObject *o, QEvent *e )
     }
     if( o != backWindow->windowHandle() )
         return false;
-    /* in the back button's window: Tab goes on to the deck, Shift+Tab and
-     * Esc give the keys back */
+    /* in the back button's window: Tab goes on to the deck, Shift+Tab wraps
+     * to the deck's last control, Esc gives the keys back */
     if( ke->key() == Qt::Key_Tab && ke->modifiers() == Qt::NoModifier )
     {
         backWindow->giveFocusBack();
@@ -956,6 +961,12 @@ bool PlayerHeader::eventFilter( QObject *o, QEvent *e )
     if( ke->key() == Qt::Key_Backtab || ke->key() == Qt::Key_Escape )
     {
         backWindow->giveFocusBack();
+        QWidget *last = ke->key() == Qt::Key_Backtab ? deckStop( false ) : NULL;
+        if( last )
+        {
+            last->setFocus( Qt::BacktabFocusReason );
+            last->window()->activateWindow();   /* the immersive bar's */
+        }
         return true;
     }
     return false;
