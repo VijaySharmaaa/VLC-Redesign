@@ -506,11 +506,8 @@ void MainInterface::computeMinimumSize( bool b_minimal )
                     qMin( work.height() / 2, t->px( RedesignTokens::Breakpoint::XSMinH ) ) );
 }
 
-/* Once per change of screen: the sizes there, then the decks rebuilt at
- * them (later, not in the middle of a move). shortcut: text, stylesheet
- * sizes, icons, painted rows, decks, title bar, sidebar and overlays follow;
- * pages and panels keep the layout margins and fixed sizes they were built
- * with until restart; rebuild them on Theme::changed if those few px matter. */
+/* Once per change of screen: the sizes there (Theme rescales every page),
+ * then the decks rebuilt at them */
 void MainInterface::followScreen()
 {
     const QList<QScreen *> screens = QGuiApplication::screens();

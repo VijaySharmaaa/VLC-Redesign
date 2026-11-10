@@ -31,6 +31,7 @@
 
 #include <algorithm>
 
+#include <QFontInfo>
 #include <QLabel>
 #include <QVariant>
 #include <QString>
@@ -1032,7 +1033,7 @@ void AudioFilterControlWidget::connectConfigChanged( FilterSliderData *slider )
 void AudioFilterControlWidget::build()
 {
     QFont smallFont = QApplication::font();
-    smallFont.setPointSize( smallFont.pointSize() + i_smallfont );
+    smallFont.setPointSize( QFontInfo( smallFont ).pointSize() + i_smallfont );
 
     QVBoxLayout *layout = new QVBoxLayout( this );
     slidersBox = new QGroupBox( qtr( "Enable" ) );

@@ -900,7 +900,7 @@ QFont PlayerHeader::titleFont() const
 {
     /* PanelTitle's semibold, at the header's size */
     QFont f = Theme::instance()->font( Theme::PanelTitle );
-    f.setPointSizeF( f.pointSizeF() * V::HeaderTitle / RedesignTokens::Type::PanelTitle );
+    f.setPixelSize( Theme::instance()->px( V::HeaderTitle ) );
     return f;
 }
 

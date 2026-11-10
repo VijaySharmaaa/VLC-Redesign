@@ -73,11 +73,9 @@ GotoTimeDialog::GotoTimeDialog( intf_thread_t *_p_intf)
     timeEdit->setDisplayFormat( "H:mm:ss" );
     timeEdit->setButtonSymbols( QAbstractSpinBox::NoButtons );
     timeEdit->setAccessibleName( qtr( "Go to time" ) );
-    /* a large mono timecode, scaled from Theme's mono font so it follows
-     * the Windows text scale as Theme's fonts do */
+    /* a large mono timecode */
     QFont mono = t->font( Theme::Mono );
-    mono.setPointSizeF( mono.pointSizeF() * RedesignTokens::Dialogs::JumpFont
-                                          / RedesignTokens::Type::Mono );
+    mono.setPixelSize( t->px( RedesignTokens::Dialogs::JumpFont ) );
     timeEdit->setFont( mono );
     timeEdit->setMinimumHeight( t->px( RedesignTokens::Dialogs::JumpInputH ) );
 

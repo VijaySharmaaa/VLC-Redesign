@@ -26,6 +26,7 @@
 
 #include <cassert>
 
+#include <QAbstractItemView>
 #include <QAction>
 #include <QApplication>
 #include <QCheckBox>
@@ -35,6 +36,9 @@
 #include <QFontDatabase>
 #include <QFontInfo>
 #include <QFontMetrics>
+#include <QFormLayout>
+#include <QGridLayout>
+#include <QHeaderView>
 #include <QIconEngine>
 #include <QKeyEvent>
 #include <QLineEdit>
@@ -46,6 +50,7 @@
 #include <QSaveFile>
 #include <QScreen>
 #include <QSettings>
+#include <QSpacerItem>
 #include <QStringList>
 #include <QStyle>
 #include <QStyleFactory>
@@ -649,20 +654,140 @@ int Theme::textNudge(const QFont &f) const
     return n;
 }
 
+namespace
+{
+    /* A size a widget or a layout was given, and what it became at each
+     * scale since: back on the first scale it is exactly what it was. A
+     * value set again in between (a page re-applying its own px()) is the
+     * new base; the base itself again is the base (a restyle puts back the
+     * font a widget was built with). */
+    struct Rescaled { int base; qreal baseScale; int last; };
+    QHash<QPair<const void *, int>, Rescaled> rescaledValues;
+
+    int rescaled(const void *owner, int slot, int value, qreal from, qreal to)
+    {
+        if (value <= 0 || value >= QWIDGETSIZE_MAX)
+            return value;
+        Rescaled &r = rescaledValues[qMakePair(owner, slot)];
+        if (r.baseScale <= 0 || (value != r.last && value != r.base))
+        {
+            r.base = value;
+            r.baseScale = from;
+        }
+        r.last = qRound(r.base * to / r.baseScale);
+        return r.last;
+    }
+
+    void rescaleLayout(QLayout *l, qreal from, qreal to)
+    {
+        int m[4];
+        l->getContentsMargins(&m[0], &m[1], &m[2], &m[3]);
+        for (int i = 0; i < 4; ++i)
+            m[i] = rescaled(l, i, m[i], from, to);
+        l->setContentsMargins(m[0], m[1], m[2], m[3]);
+        if (QGridLayout *g = qobject_cast<QGridLayout *>(l))
+        {
+            g->setHorizontalSpacing(rescaled(l, 4, g->horizontalSpacing(), from, to));
+            g->setVerticalSpacing(rescaled(l, 5, g->verticalSpacing(), from, to));
+        }
+        else if (QFormLayout *f = qobject_cast<QFormLayout *>(l))
+        {
+            f->setHorizontalSpacing(rescaled(l, 4, f->horizontalSpacing(), from, to));
+            f->setVerticalSpacing(rescaled(l, 5, f->verticalSpacing(), from, to));
+        }
+        else
+            l->setSpacing(rescaled(l, 4, l->spacing(), from, to));
+        for (int i = 0; i < l->count(); ++i)
+        {
+            QLayoutItem *item = l->itemAt(i);
+            if (QSpacerItem *s = item->spacerItem())
+            {
+                const QSize sz = s->sizeHint();
+                const QSizePolicy pol = s->sizePolicy();
+                s->changeSize(rescaled(s, 0, sz.width(), from, to),
+                              rescaled(s, 1, sz.height(), from, to),
+                              pol.horizontalPolicy(), pol.verticalPolicy());
+            }
+            else if (item->layout())
+                rescaleLayout(item->layout(), from, to);
+        }
+        l->invalidate();
+    }
+
+    /* a font set in pixels (Theme::font()), after the stylesheet: a
+     * restyle puts back the font the widget had before it */
+    void rescaleFont(QWidget *w, qreal from, qreal to)
+    {
+        if (w->testAttribute(Qt::WA_SetFont) && w->font().pixelSize() > 0)
+        {
+            QFont f = w->font();
+            f.setPixelSize(rescaled(w, 4, f.pixelSize(), from, to));
+            w->setFont(f);
+        }
+    }
+
+    /* the sizes, margins and gaps the widget was built with */
+    void rescaleWidget(QWidget *w, qreal from, qreal to)
+    {
+        const QSize min = w->minimumSize(), max = w->maximumSize();
+        w->setMinimumSize(rescaled(w, 0, min.width(), from, to), rescaled(w, 1, min.height(), from, to));
+        w->setMaximumSize(rescaled(w, 2, max.width(), from, to), rescaled(w, 3, max.height(), from, to));
+        QSize icon;
+        QAbstractButton *button = qobject_cast<QAbstractButton *>(w);
+        QAbstractItemView *view = qobject_cast<QAbstractItemView *>(w);
+        if (button)
+            icon = button->iconSize();
+        else if (view)
+            icon = view->iconSize();
+        if (icon.isValid())
+        {
+            icon = QSize(rescaled(w, 5, icon.width(), from, to), rescaled(w, 6, icon.height(), from, to));
+            if (button)
+                button->setIconSize(icon);
+            else
+                view->setIconSize(icon);
+        }
+        if (QHeaderView *h = qobject_cast<QHeaderView *>(w))
+        {
+            h->setMinimumSectionSize(rescaled(w, 7, h->minimumSectionSize(), from, to));
+            h->setDefaultSectionSize(rescaled(w, 8, h->defaultSectionSize(), from, to));
+            for (int i = 0; i < h->count(); ++i)
+                if (h->sectionResizeMode(i) == QHeaderView::Interactive
+                    || h->sectionResizeMode(i) == QHeaderView::Fixed)
+                    h->resizeSection(i, rescaled(w, 9 + i, h->sectionSize(i), from, to));
+        }
+        if (w->layout())
+            rescaleLayout(w->layout(), from, to);
+    }
+}
+
 bool Theme::setScreen(const QScreen *screen)
 {
-    if (!screen || qFuzzyCompare(screen->logicalDotsPerInchY() / 96., scale))
+    const qreal from = scale, to = screen ? screen->logicalDotsPerInchY() / 96. : scale;
+    if (!screen || qFuzzyCompare(to, scale))
         return false;
-    msg_Dbg(p_intf, "theme: screen %s, scale %.3f -> %.3f",
-            qtu(screen->name()), scale, screen->logicalDotsPerInchY() / 96.);
-    scale = screen->logicalDotsPerInchY() / 96.;
+    msg_Dbg(p_intf, "theme: screen %s, scale %.3f -> %.3f", qtu(screen->name()), scale, to);
+    /* P6-6: every page grows with the text; read at the old scale, as the
+     * style's own metrics still are */
+    foreach (QWidget *w, QApplication::allWidgets())
+        rescaleWidget(w, from, to);
+    scale = to;
     icons.clear();
     nudges.clear();
     if (!highContrast)
+    {
+        /* the fonts that follow the application's, at this scale */
+        QApplication::setFont(font(Body));
         qApp->setStyleSheet(styleSheet());
+    }
+    foreach (QWidget *w, QApplication::allWidgets())
+        rescaleFont(w, from, to);
     /* shortcut: one scale for the whole application, the main window's; a
      * dialog on another screen keeps it. Per-window scales need px() per
-     * widget: upgrade when dialogs often sit apart from the main window. */
+     * widget: upgrade when dialogs often sit apart from the main window.
+     * shortcut: high contrast keeps the system's point fonts, which Qt 5.6
+     * measures at the dpi they were resolved at: text can clip after a move
+     * to a screen of another scale; give it pixel fonts too if that matters. */
     emit changed();
     return true;
 }
@@ -728,8 +853,10 @@ QFont Theme::font(TypeRole role) const
                               Type::Body, Type::Meta, Type::Overline, Type::Mono,
                               Type::NavTitle };
     QFont f(role == Mono ? monoFamily : uiFamily);
-    /* points follow the Windows text scale; tokens are px at 96 dpi */
-    f.setPointSizeF(px[role] * 72.0 / 96.0);
+    /* pixels at this scale: Qt 5.6 measures a point size at the primary
+     * screen's dpi (QFontMetrics(font), a widget font resolved before a
+     * screen change) but paints it at the window's */
+    f.setPixelSize(this->px(px[role]));
     if (role == Display || role == PageTitle || role == PanelTitle || role == Overline
         || role == NavTitle)
         f.setWeight(QFont::DemiBold);
@@ -1087,13 +1214,8 @@ PrefsPage QComboBox { min-height: @prefsSelectInner@px; }
 #else
     const bool dwmRounds = false;
 #endif
-    /* at this scale: QFontMetrics reads a point size at the primary
-     * screen's dpi, which is not the main window's after setScreen() */
-    QFont bodyAt = font(Body), metaAt = font(Meta);
-    bodyAt.setPixelSize(px(Type::Body));
-    metaAt.setPixelSize(px(Type::Meta));
-    const int lineH = QFontMetrics(bodyAt).height();
-    const int metaH = QFontMetrics(metaAt).height();
+    const int lineH = QFontMetrics(font(Body)).height();
+    const int metaH = QFontMetrics(font(Meta)).height();
     /* the tab's ring takes 2 px at the top and the bottom: the padding
      * shares the rest evenly, the tab keeps its height */
     const int tabPadY = qMax(0, 2 * qMax(0, (px(Size::MenuItemH) - lineH) / 2) - Size::FocusRing);
