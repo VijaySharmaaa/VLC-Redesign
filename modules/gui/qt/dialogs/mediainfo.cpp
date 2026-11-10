@@ -28,6 +28,7 @@
 
 #include "dialogs/mediainfo.hpp"
 #include "input_manager.hpp"
+#include "util/theme.hpp"
 
 #include <vlc_url.h>
 
@@ -83,6 +84,8 @@ MediaInfoDialog::MediaInfoDialog( intf_thread_t *_p_intf,
     QLabel *uriLabel = new QLabel( qtr( "Location:" ) );
     uriLine = new QLineEdit;
     uriLine->setReadOnly( true );
+    uriLine->setFont( Theme::instance()->font( Theme::Mono ) ); /* paths are mono */
+    uriLabel->setBuddy( uriLine );
 
     layout->addWidget( infoTabW, 0, 0, 1, 8 );
     layout->addWidget( uriLabel, 1, 0, 1, 1 );
