@@ -124,7 +124,8 @@ void RowDelegate::paint( QPainter *p, const QStyleOptionViewItem &option,
         QFont numFont = t->font( Theme::Meta );
         numFont.setWeight( QFont::Medium );
         p->setFont( numFont );
-        p->setPen( t->color( Theme::Dim ) );
+        /* Dim is decoration only; on the selected fill the number must read */
+        p->setPen( t->color( ( option.state & QStyle::State_Selected ) ? Theme::Mute : Theme::Dim ) );
         p->drawText( QStyle::visualRect( dir, r, numRect ), Qt::AlignCenter,
                      QString::number( index.row() + 1 ) );
     }
@@ -166,7 +167,7 @@ void RowDelegate::paint( QPainter *p, const QStyleOptionViewItem &option,
     {
         const QRect metaRect( textX, titleRect.bottom() + 1 + metaGap, textW, metaFm.height() );
         p->setFont( metaFont );
-        p->setPen( t->color( Theme::Dim ) );
+        p->setPen( t->color( Theme::Mute ) );
         p->drawText( QStyle::visualRect( dir, r, metaRect ), Qt::AlignVCenter | Qt::AlignLeft,
                      metaFm.elidedText( meta, Qt::ElideRight, textW ) );
     }

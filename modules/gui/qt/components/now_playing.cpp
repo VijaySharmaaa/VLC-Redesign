@@ -624,7 +624,7 @@ public:
         else
         {
             p->setFont( fontAt( Theme::Meta, Type::Meta, true ) );
-            p->setPen( t->color( Theme::Dim ) );
+            p->setPen( t->color( ( opt.state & QStyle::State_MouseOver ) ? Theme::Mute : Theme::Dim ) );
             p->drawText( num, Qt::AlignCenter, QString::number( index.row() + 1 ) );
         }
 
