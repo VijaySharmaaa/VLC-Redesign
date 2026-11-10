@@ -37,6 +37,9 @@ Check every changed area against the relevant rows before a phase is closed. Rec
 - [ ] Translations need a build with NLS (`build.sh -i`); a `--disable-nls` package shows English whatever `LANG` says.
 - [ ] Theme switch while running in skins2 / dialog-provider mode (no Qt main window receives `WM_SETTINGCHANGE`).
 - [ ] Simple Preferences saved with "Force window style: System's default": the next start must keep the themed look, not fall back to the Vista style.
+- [ ] A side panel (Effects sheet, docked playlist) that has once been the XS drawer, back at S or wider: it must paint again (open while resizing, or reopened after), not stay a blank native child.
+- [ ] Esc in video fullscreen with the Effects sheet open: closes the sheet first, then leaves fullscreen.
+- [ ] Ctrl+P (and other menu shortcuts) while only the mini player is shown: Preferences must stay reachable.
 
 ## Media & playback
 - [ ] Nothing loaded (idle): controls disabled sensibly, no division by zero in time/seek code.
@@ -74,3 +77,8 @@ Check every changed area against the relevant rows before a phase is closed. Rec
 - [ ] Rapid repeated clicks (play/pause spam, opening/closing panels quickly): no stuck animations or leaked widgets.
 - [ ] Closing VLC during playback, during buffering, or with a dialog open: clean shutdown, no crash, settings saved.
 - [ ] Memory: open and close every panel and dialog 50 times; no growth (check with Process Explorer or a debug build).
+- [ ] Preferences page with panels already built while the same options are saved elsewhere (the Ctrl+P dialog fallback in fullscreen, Show all settings, Reset, the Effects sheet's Save): the page's next Save must not write its stale values back.
+- [ ] Errors re-enabled after "Hide future errors" (Reset, or the option in all settings): the next error dialog shows the box unchecked.
+- [ ] Open media "Show more options" kept across a restart (`OpenDialog/advanced`), also when VLC quits with the dialog open or closed.
+- [ ] Open media at XS (800 × 600) with "Show more options": the dialog stays on screen and usable.
+- [ ] Accessible names on dialog fields: the Open media network URL, the Media information metadata fields.
