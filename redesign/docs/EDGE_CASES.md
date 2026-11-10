@@ -10,14 +10,19 @@ Check every changed area against the relevant rows before a phase is closed. Rec
 - [ ] Switching Windows light/dark while VLC is open; high-contrast mode (fall back to system colours, keep it readable).
 - [ ] "Animation effects" off: no motion, and state changes are still visible.
 - [ ] Taskbar on top/left/auto-hide (maximised window must not cover it); title-bar double-click, Alt+Space system menu, Win+↑/↓.
+- [ ] Quarter snap (Win+Left, Win+Up) on a 1920×1080 work area: a quarter is shorter than the 600 px minimum height.
+- [ ] Restoring a saved maximised `geometry` whose normal size is below the current minimum (stock 3.0 default 600×420): must come back truly maximised, not "zoomed" at the minimum size.
+- [ ] Leaving video fullscreen by end of media (not Esc/f) puts the window back at its old position.
 - [ ] Touch and pen input on the title bar, seek and volume.
 
 ## Interface states
 - [ ] Menu bar hidden or shown (Ctrl+H in v3 minimal view); minimal view; fullscreen with the fullscreen controller on and off (`qt-fs-controller`).
 - [ ] Playlist docked vs detached window; playlist panel at XS (overlay drawer).
+- [ ] Docked playlist toggled (Ctrl+L) repeatedly across the sidebar rail breakpoint, and in minimal view: window size must not drift.
 - [ ] Saved custom toolbar strings from an old VLC (must still load); empty or corrupt toolbar strings fall back to the defaults; the toolbar editor round-trips.
 - [ ] First run (privacy dialog `qt-privacy-ask`); a clean profile vs a profile with old `vlc-qt-interface.ini`.
 - [ ] Systray on/off, start minimised, pause on minimise; taskbar thumbnail buttons.
+- [ ] `TaskbarButtonCreated` arriving more than once: thumbnail buttons and their signal connections are created once.
 - [ ] `-I skins2` and `--qt-minimal-view` still work; skins2 isn't affected by the theme.
 - [ ] Translations: long German/Russian strings in menus and buttons (no clipping), right-to-left (Arabic/Hebrew) layout mirroring, CJK fonts.
 - [ ] Keyboard only: tab order, focus visible on every control, Esc closes the top popover/dialog first, hotkeys don't fire while typing in a field.
@@ -34,6 +39,7 @@ Check every changed area against the relevant rows before a phase is closed. Rec
 - [ ] Very short (< 1 s) and very long (> 10 h, h:mm:ss) media; media with and without chapters (chapter ticks).
 - [ ] Audio-only, video-only, no art, huge art, transparent PNG art.
 - [ ] No audio tracks, no subtitle tracks, 20+ tracks (popover scrolls), tracks added mid-playback (an .srt dropped in).
+- [ ] A toast (e.g. "Loaded subtitle") must not cover the subtitle line it announces.
 - [ ] Speed at the extremes (0.25×, 4×, and values typed via hotkeys that aren't presets).
 - [ ] Volume 0, 100, 125, and `qt-max-volume` set to 200/300 (tick and boost colour scale correctly); mute → unmute restores the level.
 - [ ] Buffering that never finishes; the network dropping mid-stream; an unreachable URL (error dialog, Retry works, Show log opens messages).
