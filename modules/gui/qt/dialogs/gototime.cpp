@@ -34,6 +34,26 @@
 #include <QDialogButtonBox>
 #include <QPushButton>
 #include <QGridLayout>
+#include <QFocusEvent>
+#include <QLineEdit>
+
+namespace
+{
+
+/* opens with a caret, not the hours selected in accent; Tab still
+ * selects a section, to type over */
+class TimeEdit : public QTimeEdit
+{
+protected:
+    void focusInEvent( QFocusEvent *e ) Q_DECL_OVERRIDE
+    {
+        QTimeEdit::focusInEvent( e );
+        if( e->reason() != Qt::TabFocusReason && e->reason() != Qt::BacktabFocusReason )
+            lineEdit()->deselect();
+    }
+};
+
+}
 
 GotoTimeDialog::GotoTimeDialog( intf_thread_t *_p_intf)
                : QVLCDialog( (QWidget*)_p_intf->p_sys->p_mi, _p_intf )
@@ -57,15 +77,17 @@ GotoTimeDialog::GotoTimeDialog( intf_thread_t *_p_intf)
     timeIntro->setWordWrap( true );
     timeIntro->setAlignment( Qt::AlignCenter );
 
-    timeEdit = new QTimeEdit();
+    timeEdit = new TimeEdit();
     timeEdit->setDisplayFormat( "HH'H':mm'm':ss's'" );
     timeEdit->setAlignment( Qt::AlignRight );
     timeEdit->setSizePolicy( QSizePolicy::Expanding, QSizePolicy::Minimum );
     timeEdit->setAccessibleName( qtr( "Go to time" ) );
-    /* DESIGN_SPEC 7: a large mono timecode; tokens are px at 96 dpi, fonts points */
+    /* DESIGN_SPEC 7: a large mono timecode, scaled from Theme's mono font
+     * so it follows the Windows text scale as Theme's fonts do */
     Theme *t = Theme::instance();
     QFont mono = t->font( Theme::Mono );
-    mono.setPointSizeF( RedesignTokens::Dialogs::JumpFont * 72.0 / 96.0 );
+    mono.setPointSizeF( mono.pointSizeF() * RedesignTokens::Dialogs::JumpFont
+                                          / RedesignTokens::Type::Mono );
     timeEdit->setFont( mono );
     timeEdit->setMinimumHeight( t->px( RedesignTokens::Dialogs::JumpInputH ) );
 
