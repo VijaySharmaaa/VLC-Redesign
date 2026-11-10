@@ -107,10 +107,9 @@ TitleBar::TitleBar( QWidget *_window )
     layout->setContentsMargins( 0, 0, 0, 0 );
     layout->setSpacing( 0 );
 
-    static bool factory = false;
-    if( !factory )
-        QAccessible::installFactory( titleBarFactory );
-    factory = true;
+    /* every time: Qt skips a factory it has, and forgets them all when the
+     * application object goes (the interface closed and opened again) */
+    QAccessible::installFactory( titleBarFactory );
 
     Theme *t = Theme::instance();
     cone = addButton( qtr( "Go to library" ), t->px( Size::TitleConeW ) );

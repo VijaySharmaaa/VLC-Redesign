@@ -183,12 +183,9 @@ OpenDialog::OpenDialog( QWidget *parent,
     const int glyph = t->px( RedesignTokens::Dialogs::TabTileGlyph );
     QHBoxLayout *tileRow = new QHBoxLayout;
     tileRow->setSpacing( t->px( RedesignTokens::Dialogs::TabTileGap ) );
-    static bool accessibleInstalled = false;
-    if( !accessibleInstalled )
-    {
-        QAccessible::installFactory( openButtonAccessible );
-        accessibleInstalled = true;
-    }
+    /* every time: Qt skips a factory it has, and forgets them all when the
+     * application object goes (the interface closed and opened again) */
+    QAccessible::installFactory( openButtonAccessible );
     tiles = new QButtonGroup( this );
     for( int i = 0; i < OPEN_TAB_MAX; i++ )
     {
