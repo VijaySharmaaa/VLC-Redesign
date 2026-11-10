@@ -690,8 +690,8 @@ PlayerHeader::PlayerHeader( intf_thread_t *_p_intf, QWidget *owner, QWidget *_vi
     backWindow->setWindowFlags( backWindow->windowFlags() & ~Qt::WindowDoesNotAcceptFocus );
     back = new HeaderBackButton( backWindow );
     back->setFocusPolicy( Qt::TabFocus );
-    back->setAccessibleName( qtr( "Go to library" ) );
-    back->setToolTip( qtr( "Go to library" ) );
+    back->setAccessibleName( qtr( "Back to library" ) );
+    back->setToolTip( qtr( "Back to library" ) );
     /* its Tab, Shift+Tab and Esc, before the button takes them */
     backWindow->winId();   /* creates its window */
     backWindow->windowHandle()->installEventFilter( this );
