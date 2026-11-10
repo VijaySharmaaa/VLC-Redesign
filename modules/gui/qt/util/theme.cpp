@@ -105,7 +105,7 @@ namespace
         Motion::PausedBadge, Motion::MiniPlayer, Motion::DropTarget, Motion::SeekTick,
         Motion::VolumeFill, Motion::EqBand, Motion::Toggle, Motion::PlayPress,
         Motion::ImmersiveIdle, Motion::ImmersiveFade,
-        VideoOverlay::RingTurn, NowPlaying::SpectrumMotion,
+        VideoOverlay::RingTurn, NowPlaying::SpectrumMotion, Motion::SeekLoading,
     };
     static_assert(sizeof(durations) / sizeof(durations[0]) == Theme::MotionRoleCount,
                   "MotionRole and the duration table differ");
@@ -829,6 +829,9 @@ QAbstractItemView { background: @surface@; alternate-background-color: @panel@; 
     selection-background-color: @accentTint@; selection-color: @tx@; }
 QAbstractItemView::item:hover { background: @hoverFill@; }
 QAbstractItemView::item:selected { background: @accentTint@; color: @tx@; }
+/* views that draw their own row rings set [role] rules with no border, later */
+QAbstractItemView:focus { border: 2px solid @focusRing@; }
+QComboBox QAbstractItemView:focus { border: @popupBorder@; }
 QHeaderView::section { background: @panel@; color: @mute@; border: none; border-bottom: 1px solid @divider@; border-right: 1px solid @divider@; padding: @menuPad@px @menuTitlePadX@px; }
 
 QScrollBar:vertical { background: transparent; width: @scrollW@px; margin: 0; }
@@ -845,6 +848,8 @@ QStatusBar { background: @chrome@; color: @mute@; border-top: 1px solid @divider
 QStatusBar::item { border: none; }
 
 QLabel[role="hint"] { color: @mute@; }
+/* selectable hints (the error dialog's details) take focus */
+QLabel[role="hint"]:focus { border: 1px solid @focusRing@; border-radius: @radiusSm@px; }
 
 .QSlider::groove:horizontal { height: @track@px; background: @trackInk@; border-radius: @trackRadius@px; }
 .QSlider::groove:vertical { width: @track@px; background: @trackInk@; border-radius: @trackRadius@px; }
@@ -944,7 +949,8 @@ QToolButton[role="stepper"]:hover { background: @stepperHover@; }
 QToolButton[role="openTile"] { background: @raised@; color: @tx2@; border: 1px solid transparent; border-radius: @radiusLg@px; }
 QToolButton[role="openTile"]:hover { background: @hover@; color: @tx@; }
 QToolButton[role="openTile"]:checked { background: @accentTint@; color: @accTx@; border-color: @accentBorder@; }
-QToolButton[role="openTile"]:focus { border-color: @focusRing@; }
+/* 2 px, unlike the 1 px checked outline; the content stays centred */
+QToolButton[role="openTile"]:focus { border: 2px solid @focusRing@; }
 #OpenDisk QRadioButton { background: @raised@; border: 1px solid transparent; border-radius: @radiusMd@px; padding: @menuPad@px @buttonPadX@px; spacing: 0; }
 #OpenDisk QRadioButton::indicator { image: none; width: 0; height: 0; border: none; }
 #OpenDisk QRadioButton:hover { background: @hover@; }
@@ -955,6 +961,8 @@ QToolButton[role="split"][popupMode="1"] { padding-right: @splitPadR@px; }
 QToolButton[role="split"]:hover { background: @accentHover@; }
 QToolButton[role="split"]:focus { border-color: @onAccent@; }
 QToolButton[role="split"]::menu-arrow { image: url("@arrowDownOnAccent@"); }
+QToolButton[role="split"]:disabled { background: @panel@; color: @dim@; }
+QToolButton[role="split"]::menu-arrow:disabled { image: url("@arrowDownDim@"); }
 QLabel[role="errorIcon"] { background: @errorTint@; border-radius: @errorIconR@px; }
 QPushButton[role="link"] { background: transparent; color: @accTx@; border: 2px solid transparent; }
 QPushButton[role="link"]:hover { background: @hoverFill@; }

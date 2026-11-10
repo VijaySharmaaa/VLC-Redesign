@@ -79,6 +79,7 @@ public:
         SeekTick, VolumeFill, EqBand, Toggle, PlayPress, ImmersiveIdle, ImmersiveFade,
         Spinner,    /* one turn of the buffering ring */
         Spectrum,
+        SeekLoading,
         MotionRoleCount
     };
 

@@ -133,7 +133,14 @@ namespace RedesignTokens
         static const int PausedBadge = 180, MiniPlayer = 240, DropTarget = 150;
         static const int SeekTick = 250, VolumeFill = 120, EqBand = 150, Toggle = 150, PlayPress = 100;
         static const int ImmersiveIdle = 2500, ImmersiveFade = 300;
+        static const int SeekLoading = 2000, SeekLoadingDelay = 500;
         static const int SlideOffset = 28, RiseOffset = 8, DropOffset = 6, ToastOffset = 12;
+    }
+
+    /* ---- Dialogs (px) ---- */
+    namespace Dialogs
+    {
+        static const int AboutLogo = 64, AboutW = 440;
     }
 }
 
