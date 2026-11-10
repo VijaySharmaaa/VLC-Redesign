@@ -99,6 +99,7 @@ libqt_plugin_la_SOURCES = \
 	gui/qt/components/overlay_host.cpp gui/qt/components/overlay_host.hpp \
 	gui/qt/components/toast.cpp gui/qt/components/toast.hpp \
 	gui/qt/components/drop_overlay.cpp gui/qt/components/drop_overlay.hpp \
+	gui/qt/components/sidebar.cpp gui/qt/components/sidebar.hpp \
 	gui/qt/components/controller_widget.cpp \
 	gui/qt/components/controller_widget.hpp \
 	gui/qt/components/epg/EPGChannels.cpp \
@@ -153,6 +154,7 @@ libqt_plugin_la_SOURCES = \
 	gui/qt/util/singleton.hpp \
 	gui/qt/util/imagehelper.cpp gui/qt/util/imagehelper.hpp \
 	gui/qt/util/theme.cpp gui/qt/util/theme.hpp gui/qt/util/theme_tokens.hpp \
+	gui/qt/util/breakpoints.cpp gui/qt/util/breakpoints.hpp \
 	gui/qt/styles/seekstyle.cpp gui/qt/styles/seekstyle.hpp
 if HAVE_WIN32
 libqt_plugin_la_SOURCES += \
@@ -217,6 +219,7 @@ nodist_libqt_plugin_la_SOURCES = \
 	gui/qt/components/controller.moc.cpp \
 	gui/qt/components/overlay_host.moc.cpp \
 	gui/qt/components/toast.moc.cpp \
+	gui/qt/components/sidebar.moc.cpp \
 	gui/qt/components/controller_widget.moc.cpp \
 	gui/qt/components/epg/EPGChannels.moc.cpp \
 	gui/qt/components/epg/EPGProgram.moc.cpp \
@@ -239,6 +242,7 @@ nodist_libqt_plugin_la_SOURCES = \
 	gui/qt/util/qmenuview.moc.cpp \
 	gui/qt/util/qvlcapp.moc.cpp \
 	gui/qt/util/theme.moc.cpp \
+	gui/qt/util/breakpoints.moc.cpp \
 	gui/qt/util/pictureflow.moc.cpp \
 	gui/qt/util/validators.moc.cpp \
 	gui/qt/util/buttons/RoundButton.moc.cpp \

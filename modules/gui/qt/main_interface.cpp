@@ -43,6 +43,8 @@
 #include "components/drop_overlay.hpp"
 #include "components/controller.hpp"            // controllers
 #include "components/playlist/playlist.hpp"     // plWidget
+#include "components/sidebar.hpp"               // Sidebar
+#include "util/breakpoints.hpp"                 // BreakpointWatcher
 #include "dialogs/firstrun.hpp"                 // First Run
 #include "dialogs/playlist.hpp"                 // PlaylistDialog
 
@@ -104,6 +106,8 @@ MainInterface::MainInterface( intf_thread_t *_p_intf ) : QVLCMW( _p_intf )
     bgWidget             = NULL;
     videoWidget          = NULL;
     playlistWidget       = NULL;
+    sidebar              = NULL;
+    breakpoints          = NULL;
     stackCentralOldWidget= NULL;
     lastWinScreen        = NULL;
     sysTray              = NULL;
@@ -502,7 +506,28 @@ void MainInterface::createMainWidget( QSettings *creationSettings )
         videoWidget = new VideoWidget( p_intf, stackCentralW );
         stackCentralW->addWidget( videoWidget );
     }
-    mainLayout->insertWidget( 1, stackCentralW );
+
+    /* Sidebar and stack side by side, at the stack's former layout index */
+    QWidget *body = new QWidget( main );
+    QHBoxLayout *bodyLayout = new QHBoxLayout( body );
+    bodyLayout->setContentsMargins( 0, 0, 0, 0 );
+    bodyLayout->setSpacing( 0 );
+    sidebar = new Sidebar( body );
+    bodyLayout->addWidget( sidebar );
+    bodyLayout->addWidget( stackCentralW, 1 );
+    mainLayout->insertWidget( 1, body );
+
+    for( int i = 0; i < Sidebar::PageCount; i++ )
+        stackCentralW->addWidget( sidebar->page( static_cast<Sidebar::Page>( i ) ) );
+    connect( sidebar, &Sidebar::pageRequested,
+             this, [this]( QWidget *page ) { showTab( page ); } );
+    connect( stackCentralW, &QStackedWidget::currentChanged, sidebar,
+             [this]() { sidebar->setCurrentWidget( stackCentralW->currentWidget() ); } );
+
+    breakpoints = new BreakpointWatcher( this );
+    breakpoints->addTarget( sidebar );
+    sidebar->setBreakpoint( breakpoints->current() );
+    connect( breakpoints, &BreakpointWatcher::changed, sidebar, &Sidebar::setBreakpoint );
 
     stackWidgetsSizes[bgWidget] =
         creationSettings->value( "MainWindow/bgSize", QSize( 600, 0 ) ).toSize();
@@ -700,8 +725,8 @@ inline void MainInterface::showTab( QWidget *widget, bool video_closing )
             stackCentralW->addWidget( videoWidget );
         }
 
-        /* Embedded playlist -> Non-embedded playlist */
-        if( bgWidget == stackCentralOldWidget && widget == videoWidget )
+        /* Background or library page -> Video */
+        if( playlistWidget != stackCentralOldWidget && widget == videoWidget )
         {
             /* In rare case when video is started before the interface */
             if( playlistWidget != NULL )
@@ -713,7 +738,8 @@ inline void MainInterface::showTab( QWidget *widget, bool video_closing )
     }
 
     stackCentralW->setCurrentWidget( widget );
-    if( b_autoresize )
+    /* a widget shown for the first time keeps the current size */
+    if( b_autoresize && stackWidgetsSizes.contains( widget ) )
         resizeStack( stackWidgetsSizes[widget].width(), stackWidgetsSizes[widget].height() );
 
 #ifdef DEBUG_INTF
@@ -918,7 +944,8 @@ void MainInterface::setVideoFullScreen( bool fs )
             }
         }
 
-        if( playlistWidget != NULL && playlistWidget->artContainer->currentWidget() == videoWidget )
+        /* from the playlist or a library page */
+        if( stackCentralW->currentWidget() != videoWidget )
             showTab( videoWidget );
 
         /* we won't be able to get its windowed sized once in fullscreen, so update it now */
@@ -1140,6 +1167,7 @@ void MainInterface::dockPlaylist( bool p_docked )
 void MainInterface::displayNormalView()
 {
     menuBar()->setVisible( false );
+    sidebar->setVisible( false );
     controls->setVisible( false );
 #ifndef QT_NO_STATUSBAR
     statusBar()->setVisible( false );
@@ -1180,6 +1208,7 @@ void MainInterface::setMinimalView( bool b_minimal )
     }
 
     menuBar()->setVisible( !b_minimal );
+    sidebar->setVisible( !b_minimal );
     controls->setVisible( !b_minimal );
 #ifndef QT_NO_STATUSBAR
     statusBar()->setVisible( !b_minimal && b_statusbarVisible );

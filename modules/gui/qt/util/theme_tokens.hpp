@@ -99,6 +99,12 @@ namespace RedesignTokens
         static const int MenuTitlePadX = 9, MenuPanelPadding = 4, MenuIconCol = 22;
         static const int ButtonPadX = 16;
         static const int SidebarItemH = 36, SidebarOpenBtnH = 38, SidebarRailBelow = 1200;
+        /* not in tokens.json: the prototype's sidebar and library page layout */
+        static const int SidebarL = 260, SidebarM = 232, SidebarS = 72, SidebarXS = 64;
+        static const int SidebarPadY = 14, SidebarPadX = 10, SidebarItemGap = 4, SidebarOpenBelow = 10;
+        static const int SidebarIcon = 20, SidebarItemPadX = 12, SidebarIconGap = 12;
+        static const int SidebarOpenIconGap = 8, SidebarOpenRadius = 7;
+        static const int PagePadTop = 28, PagePadX = 32;
         static const int IconButton = 36, IconGlyph = 22;
         static const int PlayDeck = 44, PlayNowBar = 36, PausedBadge = 76;
         static const int NowPlayingBarH = 76;
