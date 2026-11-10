@@ -445,6 +445,14 @@ void InputManager::UpdatePosition()
     emit positionUpdated( f_pos, i_time, i_length / CLOCK_FREQ );
 }
 
+void InputManager::resendPosition()
+{
+    if( !hasInput() )
+        return;
+    UpdateNavigation();
+    UpdatePosition();
+}
+
 void InputManager::UpdateNavigation()
 {
     /* Update navigation status */

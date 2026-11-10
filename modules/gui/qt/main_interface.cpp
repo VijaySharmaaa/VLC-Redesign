@@ -554,6 +554,8 @@ void MainInterface::recreateToolbars()
     }
 
     setMinimalView( b_minimalView );
+    /* the new seek rows know nothing of a paused input */
+    THEMIM->getIM()->resendPosition();
 }
 
 void MainInterface::reloadPrefs()
