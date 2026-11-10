@@ -702,6 +702,10 @@ void MainInterface::createMainWidget( QSettings *creationSettings )
     for( int i = 0; i < Sidebar::PageCount; i++ )
         stackCentralW->addWidget( sidebar->page( static_cast<Sidebar::Page>( i ) ) );
     connect( sidebar, &Sidebar::pageRequested, this, [this]( QWidget *page ) {
+        /* back from Preferences to a video that ended meanwhile: Home, not
+         * a blank view */
+        if( page == videoWidget && !THEMIM->getIM()->hasVideo() )
+            page = sidebar->page( Sidebar::Home );
         /* browsing during playback: the next track keeps the library open */
         b_browsing = THEMIM->getIM()->hasInput();
         showTab( page );
@@ -1604,11 +1608,13 @@ bool MainInterface::isMiniPlayerVisible() const
     return miniPlayer && miniPlayer->isVisible();
 }
 
-/* Hidden (tray, mini player), minimised or in video full screen, the window
- * can't show the page: the caller opens the dialog as before */
+/* Hidden (tray, mini player), minimised, in video full screen or in minimal
+ * view (no sidebar for its sections), the window can't show the page: the
+ * caller opens the dialog as before */
 bool MainInterface::showPreferences()
 {
-    if( !isVisible() || isMinimized() || b_videoFullScreen || isMiniPlayerVisible() )
+    if( !isVisible() || isMinimized() || b_videoFullScreen || isMiniPlayerVisible()
+     || b_minimalView )
         return false;
     sidebar->showPage( Sidebar::Preferences );
     return true;
@@ -2153,11 +2159,21 @@ void MainInterface::keyReleaseEvent( QKeyEvent *e )
 void MainInterface::handleKeyPress( QKeyEvent *e )
 {
     /* Esc closes the top-most surface first: the Effects sheet, then
-     * (key-leave-fullscreen) the full screen */
+     * Preferences (back), then minimal view or (key-leave-fullscreen) the
+     * full screen. Menus, pop-ups and dialogs are windows of their own and
+     * take it before. */
     if( e->key() == Qt::Key_Escape && e->modifiers() == Qt::NoModifier
      && THEDP->isPanelShown( EXTENDED_ACTION ) )
     {
         ExtendedDialog::getInstance( p_intf )->hide();
+        e->accept();
+        return;
+    }
+    if( e->key() == Qt::Key_Escape && e->modifiers() == Qt::NoModifier
+     && isVisible() /* not from the mini player */
+     && stackCentralW->currentWidget() == sidebar->page( Sidebar::Preferences ) )
+    {
+        sidebar->goBack();
         e->accept();
         return;
     }

@@ -26,49 +26,51 @@
 #include <QWidget>
 
 class QLabel;
-class QListWidget;
+class QPushButton;
 class QStackedWidget;
 
 /* DESIGN_SPEC 8: Simple Preferences as a page of the window, not modal.
  * The sections are the dialog's SPrefsPanels, built on first view; edits
  * stay pending until Save or Cancel, as in PrefsDialog, after which the
  * panels are built again from the configuration. Advanced holds Reset and
- * opens the complete tree, which stays the PrefsDialog. */
+ * opens the complete tree, which stays the PrefsDialog. The sidebar lists
+ * the sections and picks the one shown. */
 class PrefsPage : public QWidget
 {
     Q_OBJECT
 public:
-    explicit PrefsPage( intf_thread_t *, QWidget *parent = NULL );
+    /* the SPrefs categories in their order, then Advanced */
+    enum { Advanced = SPrefsMax, SectionCount };
+    static const struct Section { const char *label; const char *icon; } sections[SectionCount];
+
+    /* Tab comes into the page from tabAnchor, the last section */
+    PrefsPage( intf_thread_t *, QWidget *tabAnchor );
 
 public slots:
+    void showSection( int );
+    /* drop the edits not saved */
+    void cancel();
     /* drop the panels: the next view builds them from the configuration */
     void rebuild();
 
 protected:
     void showEvent( QShowEvent * ) Q_DECL_OVERRIDE;
-    void keyPressEvent( QKeyEvent * ) Q_DECL_OVERRIDE;
-    void resizeEvent( QResizeEvent * ) Q_DECL_OVERRIDE;
 
 private slots:
-    void showSection( int );
     void save();
-    void cancel();
     void reset();
     void showAllSettings();
     void configSaved();
 
 private:
-    enum { Advanced = SPrefsMax, SectionCount };
-    void updateIcons();
-    void setRail( bool );
-
     intf_thread_t *p_intf;
+    QWidget *tabAnchor;     /* NULL once the page's own buttons follow it */
     QLabel *title;
-    QListWidget *sections;
     QStackedWidget *stack;
     QWidget *advanced;
+    QPushButton *showAll, *resetButton, *cancelButton, *saveButton;
     SPrefsPanel *panels[SPrefsMax];
-    bool rail;
+    int section;
     QString configFile;     /* vlcrc */
     QDateTime configTime;   /* its time when the panels last matched it */
 };

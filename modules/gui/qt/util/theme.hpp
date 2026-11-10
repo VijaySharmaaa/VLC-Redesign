@@ -55,7 +55,7 @@ public:
         ColorRoleCount
     };
 
-    enum TypeRole { Display, PageTitle, PanelTitle, Body, Meta, Overline, Mono };
+    enum TypeRole { Display, PageTitle, PanelTitle, Body, Meta, Overline, Mono, NavTitle };
 
     enum SizeRole
     {

@@ -637,11 +637,13 @@ QColor Theme::ink(int alpha) const
 QFont Theme::font(TypeRole role) const
 {
     static const int px[] = { Type::Display, Type::PageTitle, Type::PanelTitle,
-                              Type::Body, Type::Meta, Type::Overline, Type::Mono };
+                              Type::Body, Type::Meta, Type::Overline, Type::Mono,
+                              Type::NavTitle };
     QFont f(role == Mono ? monoFamily : uiFamily);
     /* points follow the Windows text scale; tokens are px at 96 dpi */
     f.setPointSizeF(px[role] * 72.0 / 96.0);
-    if (role == Display || role == PageTitle || role == PanelTitle || role == Overline)
+    if (role == Display || role == PageTitle || role == PanelTitle || role == Overline
+        || role == NavTitle)
         f.setWeight(QFont::DemiBold);
     return f;
 }
@@ -958,15 +960,8 @@ QListWidget[role="netRecent"] { background: transparent; border: none; outline: 
 QListWidget[role="netRecent"]::item { padding: @menuPad@px 0; border-radius: @radiusSm@px; }
 QListWidget[role="netRecent"]::item:selected { background: @hoverFill@; color: @tx@; }
 QListWidget[role="netRecent"]:focus { border: 2px solid @focusRing@; border-radius: @radiusMd@px; }
-/* Phase 5: preferences (components/prefs_page.cpp): the section list, and
-   the Simple Preferences group boxes as cards of rows */
-QFrame[role="prefsList"] { border: none; border-right: 1px solid @divider@; }
-QListWidget[role="prefsSections"] { background: transparent; border: none; outline: 0; }
-QListWidget[role="prefsSections"]::item { height: @prefsItemH@px; padding: 0 @prefsItemPadX@px; margin-bottom: @prefsItemGap@px;
-    border: 2px solid transparent; border-radius: @radiusMd@px; color: @tx2@; }
-QListWidget[role="prefsSections"]::item:hover { background: @divider@; }
-QListWidget[role="prefsSections"]::item:selected { background: @accentTint12@; color: @accTx@; }
-QListWidget[role="prefsSections"]::item:focus { border-color: @focusRing@; }
+/* Phase 5: preferences (components/prefs_page.cpp): the Simple Preferences
+   group boxes as cards of rows */
 PrefsPage QScrollArea, PrefsPage QScrollArea > QWidget > QWidget { background: transparent; }
 PrefsPage QGroupBox, QFrame[role="prefsCard"] { background: @surface@; border: 1px solid @divider@; border-radius: @prefsCardR@px; }
 QFrame[role="prefsRow"], QFrame[role="prefsRowNext"] { background: transparent; border: none; }
@@ -1071,10 +1066,6 @@ PrefsPage QComboBox { min-height: @prefsSelectInner@px; }
         { "arrowDownOnAccent", tintedIconFile(p_intf, RedesignIcons::IconExpandMore, color(OnAccent), 0) },
         { "errorIconR", QString::number(px(Dialogs::ErrorIcon) / 2) },
         /* Phase 5: preferences */
-        { "accentTint12", css(color(AccentTint12)) },
-        { "prefsItemH", QString::number(px(Prefs::ItemH)) },
-        { "prefsItemPadX", QString::number(px(Prefs::ItemPadX)) },
-        { "prefsItemGap", QString::number(px(Prefs::ItemGap)) },
         { "prefsCardR", QString::number(px(Prefs::CardRadius)) },
         { "prefsRowLine", css(ink(InkAlpha::Hairline)) },
         { "prefsSelectInner", QString::number(px(Size::SelectH) - 4) },

@@ -84,6 +84,8 @@ namespace RedesignTokens
         static const char * const UiFamilies   = "Segoe UI Variable Text,Segoe UI";
         static const char * const MonoFamilies = "JetBrains Mono,Cascadia Mono,Consolas";
         static const int Display = 48, PageTitle = 26, PanelTitle = 16, Body = 13, Meta = 12, Overline = 11, Mono = 12;
+        static const int NavTitle = 22;       /* "Preferences" over its sections */
+        static const int TitleTracking = 99;  /* % letter spacing: -0.01em */
     }
 
     /* ---- Metrics (px) ---- */
@@ -92,6 +94,11 @@ namespace RedesignTokens
         static const int TitleBar = 40, CaptionButtonW = 46;
         static const int MenuTitleH = 28, MenuItemH = 30, MenuMinW = 290;
         static const int SidebarItemH = 36, SidebarOpenBtnH = 38, SidebarRailBelow = 1200;
+        /* Preferences in the sidebar (DESIGN_SPEC 8): the back row, the
+         * heading and the sections, the active one's accent bar */
+        static const int SidebarBackH = 32, SidebarBackIconGap = 10, SidebarBackBelow = 6;
+        static const int SidebarTitlePadTop = 4, SidebarTitlePadBottom = 14, SidebarSectionGap = 2;
+        static const int SidebarBarW = 3, SidebarBarInset = 9, SidebarBarRadius = 2;
         static const int IconButton = 36, IconGlyph = 22;
         static const int PlayDeck = 44, PlayNowBar = 36, PausedBadge = 76;
         static const int NowPlayingBarH = 76;
