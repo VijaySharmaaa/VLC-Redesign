@@ -174,6 +174,10 @@ protected:
      * now-playing bar */
     void setDeckVisible( bool );
     bool isLibraryPage( QWidget * ) const;
+    /* Where Back from Preferences goes: the view it was opened from, or
+     * Home for a player view with nothing left to show (or none) */
+    QWidget *backTarget( QWidget * ) const;
+    void updateBackLabel();
 
     /* */
     QSettings           *settings;

@@ -58,8 +58,14 @@ public slots:
     void setCurrentWidget( QWidget * );
     void setBreakpoint( BreakpointWatcher::Size );
     /* Back, or Esc, in Preferences: the view it was opened from, the edits
-     * not saved dropped as Cancel does */
+     * not saved dropped as Cancel does; the keys go back to the window */
     void goBack();
+    /* The back row names where it goes: the library or the player */
+    void setBackLabel( bool library );
+
+public:
+    /* The view Preferences was opened from, NULL for none */
+    QWidget *returnTo() const { return returnPage; }
 
 signals:
     void pageRequested( QWidget * );
@@ -70,6 +76,7 @@ protected:
 private:
     QStackedWidget *navs;   /* the library navigation | the preferences one */
     QButtonGroup *group;
+    QButtonGroup *sections;
     QList<SidebarButton *> buttons;
     SidebarButton *back;
     QLabel *heading;

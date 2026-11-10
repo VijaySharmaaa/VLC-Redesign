@@ -278,9 +278,8 @@ Sidebar::Sidebar( intf_thread_t *p_intf, QWidget *parent )
      * sections; the page shows the section the sidebar picks */
     QVBoxLayout *prefsNav = navLayout( navs, Size::SidebarSectionGap );
     prefsNav->parentWidget()->setAccessibleName( qtr( "Preferences sections" ) );
-    back = new SidebarButton( qtr( "Back to library" ), RedesignIcons::IconBack,
-                              SidebarButton::Back, this );
-    back->setToolTip( tip( back->text(), "Esc" ) );
+    back = new SidebarButton( QString(), RedesignIcons::IconBack, SidebarButton::Back, this );
+    setBackLabel( true );
     connect( back, &QAbstractButton::clicked, this, &Sidebar::goBack );
     prefsNav->addWidget( back );
     prefsNav->addSpacing( t->px( Size::SidebarBackBelow ) );
@@ -292,7 +291,7 @@ Sidebar::Sidebar( intf_thread_t *p_intf, QWidget *parent )
     heading->setContentsMargins( t->px( Size::SidebarItemPadX ), t->px( Size::SidebarTitlePadTop ),
                                  t->px( Size::SidebarItemPadX ), t->px( Size::SidebarTitlePadBottom ) );
     prefsNav->addWidget( heading );
-    QButtonGroup *sections = new QButtonGroup( this );
+    sections = new QButtonGroup( this );
     SidebarButton *section = NULL;
     for( int i = 0; i < PrefsPage::SectionCount; i++ )
     {
@@ -324,19 +323,13 @@ void Sidebar::showPage( int i )
 
 void Sidebar::setCurrentWidget( QWidget *w )
 {
-    if( w == pages[Preferences] && currentPage != w )
-    {
-        /* the way back: the window opens on Home, so a library page */
-        returnPage = currentPage;
-        bool library = !returnPage;
-        for( int i = 0; i < Preferences; i++ )
-            library |= returnPage == pages[i];
-        const QString label = library ? qtr( "Back to library" ) : qtr( "Back to player" );
-        back->setText( label );
-        back->setAccessibleName( label );
-        back->setToolTip( tip( label, "Esc" ) );
-    }
+    const bool entering = w == pages[Preferences] && currentPage != w;
+    if( entering )
+        returnPage = currentPage;   /* the way back */
     navs->setCurrentIndex( w == pages[Preferences] ? 1 : 0 );
+    if( entering )
+        /* the keys start on the section shown */
+        sections->checkedButton()->setFocus( Qt::OtherFocusReason );
     currentPage = w;
     for( int i = 0; i < PageCount; i++ )
         if( pages[i] == w )
@@ -359,6 +352,16 @@ void Sidebar::goBack()
     /* first away, so the page drops its panels without building them again */
     emit pageRequested( returnPage ? returnPage : pages[Home] );
     prefsPage->cancel();
+    /* as at startup: Space is play/pause again, not a stray button's */
+    window()->setFocus( Qt::OtherFocusReason );
+}
+
+void Sidebar::setBackLabel( bool library )
+{
+    const QString label = library ? qtr( "Back to library" ) : qtr( "Back to player" );
+    back->setText( label );
+    back->setAccessibleName( label );
+    back->setToolTip( tip( label, "Esc" ) );
 }
 
 int Sidebar::widthAt( BreakpointWatcher::Size bp )

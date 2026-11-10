@@ -213,8 +213,9 @@ MainInterface::MainInterface( intf_thread_t *_p_intf, bool customFrame ) : QVLCM
      *  Configuration and settings
      *  Pre-building of interface
      **/
-    /* Main settings */
-    setFocusPolicy( Qt::StrongFocus );
+    /* Main settings; the window takes the keys at startup, after Back and
+     * on a click, but is no Tab stop of its own (no ring to show it) */
+    setFocusPolicy( Qt::ClickFocus );
     setAcceptDrops( true );
     setWindowRole( "vlc-main" );
     setWindowIcon( QApplication::windowIcon() );
@@ -714,16 +715,18 @@ void MainInterface::createMainWidget( QSettings *creationSettings )
     for( int i = 0; i < Sidebar::PageCount; i++ )
         stackCentralW->addWidget( sidebar->page( static_cast<Sidebar::Page>( i ) ) );
     connect( sidebar, &Sidebar::pageRequested, this, [this]( QWidget *page ) {
-        /* back from Preferences to a video that ended meanwhile: Home, not
-         * a blank view */
-        if( page == videoWidget && !THEMIM->getIM()->hasVideo() )
-            page = sidebar->page( Sidebar::Home );
+        page = backTarget( page );
         /* browsing during playback: the next track keeps the library open */
         b_browsing = THEMIM->getIM()->hasInput();
         showTab( page );
     } );
-    connect( stackCentralW, &QStackedWidget::currentChanged, sidebar,
-             [this]() { sidebar->setCurrentWidget( stackCentralW->currentWidget() ); } );
+    connect( stackCentralW, &QStackedWidget::currentChanged, sidebar, [this]() {
+        sidebar->setCurrentWidget( stackCentralW->currentWidget() );
+        updateBackLabel();
+    } );
+    /* what Back goes to changes with the playback */
+    connect( THEMIM, &MainInputManager::inputChanged, this, &MainInterface::updateBackLabel );
+    connect( THEMIM->getIM(), &InputManager::voutChanged, this, &MainInterface::updateBackLabel );
     connect( stackCentralW, &QStackedWidget::currentChanged,
              this, &MainInterface::updateNowPlayingBar );
     /* the window opens on Home; bgWidget stays for cover art */
@@ -1592,6 +1595,21 @@ bool MainInterface::isLibraryPage( QWidget *w ) const
         if( w == sidebar->page( static_cast<Sidebar::Page>( i ) ) )
             return true;
     return false;
+}
+
+QWidget *MainInterface::backTarget( QWidget *page ) const
+{
+    InputManager *im = THEMIM->getIM();
+    if( !page || ( page == videoWidget && !im->hasVideo() )
+     || ( ( page == audioPage || page == bgWidget ) && !im->hasInput() ) )
+        return sidebar->page( Sidebar::Home );
+    return page;
+}
+
+void MainInterface::updateBackLabel()
+{
+    if( stackCentralW->currentWidget() == sidebar->page( Sidebar::Preferences ) )
+        sidebar->setBackLabel( isLibraryPage( backTarget( sidebar->returnTo() ) ) );
 }
 
 void MainInterface::updateNowPlayingBar()

@@ -474,11 +474,14 @@ void PrefsPage::showSection( int i )
         panels[i] = new SPrefsPanel( p_intf, stack, i );
         stack->addWidget( panels[i] );
         /* the page's title names the section: the panel's own goes */
-        panels[i]->layout()->itemAt( 0 )->widget()->hide();
-        /* the form as cards of rows; its scroll area stays a Tab stop */
+        QLayoutItem *panelTitle = panels[i]->layout()->itemAt( 0 );
+        if( panelTitle && panelTitle->widget() )
+            panelTitle->widget()->hide();
+        /* the form as cards of rows; its scroll area is no Tab stop (it has
+         * no focus ring), Tab scrolls to the control it reaches */
         QScrollArea *scroller = panels[i]->findChild<QScrollArea *>();
+        scroller->setFocusPolicy( Qt::NoFocus );
         QList<QWidget *> order;
-        order.append( scroller );
         toRows( scroller->widget(), QString(), false, false, order );
         /* built after the page, its widgets end the window's focus chain:
          * move them after the sections and before Advanced's buttons,
