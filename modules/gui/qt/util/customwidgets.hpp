@@ -148,6 +148,9 @@ int qtKeyModifiersToVLC( const QInputEvent* e );
 int qtEventToVLCKey( const QKeyEvent *e );
 int qtWheelEventToVLCKey( const QWheelEvent *e );
 QString VLCKeyToString( unsigned val, bool );
+/* The text of a shortcut: a key-* hotkey's first binding, or a Qt key
+ * sequence such as a menu's "Ctrl+E"; empty when unbound or NULL */
+QString hotkeyText( intf_thread_t *, const char *id );
 /* "9:36" under an hour, "1:02:03" above: no leading zero (DESIGN_SPEC 3) */
 QString timeString( int64_t secs );
 

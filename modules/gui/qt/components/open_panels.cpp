@@ -44,6 +44,7 @@
 #include <QFileDialog>
 #include <QDialogButtonBox>
 #include <QLineEdit>
+#include <QListWidget>
 #include <QStackedLayout>
 #include <QCompleter>
 #include <QScrollArea>
@@ -664,11 +665,46 @@ NetOpenPanel::NetOpenPanel( QWidget *_parent, intf_thread_t *_p_intf ) :
     else
         b_recentList = false;
 
-    /* DESIGN_SPEC 7: a 38 px mono URL field; the examples are the help */
+    /* DESIGN_SPEC 7 (1.6.2): a 38 px mono URL field, the protocols on one
+     * line (the examples stay in the tooltips), the recent streams listed */
     Theme *t = Theme::instance();
+    ui.urlComboBox->setProperty( "role", "netUrl" );   /* no drop-down arrow */
+    ui.urlComboBox->setAccessibleName( qtr( "Network URL" ) );
     ui.urlComboBox->setFont( t->font( Theme::Mono ) );
+    ui.urlComboBox->lineEdit()->setFont( t->font( Theme::Mono ) );
     ui.urlComboBox->setMinimumHeight( t->metric( Theme::UrlInputH ) );
-    ui.examples->setFont( t->font( Theme::Mono ) );
+    const QString examples = ui.examples->text();
+    ui.examples->setText( qtr( "Supports http, https, rtsp, rtmp, mms, udp, ftp, smb "
+                               "and HLS / DASH manifests." ) );
+    ui.examples->setWordWrap( true );
+    ui.examples->setToolTip( examples );
+    ui.urlComboBox->setToolTip( examples );
+
+    /* the recent streams: the combo keeps them (and saves them), the list
+     * shows them instead of a drop-down over the help */
+    QLabel *recentLabel = new QLabel( qtr( "Recent" ).toUpper(), ui.groupBox );
+    recentLabel->setFont( t->font( Theme::Overline ) );
+    recentLabel->setProperty( "role", "hint" );
+    recentView = new QListWidget( ui.groupBox );
+    recentView->setProperty( "role", "netRecent" );
+    recentView->setFont( t->font( Theme::Mono ) );
+    recentView->setHorizontalScrollBarPolicy( Qt::ScrollBarAlwaysOff );
+    recentView->setTextElideMode( Qt::ElideMiddle );
+    recentView->setAccessibleName( qtr( "Recent streams" ) );
+    recentView->setToolTip( qtr( "Click to fill the network URL" ) );
+    for( int i = 0; i < ui.urlComboBox->count(); i++ )
+        recentView->addItem( ui.urlComboBox->itemText( i ) );
+    recentLabel->setVisible( recentView->count() > 0 );
+    recentView->setVisible( recentView->count() > 0 );
+    ui.netLayout->addWidget( recentLabel, 3, 0 );
+    ui.netLayout->addWidget( recentView, 4, 0 );
+    connect( recentView, &QListWidget::itemActivated, this, [this]( QListWidgetItem *item ) {
+        ui.urlComboBox->setEditText( item->text() );
+        ui.urlComboBox->setFocus();
+    } );
+    connect( recentView, &QListWidget::itemClicked, this, [this]( QListWidgetItem *item ) {
+        ui.urlComboBox->setEditText( item->text() );
+    } );
 
     /* Use a simple validator for URLs */
     ui.urlComboBox->setValidator( new UrlValidator( this ) );
@@ -704,7 +740,16 @@ void NetOpenPanel::clear()
 void NetOpenPanel::onAccept()
 {
     if( ui.urlComboBox->findText( ui.urlComboBox->currentText() ) == -1 )
+    {
         ui.urlComboBox->insertItem( 0, ui.urlComboBox->currentText());
+        if( b_recentList )
+        {
+            recentView->insertItem( 0, ui.urlComboBox->currentText() );
+            delete recentView->item( ui.urlComboBox->maxCount() );   /* as the combo */
+            recentView->show();
+            ui.netLayout->itemAtPosition( 3, 0 )->widget()->show();
+        }
+    }
 }
 
 void NetOpenPanel::onFocus()

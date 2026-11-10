@@ -341,6 +341,9 @@ namespace RedesignTokens
         static const int TabTileH = 58, TabTileGap = 6, TabTileGlyph = 22;
         /* Error: the round icon left of the title */
         static const int ErrorIcon = 40, ErrorGlyph = 22;
+        /* not in tokens.json: the prototype's 480 px card, and room for
+         * two lines of details before they scroll */
+        static const int ErrorW = 480, ErrorH = 190;
         /* Go to time: the timecode field */
         static const int JumpInputH = 44, JumpFont = 20;
     }

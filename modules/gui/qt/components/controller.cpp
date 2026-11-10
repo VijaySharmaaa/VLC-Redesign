@@ -48,14 +48,12 @@
 
 #include "adapters/seekpoints.hpp"
 
-#include <vlc_actions.h>                    /* vlc_str2keycode */
 
 #include <QToolButton>
 #include <QStyle>
 #include <QToolTip>
 #include <QHelpEvent>
 #include <QIconEngine>
-#include <QKeySequence>
 #include <QHBoxLayout>
 #include <QRegion>
 #include <QSignalMapper>
@@ -123,27 +121,6 @@ namespace
         int fixedRole;
     };
 
-    /* The text of a key-* hotkey (its first binding), or of a Qt sequence */
-    QString shortcutText( intf_thread_t *p_intf, const QByteArray &id )
-    {
-        if( id.isEmpty() )
-            return QString();
-        if( !id.startsWith( "key-" ) )
-            return QKeySequence( QString::fromLatin1( id ) ).toString( QKeySequence::NativeText );
-        QString text;
-        char *psz = var_InheritString( p_intf, id.constData() );
-        if( psz )
-        {
-            char *tab = strchr( psz, '\t' );
-            if( tab )
-                *tab = '\0';
-            const uint_fast32_t key = vlc_str2keycode( psz );
-            if( key != KEY_UNSET )
-                text = VLCKeyToString( key, true );
-            free( psz );
-        }
-        return text;
-    }
 }
 
 QIcon deckIcon( const char *name, bool onAccent )
@@ -265,7 +242,7 @@ bool AbstractController::eventFilter( QObject *obj, QEvent *e )
     case QEvent::ToolTip:
     {
         /* read when shown, so a changed hotkey shows at once */
-        const QString key = shortcutText( p_intf, button->property( "hotkey" ).toByteArray() );
+        const QString key = hotkeyText( p_intf, button->property( "hotkey" ).toByteArray().constData() );
         if( key.isEmpty() || button->toolTip().isEmpty() )
             break;
         QToolTip::showText( static_cast<QHelpEvent *>( e )->globalPos(),
@@ -500,6 +477,7 @@ QWidget *AbstractController::createWidget( buttonType_e button, int options )
     case EXTENDED_BUTTON:{
         NORMAL_BUTTON( EXTENDED );
         followPanel( EXTENDEDButton, EXTENDED_ACTION );
+        EXTENDEDButton->setObjectName( "effectsButton" ); /* the sheet's Esc returns here */
         }
         break;
     case PLAYLIST_BUTTON:{

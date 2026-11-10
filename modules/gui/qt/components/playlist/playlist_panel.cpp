@@ -366,7 +366,10 @@ void PlaylistPanel::setBreakpoint( BreakpointWatcher::Size bp )
         }
         else
         {
-            setParent( dockParent );
+            /* Qt::Widget drops the drawer's FramelessWindowHint: with it, a
+             * native child of an alpha (translucent) format is flushed as a
+             * layered window, which a child cannot be: it stays blank */
+            setParent( dockParent, Qt::Widget );
             dock->addWidget( this );
         }
         if( shown )

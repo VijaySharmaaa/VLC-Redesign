@@ -37,6 +37,7 @@
 #include <QHBoxLayout>
 #include <QTabBar>
 #include <QToolButton>
+#include <QKeySequence>
 
 #include <cstddef>
 
@@ -112,7 +113,12 @@ OpenDialog::OpenDialog( QWidget *parent,
     {
         QToolButton *tile = new QToolButton;
         tile->setProperty( "role", "openTile" );
-        tile->setText( ui.Tab->tabText( i ) );
+        /* no underlined mnemonic on a tile (1.6.2); its Alt key stays.
+         * shortcut: Disc and Capture &Device share Alt+D (Qt focuses each in
+         * turn), as before; give Capture its own letter in the strings */
+        const QString label = ui.Tab->tabText( i );
+        tile->setText( QString( label ).remove( QLatin1Char( '&' ) ) );
+        tile->setShortcut( QKeySequence::mnemonic( label ) );
         tile->setIcon( Theme::themedIcon( tileIcons[i], Theme::Text2 ) );
         tile->setIconSize( QSize( glyph, glyph ) );
         tile->setToolButtonStyle( Qt::ToolButtonTextUnderIcon );
@@ -258,7 +264,8 @@ OpenDialog::~OpenDialog()
     getSettings()->setValue( "OpenDialog/size", size() -
                  ( ui.advancedFrame->isEnabled() ?
                    QSize(0, ui.advancedFrame->height()) : QSize(0, 0) ) );
-    getSettings()->setValue( "OpenDialog/advanced", ui.advancedFrame->isVisible() );
+    /* the checkbox: the frame is no longer visible once the dialog is hidden */
+    getSettings()->setValue( "OpenDialog/advanced", ui.advancedCheckBox->isChecked() );
 }
 
 /* Used by VLM dialog and inputSlave selection */

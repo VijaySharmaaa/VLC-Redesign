@@ -60,7 +60,6 @@
 #include "../../audio_filter/equalizer_presets.h"
 #include <vlc_vout.h>
 #include <vlc_modules.h>
-#include <vlc_actions.h>                 /* vlc_str2keycode */
 #include <vlc_plugin.h>
 
 static bool filterIsPresent( const QString &filters, const QString &filter )
@@ -1382,6 +1381,8 @@ void Equalizer::build()
     ui.mainLayout->setSpacing( t->px( Effects::SectionGap ) );
     ui.presetLabel->setProperty( "role", "hint" );
     presetName = ui.presetName;
+    /* drawn as a switch by ThemeStyle */
+    ui.enableCheck->setProperty( "role", "toggle" );
 
     /* set up preamp control */
     ui.preampLabel->setProperty( "role", "hint" );
@@ -1440,6 +1441,7 @@ void Equalizer::build()
         ctrlLayout->addWidget( scaleBox, 0, 0 );
     }
     int i = 0;
+    QString baseUnit;
     foreach( const FilterSliderData::slider_data_t &data, controls )
     {
         EqBandSlider *slider = new EqBandSlider;
@@ -1453,11 +1455,19 @@ void Equalizer::build()
         nameLabel->setFont( t->font( Theme::Meta ) );
         nameLabel->setProperty( "role", "hint" );
         nameLabel->setAlignment( Qt::AlignHCenter );
-        /* "1 KHz" over two lines: ten bands fit the sheet */
-        nameLabel->setWordWrap( true );
         EqualizerSliderData *filter =
             new EqualizerSliderData( this, p_intf,
                                      slider, valueLabel, nameLabel, & data, i );
+        /* one line per band (1.5.1): "60", "1K", the unit once under the
+         * scale; the slider's name keeps the full "1 KHz" */
+        const QString number = data.descs.section( QLatin1Char( ' ' ), 0, 0 );
+        const QString unit = data.descs.section( QLatin1Char( ' ' ), 1 );
+        if( !unit.isEmpty() )
+        {
+            if( baseUnit.isEmpty() )
+                baseUnit = unit;
+            nameLabel->setText( unit == baseUnit ? number : number + unit.left( 1 ) );
+        }
         slider->setToolTip( valueLabel->text() );
         connect( slider, &QSlider::valueChanged, slider,
                  [slider, valueLabel]() { slider->setToolTip( valueLabel->text() ); } );
@@ -1470,6 +1480,14 @@ void Equalizer::build()
         connect( slider, &QSlider::valueChanged, this, &Equalizer::updatePreset );
         i++;
         connectConfigChanged( filter );
+    }
+    if( !baseUnit.isEmpty() )
+    {
+        QLabel *unitLabel = new QLabel( baseUnit, ui.slidersPlaceholder );
+        unitLabel->setFont( t->font( Theme::Meta ) );
+        unitLabel->setProperty( "role", "libraryDim" );
+        unitLabel->setAlignment( Qt::AlignRight );
+        ctrlLayout->addWidget( unitLabel, 1, 0 );
     }
     setTabOrder( previous, ui.preampSlider );
     setTabOrder( ui.preampSlider, ui.eq2PassCheck );
@@ -1647,6 +1665,8 @@ PitchShifter::PitchShifter( intf_thread_t *p_intf, QWidget *parent )
 
 #include <QToolButton>
 #include <QGridLayout>
+#include <QFocusEvent>
+#include <QLineEdit>
 
 #define SUBSDELAY_CFG_MODE                     "subsdelay-mode"
 #define SUBSDELAY_CFG_FACTOR                   "subsdelay-factor"
@@ -1666,26 +1686,15 @@ protected:
         const QString text = QDoubleSpinBox::textFromValue( value );
         return value > 0 ? QLatin1Char( '+' ) + text : text;
     }
-};
-
-/* The text of a hotkey's first binding, empty when unbound */
-QString hotkeyText( intf_thread_t *p_intf, const char *hotkey )
-{
-    QString text;
-    char *psz = var_InheritString( p_intf, hotkey );
-    if( psz )
+    /* the sheet opens with a caret, not the value selected in accent;
+     * Tab still selects it all, to type over */
+    void focusInEvent( QFocusEvent *e ) Q_DECL_OVERRIDE
     {
-        char *tab = strchr( psz, '\t' );
-        if( tab )
-            *tab = '\0';
-        const uint_fast32_t key = vlc_str2keycode( psz );
-        if( key != KEY_UNSET )
-            text = VLCKeyToString( key, true );
-        free( psz );
+        QDoubleSpinBox::focusInEvent( e );
+        if( e->reason() != Qt::TabFocusReason && e->reason() != Qt::BacktabFocusReason )
+            lineEdit()->deselect();
     }
-    /* "J", as on the key */
-    return text.length() == 1 ? text.toUpper() : text;
-}
+};
 
 /* "Decrease (G)", or the bare label when the action has no key */
 QString withHotkey( const QString &label, const QString &key )

@@ -917,7 +917,9 @@ QLabel[role="libraryDim"] { color: @dim@; }
 #effectsSheet QTabWidget::pane { background: transparent; border: none; }
 #effectsSheet QTabWidget#effectsTabs::pane { border-top: 1px solid @divider@; }
 #effectsSheet QTabWidget#effectsTabs::tab-bar { left: @fxTabsPadX@px; }
-#effectsTabs > QToolButton { padding-right: @iconGlyph@px; }
+QToolButton#effectsMore { padding-right: @iconGlyph@px; }
+QToolButton#effectsMore::menu-indicator { image: url("@arrowDown@"); subcontrol-origin: padding; subcontrol-position: center right;
+    width: @iconGlyph@px; height: @iconGlyph@px; }
 #effectsSheet QScrollArea, #effectsSheet QScrollArea > QWidget > QWidget { background: transparent; }
 QPushButton[role="chip"] { background: transparent; color: @tx2@; border: 1px solid @chipBorder@; border-radius: @chipRadius@px; padding: 0 @fxChipPadX@px; }
 QPushButton[role="chip"]:hover { background: @hoverFill@; }
@@ -948,6 +950,14 @@ QLabel[role="errorIcon"] { background: @errorTint@; border-radius: @errorIconR@p
 QPushButton[role="link"] { background: transparent; color: @accTx@; border: 2px solid transparent; }
 QPushButton[role="link"]:hover { background: @hoverFill@; }
 QPushButton[role="link"]:focus { border-color: @focusRing@; }
+/* netUrl = the network URL field: no arrow (netRecent lists its items), the accent ring as in 1.6.2 */
+QComboBox[role="netUrl"]::drop-down { width: 0; border: none; }
+QComboBox[role="netUrl"]::down-arrow { image: none; width: 0; }
+QComboBox[role="netUrl"]:focus { border-color: @accent@; }
+QListWidget[role="netRecent"] { background: transparent; border: none; outline: 0; }
+QListWidget[role="netRecent"]::item { padding: @menuPad@px 0; border-radius: @radiusSm@px; }
+QListWidget[role="netRecent"]::item:selected { background: @hoverFill@; color: @tx@; }
+QListWidget[role="netRecent"]:focus { border: 2px solid @focusRing@; border-radius: @radiusMd@px; }
 /* Phase 5: preferences (components/prefs_page.cpp): the section list, and
    the Simple Preferences group boxes as cards of rows */
 QFrame[role="prefsList"] { border: none; border-right: 1px solid @divider@; }

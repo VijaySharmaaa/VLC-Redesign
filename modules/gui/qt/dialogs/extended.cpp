@@ -34,6 +34,9 @@
 #include "dialogs_provider.hpp"
 #include "actions_manager.hpp"   /* EXTENDED_ACTION, PLAYLIST_ACTION */
 #include "components/overlay_host.hpp"
+#include "components/controller.hpp"   /* hotkeyL */
+#include "components/playlist/playlist_panel.hpp"
+#include "util/customwidgets.hpp"      /* hotkeyText */
 #include "util/theme.hpp"
 #include "util/redesign_icons.hpp"
 
@@ -41,7 +44,7 @@
 #include <QBoxLayout>
 #include <QGridLayout>
 #include <QKeyEvent>
-#include <QKeySequence>
+#include <QAbstractButton>
 #include <QLabel>
 #include <QLinearGradient>
 #include <QMenu>
@@ -135,10 +138,9 @@ ExtendedDialog::ExtendedDialog( intf_thread_t *_p_intf )
     close->setIconSize( QSize( glyphPx, glyphPx ) );
     close->setFixedSize( t->px( Effects::CloseButton ), t->px( Effects::CloseButton ) );
     close->setAccessibleName( qtr( "Close effects" ) );
-    /* shortcut: Ctrl+E is copied from menus.cpp (Tools > Effects and
-     * Filters), read it from that action once the menus expose it */
+    /* the deck's Effects button names the same shortcut */
     close->setToolTip( QString( "%1 (%2)" ).arg( qtr( "Close effects" ),
-        QKeySequence( QLatin1String( "Ctrl+E" ) ).toString( QKeySequence::NativeText ) ) );
+        hotkeyText( p_intf, hotkeyL[EXTENDED_BUTTON] ) ) );
     connect( close, &QToolButton::clicked, this, &QWidget::hide );
     head->addWidget( close );
     layout->addLayout( head );
@@ -146,6 +148,9 @@ ExtendedDialog::ExtendedDialog( intf_thread_t *_p_intf )
     mainTabW = new QTabWidget( content );
     mainTabW->setObjectName( "effectsTabs" );
     mainTabW->setDocumentMode( true );
+    /* the drawer is narrow: a long tab shortens, no scroll arrows under "More" */
+    mainTabW->setUsesScrollButtons( false );
+    mainTabW->setElideMode( Qt::ElideRight );
 
     /* AUDIO effects */
     audioTab = new QTabWidget;
@@ -220,7 +225,17 @@ ExtendedDialog::ExtendedDialog( intf_thread_t *_p_intf )
                      this, [this, pages, i]() { showPage( pages, i ); } );
     }
     moreButton->setMenu( moreMenu );
-    mainTabW->setCornerWidget( moreButton, Qt::TopRightCorner );
+    moreButton->setObjectName( "effectsMore" );
+    /* the tabs' height and the sheet's right padding: the arrow stays in
+     * and "More" sits on the tabs' line */
+    QTabBar *tabs = mainTabW->findChild<QTabBar *>( QString(), Qt::FindDirectChildrenOnly );
+    if( tabs )
+        moreButton->setFixedHeight( tabs->sizeHint().height() );
+    QWidget *corner = new QWidget( mainTabW );
+    QHBoxLayout *cornerLayout = new QHBoxLayout( corner );
+    cornerLayout->setContentsMargins( 0, 0, t->px( Effects::TabsPadX ), 0 );
+    cornerLayout->addWidget( moreButton, 0, Qt::AlignTop );
+    mainTabW->setCornerWidget( corner, Qt::TopRightCorner );
 
     /* the top tabs lead to each group's first page */
     connect( mainTabW, &QTabWidget::tabBarClicked, this, [this]( int i ) {
@@ -286,9 +301,11 @@ ExtendedDialog::ExtendedDialog( intf_thread_t *_p_intf )
     connect( p_mi->getBreakpoints(), &BreakpointWatcher::changed,
              this, &ExtendedDialog::setBreakpoint );
 
-    /* the docked playlist takes the right side back */
-    connect( THEDP, &DialogsProvider::panelShown, this, [this]( int action, bool shown ) {
-        if( action == PLAYLIST_ACTION && shown )
+    /* the docked playlist takes the right side back; the separate playlist
+     * window (PlaylistDialog) says PLAYLIST_ACTION too, and leaves it */
+    connect( THEDP, &DialogsProvider::panelShown, this, [this, p_mi]( int action, bool shown ) {
+        PlaylistPanel *docked = p_mi->findChild<PlaylistPanel *>();
+        if( action == PLAYLIST_ACTION && shown && docked && docked->isVisible() )
             hide();
     } );
 }
@@ -354,7 +371,10 @@ void ExtendedDialog::setBreakpoint( BreakpointWatcher::Size bp )
         }
         else
         {
-            setParent( dockParent );
+            /* Qt::Widget drops the drawer's FramelessWindowHint: with it, a
+             * native child of an alpha (translucent) format is flushed as a
+             * layered window, which a child cannot be: it stays blank */
+            setParent( dockParent, Qt::Widget );
             dock->addWidget( this );
         }
         if( shown )
@@ -420,16 +440,45 @@ void ExtendedDialog::paintEvent( QPaintEvent * )
         p.fillRect( s, 0, Size::Hairline, height(), t->ink( InkAlpha::Divider ) );
 }
 
-/* QVLCDialog's keys: Esc and Enter close */
+/* QVLCDialog's keys: Esc and Enter close, Enter on a button presses it
+ * (the sheet is no QDialog: its buttons do not take Enter themselves) */
 void ExtendedDialog::keyPressEvent( QKeyEvent *e )
 {
     switch( e->key() )
     {
-    case Qt::Key_Escape:
     case Qt::Key_Return:
     case Qt::Key_Enter:
-        hide();
+    {
+        QWidget *focus = QApplication::focusWidget();
+        QAbstractButton *button = isAncestorOf( focus )
+                                ? qobject_cast<QAbstractButton *>( focus ) : NULL;
+        QToolButton *popup = qobject_cast<QToolButton *>( button );
+        if( popup && popup->menu() )
+            popup->showMenu();
+        else if( button )
+            button->animateClick();
+        else
+            hide();
         return;
+    }
+    case Qt::Key_Escape:
+    {
+        hide();
+        /* back to the deck's Effects button the keyboard came from */
+        MainInterface *p_mi = p_intf->p_sys->p_mi;
+        if( !p_mi )
+            return;
+        foreach( QAbstractButton *b, p_mi->findChildren<QAbstractButton *>( "effectsButton" ) )
+        {
+            if( b->isVisible() )
+            {
+                b->window()->activateWindow();
+                b->setFocus( Qt::OtherFocusReason );
+                break;
+            }
+        }
+        return;
+    }
     }
     if( drawer && dockParent->window() )
         /* a window of its own: the player's hotkeys still apply */

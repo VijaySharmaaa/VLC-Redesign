@@ -79,13 +79,14 @@ MediaInfoDialog::MediaInfoDialog( intf_thread_t *_p_intf,
     saveMetaButton = new QPushButton( qtr( "&Save Metadata" ) );
     saveMetaButton->hide();
     QPushButton *closeButton = new QPushButton( qtr( "&Close" ) );
-    closeButton->setDefault( true );
+    /* neutral (2.1.4); Enter closes through QVLCFrame either way */
 
     QLabel *uriLabel = new QLabel( qtr( "Location:" ) );
     uriLine = new QLineEdit;
     uriLine->setReadOnly( true );
     uriLine->setFont( Theme::instance()->font( Theme::Mono ) ); /* paths are mono */
     uriLabel->setBuddy( uriLine );
+    uriLine->setAccessibleName( qtr( "Location" ) );
 
     layout->addWidget( infoTabW, 0, 0, 1, 8 );
     layout->addWidget( uriLabel, 1, 0, 1, 1 );
