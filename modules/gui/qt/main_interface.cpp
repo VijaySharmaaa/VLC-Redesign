@@ -55,6 +55,8 @@
 
 #include "menus.hpp"                            // Menu creation
 #include "recents.hpp"                          // RecentItems when DnD
+/* after the components: extended_panels.hpp #defines BANDS */
+#include "dialogs/extended.hpp"                 // Esc closes the sheet first
 
 #include <QCloseEvent>
 #include <QKeyEvent>
@@ -2138,6 +2140,15 @@ void MainInterface::keyReleaseEvent( QKeyEvent *e )
 
 void MainInterface::handleKeyPress( QKeyEvent *e )
 {
+    /* Esc closes the top-most surface first: the Effects sheet, then
+     * (key-leave-fullscreen) the full screen */
+    if( e->key() == Qt::Key_Escape && e->modifiers() == Qt::NoModifier
+     && THEDP->isPanelShown( EXTENDED_ACTION ) )
+    {
+        ExtendedDialog::getInstance( p_intf )->hide();
+        e->accept();
+        return;
+    }
     if( ( ( e->modifiers() & Qt::ControlModifier ) && ( e->key() == Qt::Key_H ) ) ||
         ( b_minimalView && !b_videoFullScreen && e->key() == Qt::Key_Escape ) )
     {

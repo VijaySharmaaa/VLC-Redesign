@@ -36,6 +36,7 @@
 #include <QKeyEvent>
 #include <QWheelEvent>
 #include <QApplication>
+#include <QKeySequence>
 #include <vlc_actions.h>
 
 #define SPINNER_SIZE 32
@@ -340,6 +341,28 @@ QString VLCKeyToString( unsigned val, bool locale )
 
     free( base );
     return r;
+}
+
+QString hotkeyText( intf_thread_t *p_intf, const char *id )
+{
+    if( !id || !*id )
+        return QString();
+    if( strncmp( id, "key-", 4 ) )
+        return QKeySequence( QString::fromLatin1( id ) ).toString( QKeySequence::NativeText );
+    QString text;
+    char *psz = var_InheritString( p_intf, id );
+    if( psz )
+    {
+        char *tab = strchr( psz, '\t' );
+        if( tab )
+            *tab = '\0';
+        const uint_fast32_t key = vlc_str2keycode( psz );
+        if( key != KEY_UNSET )
+            text = VLCKeyToString( key, true );
+        free( psz );
+    }
+    /* "J", as on the key */
+    return text.length() == 1 ? text.toUpper() : text;
 }
 
 /* Animated Icon implementation */
