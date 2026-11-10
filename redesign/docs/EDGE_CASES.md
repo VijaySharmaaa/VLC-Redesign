@@ -22,6 +22,11 @@ Check every changed area against the relevant rows before a phase is closed. Rec
 - [ ] Translations: long German/Russian strings in menus and buttons (no clipping), right-to-left (Arabic/Hebrew) layout mirroring, CJK fonts.
 - [ ] Keyboard only: tab order, focus visible on every control, Esc closes the top popover/dialog first, hotkeys don't fire while typing in a field.
 - [ ] Screen reader (Narrator): every icon button has a name, and state changes (play/pause, mute) are announced.
+- [ ] Every combo box drop-down opens at a normal size with all items visible and clickable, in each theme and with each `MainWindow/QtStyle` (Fusion, Windows, an unknown name).
+- [ ] Focus indicator on check boxes and radio buttons has at least 3:1 contrast against the window, in light and dark.
+- [ ] Translations need a build with NLS (`build.sh -i`); a `--disable-nls` package shows English whatever `LANG` says.
+- [ ] Theme switch while running in skins2 / dialog-provider mode (no Qt main window receives `WM_SETTINGCHANGE`).
+- [ ] Simple Preferences saved with "Force window style: System's default": the next start must keep the themed look, not fall back to the Vista style.
 
 ## Media & playback
 - [ ] Nothing loaded (idle): controls disabled sensibly, no division by zero in time/seek code.
