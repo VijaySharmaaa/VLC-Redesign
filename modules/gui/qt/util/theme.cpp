@@ -265,16 +265,24 @@ namespace
             const int arrowW = mi->menuItemType == QStyleOptionMenuItem::SubMenu ? t->px(Size::IconGlyph) : 0;
             const QRect textRect = visualRect(dir, r, QRect(r.x() + labelX(t), r.y(),
                 r.width() - labelX(t) - padX - arrowW, r.height()));
-            int flags = Qt::AlignVCenter | Qt::TextShowMnemonic | Qt::TextDontClip | Qt::TextSingleLine;
+            int flags = Qt::AlignTop | Qt::TextShowMnemonic | Qt::TextDontClip | Qt::TextSingleLine;
             if (!proxy()->styleHint(SH_UnderlineShortcut, mi, w))
                 flags |= Qt::TextHideMnemonic;
+            /* the label centred by its capitals; the smaller shortcut on its
+             * baseline, not centred on its own (a pixel higher) */
+            p->setFont(mi->font);
+            const QFontMetricsF labelFm(p->font());
+            const qreal baseline = textRect.top() + (textRect.height() - labelFm.height()) / 2
+                                 + labelFm.ascent() - t->textNudge(p->font());
             QString label = mi->text;
             const int tab = label.indexOf(QLatin1Char('\t'));
             if (tab >= 0)
             {
                 p->setPen(t->color(Theme::Mute));
                 p->setFont(t->font(Theme::Meta));
-                p->drawText(textRect, flags | visualAlignment(dir, Qt::AlignRight), label.mid(tab + 1));
+                const QFontMetricsF keyFm(p->font());
+                p->drawText(QRectF(textRect.left(), baseline - keyFm.ascent(), textRect.width(), keyFm.height()),
+                            flags | visualAlignment(dir, Qt::AlignRight), label.mid(tab + 1));
                 label.truncate(tab);
             }
             const QMenu *menu = qobject_cast<const QMenu *>(w);
@@ -283,7 +291,8 @@ namespace
                                : action && action->property(destructiveProperty).toBool()
                                ? Theme::DestructiveText : Theme::Text));
             p->setFont(mi->font);
-            p->drawText(textRect, flags | visualAlignment(dir, Qt::AlignLeft), label);
+            p->drawText(QRectF(textRect.left(), baseline - labelFm.ascent(), textRect.width(), labelFm.height()),
+                        flags | visualAlignment(dir, Qt::AlignLeft), label);
 
             if (arrowW)
             {
