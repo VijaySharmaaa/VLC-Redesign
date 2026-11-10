@@ -272,3 +272,33 @@ Evidence: `D:\Projects\VLC\spike-results\p5-fixA\` (`verify.py`, `shots.py`, scr
 - Rows keep the forms' order; two-column check boxes became one row each.
 - Hotkeys keep the action table (search, list, double-click to assign) as one block; the wheel and volume-key options are rows. No keycap control.
 - Selects and fields alone in a row are at least 240 px at every width (the prototype narrows them to 180 at XS).
+
+### Edge cases (`redesign/docs/EDGE_CASES.md`), Phase 5
+Evidence: `D:\Projects\VLC\spike-results\p5-edge\` (audit on the merged build before the review fixes), `...\p5-fixA\` and `...\p5-fixB\` (after the fixes), lane evidence `p5-1\` to `p5-3\`, `p5-int\fix-1\`, `fix-2\` (baselines after the fixes). Not committed.
+
+| Row | Result | Evidence or reason |
+|---|---|---|
+| Preferences: Save, Cancel, Reset (with confirmation) | **pass** | Same variables as stock 3.0 except the planned `qt-dark-palette` → `qt-redesign-theme`. The registry key `HKCU\Software\VideoLAN` was absent before and after; `cleanLang` only opens it. |
+| Simple ↔ all settings; the tree dialog's Save | **pass** | Show all settings opens the complete tree; its Save rewrites `vlcrc`. |
+| Settings saved elsewhere while the page holds old values | **fixed** | The page used to write stale values back after a save in the fallback dialog, a Reset or the Effects sheet; it now rebuilds when `vlcrc` changes behind it (pending edits are then dropped, marked `shortcut:`). |
+| Old stock `vlcrc` (`--config`), portable mode | **pass** | Values show and survive Save; only the portable folder is written; `%APPDATA%\vlc` untouched. |
+| Pending edits across sections and page switches; Esc | **pass** | Kept until Save or Cancel (decision P5-5, confirmed by the owner: changes apply on Save). Esc cancels. |
+| `qt-advanced-pref`; Ctrl+P from fullscreen, minimal view, mini player | **pass** / **fixed** | The tree opens directly with `qt-advanced-pref`. Ctrl+P did nothing from the mini player; menu shortcuts now work there. |
+| Reset with the simple panels never built (advanced mode) | **fixed** | `cleanLang()` went through a possibly NULL panel; now static. |
+| Effects Save semantics vs stock | **pass** | Save only on the Audio/Video tabs; `equalizer-preset` and `audio-filter=equalizer` saved; sync never saved. |
+| Equalizer chips, bands, "Custom", preamp | **fixed** | "Custom" never showed when a band moved (stock bug); fixed. The preamp row was missing from the redesigned tab; restored. |
+| Every effects sub-panel reachable | **pass** | "More" lists all nine other panels; v4l2 stays a tab when present. |
+| Effects sheet across breakpoints (dock ↔ XS drawer) | **fixed** | After being the XS drawer the sheet came back blank (and so did the docked playlist): it kept its frameless flag when docking back; fixed in both. |
+| Sheet with fullscreen, library trips, playlist exclusivity | **pass** / **fixed** | Esc now closes the sheet before leaving fullscreen. The separate playlist window no longer closes the sheet; only the docked panel does. |
+| Enter in the Effects sheet | **fixed** | Enter on a focused button closed the sheet; it now presses the button. |
+| Open media: File / Disc / Network, recent streams, split menu, Ctrl+O native picker, XS | **pass** / **fixed** | Recent streams are a list under the URL field. "Show more options" never persisted (stock bug: saved after the dialog was hidden); fixed. Usable at XS. |
+| Open media: Capture tab | **deferred** (pre-existing) | Hangs on this machine in stock 3.0 too (DirectShow device scan). |
+| Error dialog: unreachable URL, Show log, Retry, "Hide future errors" | **fixed** | Retry was offered for every core error (snapshot, record…) and could restart playback; now only for an input that failed before playback, replaying that item. Enter retried instead of closing; now closes. The checkbox now follows `qt-error-dialogs` every time the dialog shows (stock bug: it started checked). |
+| Media information Save Metadata; Go to time Enter/Esc; About | **pass** | Save Metadata writes the file; Go to time jumps on Enter, closes on Esc. |
+| Closing VLC with each sheet, page or dialog open | **pass** | Exit code 0 in 0.2–0.3 s; `OpenDialog`, `Mediainfo`, `gototimedialog` saved. `EPanel/geometry` is only written when the sheet is a separate window (no main window). |
+| Open/close each surface 50× | **pass** | No GDI growth after first use; the Preferences page grew USER handles by 4 over 49 cycles. |
+| Accessible names | **fixed** | The network URL field and the Media information metadata fields were unnamed; now named. 0 unnamed in the names check. |
+| Translations | **deferred** | No NLS in this build. |
+
+**Known for Phase 6:** the disabled Preferences volume slider still draws a square knob; Hotkeys keeps its action table (no keycaps); the light URL focus ring now uses the contrast-safe colour; Alt+D is shared by "Disc" and "Capture Device" (stock, would change a translated string).
+**Decisions recorded (owner to confirm unless noted):** P5-1 the Effects sheet docks beside the video (floats at XS); P5-2 sync steps of 50 ms; P5-3 Retry replays the failed item; P5-4 prototype rows with no VLC option dropped; P5-5 Preferences changes apply on Save — **confirmed by the owner (2026-11-10)**.
