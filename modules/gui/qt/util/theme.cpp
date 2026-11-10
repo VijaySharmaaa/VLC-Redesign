@@ -749,6 +749,9 @@ QLabel[role="hint"] { color: @mute@; }
 QToolButton[role="caption"] { border-radius: 0; }
 QToolButton[role="caption"][nchover="true"] { background: @hoverFill@; }
 QToolButton#captionClose:hover, QToolButton#captionClose:pressed { background: @closeHover@; }
+
+/* Phase 3: playlist panel (components/playlist/playlist_panel.cpp) */
+#playlistPanel QListView { background: transparent; border: none; outline: 0; }
 )QSS";
 
     const Palette &p = palette();

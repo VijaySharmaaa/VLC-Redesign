@@ -161,6 +161,17 @@ namespace RedesignTokens
         static const int DropInset = 8, DropBorder = 2, DropFillAlpha = 26; /* accent 0.10 */
         static const int DropCardPadX = 36, DropCardPadY = 28, DropGap = 10, DropIcon = 40;
     }
+
+    /* ---- Phase 3: playlist panel (DESIGN_SPEC 6; sizes from the prototype markup) ---- */
+    namespace Playlist
+    {
+        static const int HeadPadTop = 16, HeadPadRight = 12, HeadPadBottom = 10, HeadPadLeft = 18;
+        static const int HeadGap = 6, HeadButton = 30, HeadButtonGlyph = 20, CountGap = 2;
+        static const int FilterMarginX = 12, FilterMarginBottom = 8;
+        static const int ListPadX = 6, ListPadBottom = 10;
+        static const int RowPadX = 10, RowGap = 10, RowNumberW = 24, RowIcon = 18, RowMetaGap = 2;
+        static const int DrawerShadow = 50, DrawerShadowAlpha = 115; /* -20px 0 50px rgba(0,0,0,.45) */
+    }
 }
 
 #endif

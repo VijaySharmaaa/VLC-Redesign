@@ -44,6 +44,7 @@
 #include "components/controller.hpp"            // controllers
 #include "components/title_bar.hpp"             // titleBar
 #include "components/playlist/playlist.hpp"     // plWidget
+#include "components/playlist/playlist_panel.hpp" // PlaylistPanel
 #include "components/sidebar.hpp"               // Sidebar
 #include "util/breakpoints.hpp"                 // BreakpointWatcher
 #include "dialogs/firstrun.hpp"                 // First Run
@@ -108,6 +109,7 @@ MainInterface::MainInterface( intf_thread_t *_p_intf, bool customFrame ) : QVLCM
     bgWidget             = NULL;
     videoWidget          = NULL;
     playlistWidget       = NULL;
+    playlistPanel        = NULL;
     sidebar              = NULL;
     breakpoints          = NULL;
     stackCentralOldWidget= NULL;
@@ -1161,25 +1163,11 @@ void MainInterface::togglePlaylist()
     PlaylistDialog *dialog = PlaylistDialog::getInstance( p_intf );
     if( b_plDocked )
     {
-        if ( dialog->hasPlaylistWidget() )
-            playlistWidget = dialog->exportPlaylistWidget();
-        /* Playlist is not visible, show it */
-        if( stackCentralW->currentWidget() != playlistWidget )
-        {
-            if( stackCentralW->indexOf( playlistWidget ) == -1 )
-                stackCentralW->addWidget( playlistWidget );
-            showTab( playlistWidget );
-        }
-        else /* Hide it! */
-        {
-            /* shortcut: until the Phase 3 now-playing bar, a playing video
-             * is the way back, not the library page left for the playlist */
-            if( videoWidget && THEMIM->getIM()->hasVideo() )
-                showVideo();
-            else
-                restoreStackOldWidget();
-        }
-        playlistVisible = ( stackCentralW->currentWidget() == playlistWidget );
+        /* the panel beside the content; the playlistWidget page stays in
+         * the stack for the separate window, no longer shown here */
+        /* from what is on screen: full screen hides the panel */
+        playlistVisible = !( playlistPanel && playlistPanel->isVisible() );
+        showPlaylistPanel( playlistVisible );
     }
     else
     {
@@ -1213,7 +1201,8 @@ void MainInterface::dockPlaylist( bool p_docked )
 
     if( !p_docked ) /* Previously docked */
     {
-        playlistVisible = playlistWidget->isVisible();
+        /* playlistVisible was the panel's */
+        showPlaylistPanel( false );
 
         /* repositioning the videowidget __before__ exporting the
            playlistwidget into the playlist dialog avoids two unneeded
@@ -1221,10 +1210,13 @@ void MainInterface::dockPlaylist( bool p_docked )
            native window back and forth.
            For Wayland, this is mandatory since reparenting is not implemented.
            For X11 or Windows, this is just an optimization. */
-        if ( videoWidget && THEMIM->getIM()->hasVideo() )
-            showTab(videoWidget);
-        else
-            showTab(bgWidget);
+        if( stackCentralW->currentWidget() == playlistWidget )
+        {
+            if ( videoWidget && THEMIM->getIM()->hasVideo() )
+                showTab(videoWidget);
+            else
+                showTab(bgWidget);
+        }
 
         /* playlistwidget exported into the playlist dialog */
         stackCentralW->removeWidget( playlistWidget );
@@ -1233,14 +1225,33 @@ void MainInterface::dockPlaylist( bool p_docked )
     }
     else /* Previously undocked */
     {
-        playlistVisible = dialog->isVisible() && !( videoWidget && THEMIM->getIM()->hasVideo() );
+        playlistVisible = dialog->isVisible();
         dialog->hide();
         playlistWidget = dialog->exportPlaylistWidget();
         stackCentralW->addWidget( playlistWidget );
 
         /* If playlist is invisible don't show it */
-        if( playlistVisible ) showTab( playlistWidget );
+        showPlaylistPanel( playlistVisible );
     }
+}
+
+/* The docked panel, created on first show; at XS a drawer over the stack */
+void MainInterface::showPlaylistPanel( bool b_show )
+{
+    if( !playlistPanel )
+    {
+        if( !b_show )
+            return;
+        QBoxLayout *body = qobject_cast<QBoxLayout *>( stackCentralW->parentWidget()->layout() );
+        assert( body );
+        playlistPanel = new PlaylistPanel( p_intf, body, stackCentralW );
+        playlistPanel->setBreakpoint( breakpoints->current() );
+        connect( breakpoints, &BreakpointWatcher::changed,
+                 playlistPanel, &PlaylistPanel::setBreakpoint );
+        connect( playlistPanel, &PlaylistPanel::closeRequested,
+                 this, &MainInterface::togglePlaylist );
+    }
+    playlistPanel->setOpen( b_show );
 }
 
 /*
@@ -1251,6 +1262,8 @@ void MainInterface::dockPlaylist( bool p_docked )
 void MainInterface::displayNormalView()
 {
     sidebar->setVisible( false );
+    if( playlistPanel )
+        playlistPanel->setOpen( false );   /* setMinimalView() brings it back */
     controls->setVisible( false );
 #ifndef QT_NO_STATUSBAR
     statusBar()->setVisible( false );
@@ -1304,6 +1317,8 @@ void MainInterface::setMinimalView( bool b_minimal )
     }
 
     sidebar->setVisible( !b_minimal );
+    if( b_plDocked )   /* back from full screen; minimal view keeps it */
+        showPlaylistPanel( playlistVisible );
     controls->setVisible( !b_minimal );
 #ifndef QT_NO_STATUSBAR
     statusBar()->setVisible( !b_minimal && b_statusbarVisible );
