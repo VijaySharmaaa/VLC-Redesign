@@ -1544,12 +1544,13 @@ void MainInterface::setMinimalView( bool b_minimal )
 
 void MainInterface::setDeckVisible( bool visible )
 {
-    const bool bar = visible && b_nowPlayingSeen
-                  && isLibraryPage( stackCentralW->currentWidget() );
-    nowPlayingBar->setVisible( bar );
+    /* a library page has the now-playing bar once something played, and
+     * no deck before (inventory 1.1.1): the hotkeys work without it */
+    const bool library = isLibraryPage( stackCentralW->currentWidget() );
+    nowPlayingBar->setVisible( visible && library && b_nowPlayingSeen );
     /* in the immersive layout the deck floats over the video instead */
-    controls->setVisible( visible && !bar && !deckFloats() );
-    inputC->setVisible( visible && !bar && !deckFloats() );
+    controls->setVisible( visible && !library && !deckFloats() );
+    inputC->setVisible( visible && !library && !deckFloats() );
 }
 
 bool MainInterface::isLibraryPage( QWidget *w ) const
