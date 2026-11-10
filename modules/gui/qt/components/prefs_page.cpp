@@ -415,7 +415,8 @@ PrefsPage::PrefsPage( intf_thread_t *_p_intf, QWidget *_tabAnchor )
     cancelButton->setToolTip( qtr( "Discard the changes not saved yet" ) );
     connect( cancelButton, &QPushButton::clicked, this, &PrefsPage::cancel );
     buttons->addWidget( cancelButton );
-    saveButton = new QPushButton( qtr( "&Save" ) );
+    /* no mnemonic: Alt+S is the Tools menu's */
+    saveButton = new QPushButton( qtr( "Save" ) );
     saveButton->setProperty( "role", "primary" );
     saveButton->setToolTip( qtr( "Save the preferences" ) );
     connect( saveButton, &QPushButton::clicked, this, &PrefsPage::save );
