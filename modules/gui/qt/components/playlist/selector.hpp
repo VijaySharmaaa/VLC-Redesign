@@ -126,6 +126,15 @@ public:
     void getCurrentItemInfos( int *type, bool *delayedSearch, QString *name );
     int getCurrentItemCategory();
 
+    /* Loads the services discovery module `name` unless it is loaded;
+     * false when it fails to load. *loadedNow tells whether this call
+     * loaded it. Playlist unlocked. */
+    static bool loadSD( playlist_t *, const char *name, bool *loadedNow );
+    /* The node of a loaded services discovery under the playlist root,
+     * found by `longname`, the untranslated description vlc_sd_GetNames
+     * gives (the node carries the translated one). Playlist locked. */
+    static playlist_item_t *sdNode( playlist_t *, const char *longname );
+
 protected:
     void drawBranches ( QPainter *, const QRect &, const QModelIndex & ) const Q_DECL_OVERRIDE;
     void dragMoveEvent ( QDragMoveEvent * event ) Q_DECL_OVERRIDE;

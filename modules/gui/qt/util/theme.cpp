@@ -804,6 +804,15 @@ QTreeView[role="homeRecent"]::item:last { padding-right: @homeRowPad@px; }
 QPushButton[role="primary"] { background: @accent@; color: @onAccent@; border-color: @accent@; font-weight: 600; }
 QPushButton[role="primary"]:hover { background: @accentHover@; }
 QPushButton[role="primary"]:focus { border-color: @onAccent@; }
+/* Phase 4: library (components/library/) */
+QListView[role="library"], QScrollArea[role="library"] { background: transparent; border: none; outline: 0; }
+QScrollArea[role="library"] > QWidget > QWidget { background: transparent; }
+QLineEdit[role="librarySearch"] { border: 1px solid @border@; }
+QLineEdit[role="librarySearch"]:hover { border-color: @outline@; }
+QLineEdit[role="librarySearch"]:focus { border: 2px solid @focusRing@; }
+QPushButton[role="outline"] { background: transparent; }
+QPushButton[role="outline"]:hover { background: @hoverFill@; }
+QLabel[role="libraryDim"] { color: @dim@; }
 )QSS";
 
     const Palette &p = palette();

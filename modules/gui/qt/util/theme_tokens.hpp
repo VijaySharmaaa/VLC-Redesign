@@ -280,6 +280,37 @@ namespace RedesignTokens
         static const int ProgressTrack = 38; /* 0.15: the card's progress track */
         static const int EmptyBorder   = 36; /* 0.14: the empty state's dashed box */
     }
+
+    /* ---- Phase 4: library pages Videos, Music, Network (DESIGN_SPEC 4;
+     *      sizes from the prototype markup) ---- */
+    namespace Library
+    {
+        /* page: PagePadTop / PagePadX, then the header row */
+        static const int PagePadBottom = 32, HeaderGap = 16, HeaderBelow = 24;
+        static const int SearchL = 360, SearchM = 300, SearchS = 220, SearchXS = 180;
+        static const int SearchIcon = 18;
+        /* card grids, per breakpoint L / M / S / XS */
+        static const int VideoColsL = 5, VideoColsM = 4, VideoColsS = 3, VideoColsXS = 2;
+        static const int AlbumColsL = 7, AlbumColsM = 5, AlbumColsS = 4, AlbumColsXS = 3;
+        static const int GridGapX = 16, GridGapY = 24;
+        static const int ThumbAspectW = 16, ThumbAspectH = 9;
+        static const int CardRadius = 8, CardStripe = 20, CardTextGap = 8, CardMetaGap = 2;
+        static const int CardTitle = 14, CardGlyph = 40;
+        static const int BadgeInset = 8, BadgePadX = 6, BadgePadY = 2, BadgeRadius = 4;
+        /* network tiles */
+        static const int NetColsL = 3, NetColsM = 3, NetColsS = 2, NetColsXS = 2;
+        static const int GroupGap = 28, GroupTitle = 15, GroupTitleBelow = 10;
+        static const int TileGap = 12, TilePad = 14, TileInnerGap = 14, TileRadius = 8;
+        static const int TileIcon = 40, TileGlyph = 22, TileSubGap = 3;
+        /* empty state */
+        static const int EmptyPad = 32, EmptyGap = 14, EmptyCone = 56;
+        static const int EmptyTitle = 20, EmptyTextW = 380, EmptyButtonH = 36, EmptyButtonGap = 8;
+        static const int EmptyBorderAlpha = 36; /* ink 0.14 */
+        static const int EmptyBorderTenths = 15; /* 1.5 px dashes */
+        /* not in tokens.json: the SDs have no "scan finished" event, so a
+         * page that got no item for this long is empty */
+        static const int SettleMs = 1500;
+    }
 }
 
 #endif

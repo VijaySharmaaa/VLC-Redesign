@@ -358,12 +358,12 @@ void PLSelector::setSource( QTreeWidgetItem *item )
     if( i_type == SD_TYPE )
     {
         QString qs = item->data( 0, NAME_ROLE ).toString();
-        sd_loaded = playlist_IsServicesDiscoveryLoaded( THEPL, qtu( qs ) );
+        bool loadedNow;
+        if( !loadSD( THEPL, qtu( qs ), &loadedNow ) )
+            return;
+        sd_loaded = !loadedNow;
         if( !sd_loaded )
         {
-            if ( playlist_ServicesDiscoveryAdd( THEPL, qtu( qs ) ) != VLC_SUCCESS )
-                return ;
-
             services_discovery_descriptor_t test;
 
             if ( playlist_ServicesDiscoveryControl( THEPL, qtu( qs ),
@@ -385,9 +385,7 @@ void PLSelector::setSource( QTreeWidgetItem *item )
     if( i_type == SD_TYPE )
     {
         /* Find the right item for the SD */
-        /* FIXME: searching by name - what could possibly go wrong? */
-        pl_item = playlist_ChildSearchName( &(THEPL->root),
-            vlc_gettext(qtu(item->data(0, LONGNAME_ROLE).toString())) );
+        pl_item = sdNode( THEPL, qtu( item->data( 0, LONGNAME_ROLE ).toString() ) );
 
         /* Podcasts */
         if( item->data( 0, SPECIAL_ROLE ).toInt() == IS_PODCAST )
@@ -414,6 +412,18 @@ void PLSelector::setSource( QTreeWidgetItem *item )
         emit SDCategorySelected( i_cat == SD_CAT_INTERNET
                                  || i_cat == SD_CAT_LAN );
     }
+}
+
+bool PLSelector::loadSD( playlist_t *p_playlist, const char *name, bool *loadedNow )
+{
+    *loadedNow = !playlist_IsServicesDiscoveryLoaded( p_playlist, name );
+    return !*loadedNow || playlist_ServicesDiscoveryAdd( p_playlist, name ) == VLC_SUCCESS;
+}
+
+playlist_item_t *PLSelector::sdNode( playlist_t *p_playlist, const char *longname )
+{
+    /* FIXME: searching by name - what could possibly go wrong? */
+    return playlist_ChildSearchName( &p_playlist->root, vlc_gettext( longname ) );
 }
 
 PLSelItem * PLSelector::addItem (

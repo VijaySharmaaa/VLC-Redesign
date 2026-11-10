@@ -28,6 +28,8 @@
 #include <QPixmap>
 
 class QLabel;
+class QPainter;
+class QRectF;
 class QListView;
 class QToolButton;
 class QBoxLayout;
@@ -44,6 +46,9 @@ QString timeString( int64_t secs );
 void paintStripes( QPainter &, const QRectF &, qreal period );
 /* A theme font at a token px size */
 QFont fontAt( Theme::TypeRole, int tokenPx, bool semibold );
+
+/* "FLAC", "H.264": short codec names, or the fourcc */
+QString codecName( const QString &fourcc );
 
 /* Cover art, cropped to fill, or the striped placeholder (DESIGN_SPEC 4) */
 class ArtView : public QWidget

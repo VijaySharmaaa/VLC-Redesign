@@ -19,6 +19,7 @@
 #ifndef VLC_QT_SIDEBAR_HPP_
 #define VLC_QT_SIDEBAR_HPP_
 
+#include "qt.hpp"
 #include "util/breakpoints.hpp"
 
 #include <QWidget>
@@ -37,9 +38,8 @@ class Sidebar : public QWidget
 public:
     enum Page { Home, Videos, Music, Network, PageCount };
 
-    explicit Sidebar( QWidget *parent = NULL );
-    /* Parentless until added to a stack, which then owns it. Phase 4
-     * replaces these placeholders with the library views. */
+    explicit Sidebar( intf_thread_t *, QWidget *parent = NULL );
+    /* Parentless until added to a stack, which then owns it */
     QWidget *page( Page p ) const { return pages[p]; }
     /* Its width at a breakpoint, device-independent px */
     static int widthAt( BreakpointWatcher::Size );
