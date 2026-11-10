@@ -625,6 +625,21 @@ void MainInterface::onInputChanged( bool hasInput )
     if( hasInput )
     {
         b_audioModeCheck = true;
+        /* a stream buffers before it plays: show the player at once, where
+         * the buffering ring is (the prototype's startStream()); audio mode
+         * then takes over from it as for a file. Files keep the page until
+         * they play, as before.
+         * shortcut: b_browsing can't tell a stream the user opened from the
+         * playlist moving on, so one opened while browsing during playback
+         * keeps the page (as audio mode does); clear it in the Open paths
+         * if that matters. */
+        input_item_t *item = input_GetItem( THEMIM->getInput() );
+        char *uri = input_item_GetURI( item );
+        QWidget *current = stackCentralW->currentWidget();
+        if( uri && strncmp( uri, "file://", 7 ) && !b_browsing && isLibraryPage( current )
+         && current != sidebar->page( Sidebar::Preferences ) )
+            showTab( bgWidget );
+        free( uri );
         /* a new audio output (device change) starts without the tap */
         SpectrumWidget::setTap( p_intf, true );
         if( !b_nowPlayingSeen )
