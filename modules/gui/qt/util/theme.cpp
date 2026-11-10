@@ -791,6 +791,18 @@ QPushButton[role="popoverLink"] { background: transparent; color: @accTx@; borde
     border-radius: 0; text-align: left; padding: @menuPad@px; }
 QPushButton[role="popoverLink"]:hover { background: @hoverFill@; }
 QPushButton[role="popoverLink"]:focus { border: 2px solid @focusRing@; border-radius: @radiusMd@px; }
+/* Phase 4: library (components/library/) */
+QListView[role="library"], QScrollArea[role="library"] { background: transparent; border: none; outline: 0; }
+QScrollArea[role="library"] > QWidget > QWidget { background: transparent; }
+QLineEdit[role="librarySearch"] { border: 1px solid @border@; }
+QLineEdit[role="librarySearch"]:hover { border-color: @outline@; }
+QLineEdit[role="librarySearch"]:focus { border: 2px solid @focusRing@; }
+QPushButton[role="primary"] { background: @accent@; color: @onAccent@; border-color: @accent@; }
+QPushButton[role="primary"]:hover { background: @accentHover@; }
+QPushButton[role="primary"]:focus { border-color: @onAccent@; }
+QPushButton[role="outline"] { background: transparent; }
+QPushButton[role="outline"]:hover { background: @hoverFill@; }
+QLabel[role="libraryDim"] { color: @dim@; }
 )QSS";
 
     const Palette &p = palette();

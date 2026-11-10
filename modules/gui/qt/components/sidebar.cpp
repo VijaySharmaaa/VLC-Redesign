@@ -22,6 +22,8 @@
 
 #include "qt.hpp"
 #include "components/sidebar.hpp"
+#include "components/library/media_page.hpp"
+#include "components/library/network_page.hpp"
 #include "dialogs_provider.hpp"
 #include "util/theme.hpp"
 #include "util/redesign_icons.hpp"
@@ -141,7 +143,7 @@ void SidebarButton::paintEvent( QPaintEvent * )
                 fm.elidedText( text(), Qt::ElideRight, textRect.width() ) );
 }
 
-/* Phase 4 replaces these with the library views */
+/* Phase 4 replaces this with the Home page */
 static QWidget *createPage( const QString &title )
 {
     QWidget *page = new QWidget;
@@ -164,7 +166,7 @@ static QString tip( const QString &label, const char *shortcut )
         QKeySequence( QLatin1String( shortcut ) ).toString( QKeySequence::NativeText ) );
 }
 
-Sidebar::Sidebar( QWidget *parent ) : QWidget( parent )
+Sidebar::Sidebar( intf_thread_t *p_intf, QWidget *parent ) : QWidget( parent )
 {
     setAccessibleName( qtr( "Library" ) );
     QVBoxLayout *layout = new QVBoxLayout( this );
@@ -193,7 +195,13 @@ Sidebar::Sidebar( QWidget *parent ) : QWidget( parent )
     for( int i = 0; i < PageCount; i++ )
     {
         const QString label = qtr( nav[i].label );
-        pages[i] = createPage( label );
+        switch( i )
+        {
+        case Videos:  pages[i] = new MediaPage( p_intf, MediaPage::Videos ); break;
+        case Music:   pages[i] = new MediaPage( p_intf, MediaPage::Music ); break;
+        case Network: pages[i] = new NetworkPage( p_intf ); break;
+        default:      pages[i] = createPage( label ); break;
+        }
         SidebarButton *b = new SidebarButton( label, nav[i].icon, false, this );
         b->setCheckable( true );
         b->setAutoExclusive( true ); /* screen readers: a radio button; the group rules */

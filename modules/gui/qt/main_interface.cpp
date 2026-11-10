@@ -613,7 +613,7 @@ void MainInterface::createMainWidget( QSettings *creationSettings )
     QHBoxLayout *bodyLayout = new QHBoxLayout( body );
     bodyLayout->setContentsMargins( 0, 0, 0, 0 );
     bodyLayout->setSpacing( 0 );
-    sidebar = new Sidebar( body );
+    sidebar = new Sidebar( p_intf, body );
     bodyLayout->addWidget( sidebar );
     bodyLayout->addWidget( stackCentralW, 1 );
     mainLayout->insertWidget( 1, body );
