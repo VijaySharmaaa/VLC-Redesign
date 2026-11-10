@@ -322,6 +322,10 @@ void BufferingOverlay::paintEvent( QPaintEvent * )
     Theme *t = Theme::instance();
     QPainter p( this );
     p.setRenderHint( QPainter::Antialiasing );
+    /* over the last frame; before the first one, over the video's black,
+     * not the cone or cover art page under it */
+    if( !THEMIM->getIM()->hasVideo() )
+        p.fillRect( rect(), t->color( Theme::VideoSurface ) );
     p.fillRect( rect(), QColor::fromRgba( RedesignTokens::BufferingScrim ) );
 
     /* ring, title and URL in a centred column; text in the dark theme's
