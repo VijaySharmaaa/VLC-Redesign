@@ -87,16 +87,19 @@ namespace
             const Theme::ColorRole role = onAccent ? Theme::OnAccent
                 : state == QIcon::On ? ( t->isDark() ? Theme::Accent : Theme::AccentText )
                 : Theme::Text2;
-            const QPixmap pix = t->icon( name, role, size ).pixmap( size );
-            if( mode != QIcon::Disabled )
+            /* square glyphs, centred in a wider box (the toolbar editor's list) */
+            const int side = qMin( size.width(), size.height() );
+            const QPixmap pix = t->icon( name, role, QSize( side, side ) ).pixmap( side, side );
+            if( mode != QIcon::Disabled && pix.size() == size )
                 return pix;
-            QPixmap faded( pix.size() );
-            faded.setDevicePixelRatio( pix.devicePixelRatio() );
-            faded.fill( Qt::transparent );
-            QPainter painter( &faded );
-            painter.setOpacity( Deck::DisabledOpacityPercent / 100. );
-            painter.drawPixmap( 0, 0, pix );
-            return faded;
+            QPixmap out( size );
+            out.fill( Qt::transparent );
+            QPainter painter( &out );
+            if( mode == QIcon::Disabled )
+                painter.setOpacity( Deck::DisabledOpacityPercent / 100. );
+            painter.drawPixmap( QRect( QPoint( ( size.width() - side ) / 2, ( size.height() - side ) / 2 ),
+                                       QSize( side, side ) ), pix );
+            return out;
         }
         void paint( QPainter *p, const QRect &rect, QIcon::Mode mode, QIcon::State state ) Q_DECL_OVERRIDE
         {
