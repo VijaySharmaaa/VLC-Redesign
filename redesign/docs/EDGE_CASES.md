@@ -47,6 +47,12 @@ Check every changed area against the relevant rows before a phase is closed. Rec
 - [ ] The deck's expert row hidden by the window width while Advanced Controls is on: its controls stay reachable and come back when the window widens.
 - [ ] Help open while the theme switches: the text keeps its scroll position.
 - [ ] VLC's interface language differs from the Windows locale: numbers, times and dates follow one of them consistently, not a mix.
+- [ ] An overlay that follows the cursor hide over the video (the player header) stays hidden with the cursor resting on the picture for 10 s; a 1-px mouse move brings it back.
+- [ ] Keys on buttons in their own overlay windows (the header's back button, the immersive bar): Space and the hotkeys still reach the player.
+- [ ] Shift+Tab from the deck's first control returns to the player header's back button while the header is shown; with the header hidden, in fullscreen or minimal view, the deck's own order applies.
+- [ ] Theme switch with non-modal dialogs open (Help, Messages, Media information): they repaint in the new theme and keep working.
+- [ ] A theme set on the command line overrides the saved preference for that session only.
+- [ ] `--video-splitter=clone`: no embedded video, and the immersive subtitle lift doesn't apply.
 
 ## Media & playback
 - [ ] Nothing loaded (idle): controls disabled sensibly, no division by zero in time/seek code.

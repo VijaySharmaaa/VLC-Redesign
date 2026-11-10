@@ -1406,7 +1406,7 @@ void MainInterface::setImmersive( bool on )
     if( on )
     {
         if( playerHeader )
-            playerHeader->setCursorHidden( false );
+            playerHeader->forgetCursor();
         immersiveBar = new ImmersiveBar( p_intf, this, stackCentralW,
                                          getControlsVisibilityStatus() & CONTROLS_ADVANCED );
         immersiveBar->setHeader( playerHeader );

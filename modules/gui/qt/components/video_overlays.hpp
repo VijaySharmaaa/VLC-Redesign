@@ -151,7 +151,8 @@ public:
     QAbstractButton *backButton() const { return back; }
     void setActive( bool );    /* the video page, neither full screen nor minimal */
     void setAsleep( bool );    /* the immersive deck's idle hide */
-    void setCursorHidden( bool );  /* the normal layout's: VLC hid the cursor */
+    void setCursorHidden( bool );  /* the normal layout's: VLC hid or showed the cursor */
+    void forgetCursor();       /* the immersive layout takes over */
     bool hovered() const;      /* the mouse on its back button */
 
 protected:
@@ -164,6 +165,7 @@ private:
     void followCursor();
     void setOpacity( qreal );
     void raiseDrawers();
+    const QWidget *firstDeckStop() const;
     QFont titleFont() const;
     int rowHeight() const;
     QRect backRect( int width ) const;  /* in the strip, mirrored right to left */
@@ -177,6 +179,8 @@ private:
     QVariantAnimation *fade;
     QString meta;
     bool active, asleep, cursorHidden;
+    QPoint hiddenAt;      /* the cursor when VLC hid it */
+    QTimer moveCheck;     /* after a show that was not the user's */
 };
 
 #endif
