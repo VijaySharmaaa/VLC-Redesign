@@ -34,6 +34,7 @@
 #include "components/open_panels.hpp"
 #include "dialogs/open.hpp"
 #include "dialogs_provider.hpp" /* Open Subtitle file */
+#include "util/customwidgets.hpp"     /* dropEarlyAccessibles */
 #include "util/qt_dirs.hpp"
 #include "util/theme.hpp"
 #include "util/validators.hpp"
@@ -81,6 +82,8 @@ FileOpenPanel::FileOpenPanel( QWidget *_parent, intf_thread_t *_p_intf ) :
 {
     /* Classic UI Setup */
     ui.setupUi( this );
+    /* "Use a subtitle file" is a checkable group box */
+    dropEarlyAccessibles( ui.subGroupBox );
 
     setAcceptDrops( true );
 

@@ -24,6 +24,7 @@
 
 #include "components/sout/profile_selector.hpp"
 #include "components/sout/profiles.hpp"
+#include "util/customwidgets.hpp"     /* dropEarlyAccessibles */
 #include "dialogs/sout.hpp"
 
 #include <QHBoxLayout>
@@ -435,6 +436,8 @@ VLCProfileEditor::VLCProfileEditor( const QString& qs_name, const QString& value
                  : QVLCDialog( _parent, NULL )
 {
     ui.setupUi( this );
+    /* the video, audio and subtitles groups are checkable group boxes */
+    dropEarlyAccessibles( this );
     ui.buttonGroup->setObjectName( CATPROP2NAME( CATANDPROP( "muxer", "mux" ) ) );
     if( !qs_name.isEmpty() )
     {
