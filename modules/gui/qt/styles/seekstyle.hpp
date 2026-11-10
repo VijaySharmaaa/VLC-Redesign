@@ -39,8 +39,6 @@ public:
         SeekStyleOption();
         float buffering;
         int length;
-        bool animate;
-        qreal animationopacity;
         qreal animationloading;
         QList<int64_t> points;
     };

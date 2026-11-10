@@ -46,9 +46,6 @@
 #include <QAbstractNativeEventFilter>
 
 class QMenu;
-class QSlider;
-class QWidgetAction;
-class SpeedControlWidget;
 struct vout_window_t;
 
 /******************** Video Widget ****************/
@@ -221,49 +218,17 @@ signals:
     void broadcastRemainingTime( bool );
 };
 
-class SpeedLabel : public QLabel
+/* "1.00×", accent when not 1 (DESIGN_SPEC 3); a click opens the speed popover */
+class SpeedLabel : public QToolButton
 {
     Q_OBJECT
 public:
     SpeedLabel( intf_thread_t *, QWidget * );
-    virtual ~SpeedLabel();
 
-protected:
-    void mousePressEvent ( QMouseEvent * event ) Q_DECL_OVERRIDE
-    {
-        showSpeedMenu( event->pos() );
-    }
 private slots:
-    void showSpeedMenu( QPoint );
     void setRate( float );
 private:
     intf_thread_t *p_intf;
-    QMenu *speedControlMenu;
-    QString tooltipStringPattern;
-    SpeedControlWidget *speedControl;
-    QWidgetAction *widgetAction;
-};
-
-/******************** Speed Control Widgets ****************/
-class SpeedControlWidget : public QFrame
-{
-    Q_OBJECT
-public:
-    SpeedControlWidget( intf_thread_t *, QWidget * );
-    void updateControls( float );
-private:
-    intf_thread_t* p_intf;
-    QSlider* speedSlider;
-    QDoubleSpinBox* spinBox;
-    int lastValue;
-
-public slots:
-    void activateOnState();
-
-private slots:
-    void updateRate( int );
-    void updateSpinBoxRate( double );
-    void resetRate();
 };
 
 class CoverArtLabel : public QLabel

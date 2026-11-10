@@ -97,6 +97,10 @@ public:
     static QMenu *rendererMenu;
     static QActionGroup *rendererGroup;
 
+    /* one checkable action per choice of the variable; the deck's tracks
+     * popover lists and triggers them too */
+    static int CreateChoicesMenu( QMenu *,const char *, vlc_object_t * );
+
 private:
     /* All main Menus */
     static QMenu *FileMenu( intf_thread_t *, QWidget *, MainInterface * mi = NULL );
@@ -149,7 +153,6 @@ private:
                                   vlc_value_t, int, bool c = false );
     static void UpdateItem( intf_thread_t *, QMenu *, const char *,
                             vlc_object_t *, bool );
-    static int CreateChoicesMenu( QMenu *,const char *, vlc_object_t * );
     static void EnableStaticEntries( QMenu *, bool );
 
     /* recentMRL menu */

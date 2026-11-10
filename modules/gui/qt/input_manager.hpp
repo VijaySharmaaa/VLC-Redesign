@@ -237,6 +237,7 @@ signals:
     void playingStatusChanged( int );
     void recordingStateChanged( bool );
     /// Teletext
+    void esChanged(); /* a track was added, removed or selected */
     void teletextPossible( bool );
     void teletextActivated( bool );
     void teletextTransparencyActivated( bool );

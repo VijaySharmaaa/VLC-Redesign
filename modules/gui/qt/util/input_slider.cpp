@@ -61,9 +61,6 @@ namespace {
     int const MAX_SLIDER_VALUE = 10000;
 
     int const CHAPTER_SPOT_SIZE = 3;
-
-    int const FADE_DURATION = 300;
-    int const FADEOUT_DELAY = 2000;
 }
 
 SeekSlider::SeekSlider( intf_thread_t *p_intf, Qt::Orientation q, QWidget *_parent, bool _static )
@@ -72,7 +69,6 @@ SeekSlider::SeekSlider( intf_thread_t *p_intf, Qt::Orientation q, QWidget *_pare
     isSliding = false;
     isJumping = false;
     f_buffering = 0.0;
-    mHandleOpacity = 1.0;
     mLoading = 0.0;
     chapters = NULL;
     mHandleLength = -1;
@@ -94,9 +90,12 @@ SeekSlider::SeekSlider( intf_thread_t *p_intf, Qt::Orientation q, QWidget *_pare
     setMouseTracking( true );
     setTracking( true );
     setFocusPolicy( Qt::NoFocus );
+    setAccessibleName( qtr( "Seek" ) );
 
-    /* Use the new/classic style */
-    setMinimumHeight( 18 );
+    /* Use the new/classic style. High enough for the hovered knob and its
+     * halo (DESIGN_SPEC 3); the style's handle length follows the height. */
+    const Theme *t = Theme::instance();
+    setMinimumHeight( t->metric( Theme::SeekKnobHover ) + 2 * t->px( RedesignTokens::Deck::KnobHalo ) );
     if( !b_classic )
     {
         alternativeStyle = new SeekStyle;
@@ -106,11 +105,6 @@ SeekSlider::SeekSlider( intf_thread_t *p_intf, Qt::Orientation q, QWidget *_pare
     /* Init to 0 */
     setPosition( -1.0, 0, 0 );
     secstotimestr( psz_length, 0 );
-
-    animHandle = new QPropertyAnimation( this, "handleOpacity", this );
-    animHandle->setDuration( FADE_DURATION );
-    animHandle->setStartValue( 0.0 );
-    animHandle->setEndValue( 1.0 );
 
     QPropertyAnimation *animLoadingIn = new QPropertyAnimation( this, "loadingProperty", this );
     animLoadingIn->setDuration( 2000 );
@@ -128,10 +122,6 @@ SeekSlider::SeekSlider( intf_thread_t *p_intf, Qt::Orientation q, QWidget *_pare
     animLoading->addAnimation( animLoadingOut );
     animLoading->setLoopCount( -1 );
 
-    hideHandleTimer = new QTimer( this );
-    hideHandleTimer->setSingleShot( true );
-    hideHandleTimer->setInterval( FADEOUT_DELAY );
-
     startAnimLoadingTimer = new QTimer( this );
     startAnimLoadingTimer->setSingleShot( true );
     startAnimLoadingTimer->setInterval( 500 );
@@ -139,11 +129,13 @@ SeekSlider::SeekSlider( intf_thread_t *p_intf, Qt::Orientation q, QWidget *_pare
     connect( MainInputManager::getInstance(), &MainInputManager::inputChanged, this, &SeekSlider::inputUpdated );
     connect( this, &SeekSlider::sliderMoved, this, &SeekSlider::startSeekTimer );
     connect( seekLimitTimer, &QTimer::timeout, this, &SeekSlider::updatePos );
-    connect( hideHandleTimer, &QTimer::timeout, this, &SeekSlider::hideHandle );
     connect( startAnimLoadingTimer, &QTimer::timeout, this, &SeekSlider::startAnimLoading );
     mTimeTooltip->installEventFilter( this );
 
     connect(&wheelEventConverter, &WheelToVLCConverter::vlcWheelKey, this, [this](int vlcButton){
+        /* idle or live: no length to step through */
+        if( inputLength <= 0 )
+            return;
         vlc_tick_t i_size = var_InheritInteger( this->p_intf->obj.libvlc, "short-jump-size" );
         int i_mode = var_InheritInteger( this->p_intf->obj.libvlc, "hotkeys-x-wheel-mode" );
 
@@ -413,17 +405,7 @@ void SeekSlider::enterEvent( QEnterEvent * )
 void SeekSlider::enterEvent( QEvent * )
 #endif
 {
-    /* Cancel the fade-out timer */
-    hideHandleTimer->stop();
-    /* Only start the fade-in if needed */
-    if( isEnabled() && animHandle->direction() != QAbstractAnimation::Forward )
-    {
-        /* If pause is called while not running Qt will complain */
-        if( animHandle->state() == QAbstractAnimation::Running )
-            animHandle->pause();
-        animHandle->setDirection( QAbstractAnimation::Forward );
-        animHandle->start();
-    }
+    update(); /* the track and the knob grow on hover */
     /* Don't show the tooltip if the slider is disabled or a menu is open */
     if( isEnabled() && inputLength > 0 && !qApp->activePopupWidget() )
         mTimeTooltip->show();
@@ -431,7 +413,7 @@ void SeekSlider::enterEvent( QEvent * )
 
 void SeekSlider::leaveEvent( QEvent * )
 {
-    hideHandleTimer->start();
+    update();
     /* Hide the tooltip
        - if the mouse leave the slider rect (Note: it can still be
          over the tooltip!)
@@ -454,9 +436,6 @@ void SeekSlider::paintEvent( QPaintEvent *ev )
         else
             option.buffering = 0.0;
         option.length = inputLength;
-        option.animate = ( animHandle->state() == QAbstractAnimation::Running
-                           || hideHandleTimer->isActive() );
-        option.animationopacity = mHandleOpacity;
         option.animationloading = mLoading;
         option.sliderPosition = sliderPosition();
         option.sliderValue = value();
@@ -506,25 +485,13 @@ QSize SeekSlider::sizeHint() const
 {
     if ( b_classic )
         return QSlider::sizeHint();
-    return ( orientation() == Qt::Horizontal ) ? QSize( 100, 18 )
-                                               : QSize( 18, 100 );
-}
-
-qreal SeekSlider::handleOpacity() const
-{
-    return mHandleOpacity;
+    return ( orientation() == Qt::Horizontal ) ? QSize( 100, minimumHeight() )
+                                               : QSize( minimumHeight(), 100 );
 }
 
 qreal SeekSlider::loading() const
 {
     return mLoading;
-}
-
-void SeekSlider::setHandleOpacity(qreal opacity)
-{
-    mHandleOpacity = opacity;
-    /* Request a new paintevent */
-    update();
 }
 
 void SeekSlider::setLoading(qreal loading)
@@ -561,16 +528,6 @@ inline float SeekSlider::getValuePercentageFromXPos( int posX )
     return getValueFromXPos( posX ) / static_cast<float>( maximum() );
 }
 
-void SeekSlider::hideHandle()
-{
-    /* If pause is called while not running Qt will complain */
-    if( animHandle->state() == QAbstractAnimation::Running )
-        animHandle->pause();
-    /* Play the animation backward */
-    animHandle->setDirection( QAbstractAnimation::Backward );
-    animHandle->start();
-}
-
 void SeekSlider::startAnimLoading()
 {
     animLoading->start();
@@ -580,12 +537,11 @@ void SeekSlider::startAnimLoading()
     - Mark Kretschmann
     - Gábor Lehel
    */
-#define WLENGTH   85  // px
-#define WHEIGHT   26  // px
-#define PADDINGL  6   // px
-#define PADDINGR  6   // px
 #define SOUNDMIN  0   // %
 
+/* DESIGN_SPEC 3: a flat 140 px track, 4 px high, a 1 px tick at 100 %, the
+ * fill in the accent and in the boost colour above 100 %; the level as
+ * text on the right. The maximum is qt-max-volume. */
 SoundSlider::SoundSlider( QWidget *_parent, float _i_step,
                           char *psz_colors, int max )
                         : QAbstractSlider( _parent )
@@ -593,12 +549,15 @@ SoundSlider::SoundSlider( QWidget *_parent, float _i_step,
     f_step = (float)(_i_step * 10000)
            / (float)((max - SOUNDMIN) * AOUT_VOLUME_DEFAULT);
     setRange( SOUNDMIN, max);
+    setSingleStep( qMax( 1, qRound( f_step ) ) );
     setMouseTracking( true );
     isSliding = false;
     b_mouseOutside = true;
     b_isMuted = false;
 
-    setFixedSize( WLENGTH, WHEIGHT );
+    const Theme *t = Theme::instance();
+    setFixedSize( t->metric( Theme::VolumeW ) + t->px( RedesignTokens::Deck::VolumeLabelW ),
+                  t->px( RedesignTokens::Deck::VolumeH ) );
 
     /* A qt-slider-colours the user changed wins over the theme's accent */
     module_config_t *p_colors = config_FindConfig( "qt-slider-colours" );
@@ -612,14 +571,8 @@ SoundSlider::SoundSlider( QWidget *_parent, float _i_step,
     }
     free( psz_colors );
 
-    textfont.setPointSize( 7 );
-    textrect.setRect( 0, 0, 34, 15 );
-
-    buildPixmaps();
-    connect( Theme::instance(), &Theme::changed, this, [this]() {
-        buildPixmaps();
-        update();
-    } );
+    connect( Theme::instance(), &Theme::changed, this,
+             static_cast<void (QWidget::*)()>( &QWidget::update ) );
 
     connect(&wheelEventConverter, &WheelToVLCConverter::vlcWheelKey, this, [this](int vlcButton){
         int newvalue = 0;
@@ -642,86 +595,38 @@ SoundSlider::SoundSlider( QWidget *_parent, float _i_step,
     });
 }
 
-void SoundSlider::buildPixmaps()
+QRect SoundSlider::trackRect() const
+{
+    const int h = Theme::instance()->metric( Theme::SeekTrack );
+    return QRect( 0, ( height() - h ) / 2, Theme::instance()->metric( Theme::VolumeW ), h );
+}
+
+QBrush SoundSlider::fillBrush() const
 {
     const Theme *theme = Theme::instance();
-
-    /* outline and track from the theme */
-    pixOutside = ImageHelper::loadSvgToPixmap( ":/toolbar/volslide-outside.svg", width(), height() );
-    const QPixmap inside = ImageHelper::loadSvgToPixmap( ":/toolbar/volslide-inside.svg", width(), height() );
-    const QBitmap mask( inside.createHeuristicMask() );
-
-    QPixmap track( pixOutside.size() );
-#if HAS_QT56
-    track.setDevicePixelRatio( pixOutside.devicePixelRatio() );
-#endif
-    track.fill( theme->ink( RedesignTokens::InkAlpha::Track ) );
-    track.setMask( mask );
-    painter.begin( &pixOutside );
-    painter.setCompositionMode( QPainter::CompositionMode_SourceIn );
-    painter.fillRect( QRect( QPoint( 0, 0 ), pixOutside.size() ), theme->ink( RedesignTokens::InkAlpha::ToggleOff ) );
-    painter.setCompositionMode( QPainter::CompositionMode_DestinationOver );
-    painter.drawPixmap( 0, 0, track );
-    painter.end();
-
-    pixGradient = QPixmap( pixOutside.size() );
-    pixGradient2 = QPixmap( pixOutside.size() );
-
-#if HAS_QT56
-    pixGradient.setDevicePixelRatio( pixOutside.devicePixelRatio() );
-    pixGradient2.setDevicePixelRatio( pixOutside.devicePixelRatio() );
-#endif
-
-    QLinearGradient gradient( PADDINGL, 2, width() - PADDINGR, 2 );
-    QLinearGradient gradient2( PADDINGL, 2, width() - PADDINGR, 2 );
-
-    /* The value maps linearly onto the gradient, so 100 % sits at 100/max;
-     * outside 0..1 (qt-max-volume up to 100) Qt ignores the stop. */
-    const qreal f_mid_point = 100.0 / maximum();
     if( colorList.isEmpty() )
     {
-        /* DESIGN_SPEC 3: accent up to 100 %, boost colour above */
-        const QColor accent = theme->color( Theme::Accent );
-        const QColor boost = theme->color( Theme::VolumeBoost );
-        gradient.setColorAt( 0.0, accent );
-        gradient.setColorAt( qMin( f_mid_point, 1.0 ), accent );
-        if( f_mid_point < 1.0 )
-        {
-            gradient.setColorAt( f_mid_point + 0.001, boost );
-            gradient.setColorAt( 1.0, boost );
-        }
-        gradient2.setColorAt( 0.0, theme->ink( RedesignTokens::InkAlpha::ToggleOff ) );
+        if( b_isMuted )
+            return theme->ink( RedesignTokens::InkAlpha::ToggleOff );
+        return theme->color( value() > 100 ? Theme::VolumeBoost : Theme::Accent );
     }
-    else
-    {
+
+    /* qt-slider-colours: four stops, the middle pair around 100 % */
+    const QRect track = trackRect();
+    QLinearGradient gradient( track.left(), 0, track.right(), 0 );
+    const qreal f_mid_point = 100.0 / maximum();
+    const qreal stops[] = { 0.0, qBound( 0.0, f_mid_point - 0.05, 1.0 ),
+                            qBound( 0.0, f_mid_point + 0.05, 1.0 ), 1.0 };
 #define c(i) colorList.at(i).toInt()
-        const qreal stops[] = { 0.0, qBound( 0.0, f_mid_point - 0.05, 1.0 ),
-                                qBound( 0.0, f_mid_point + 0.05, 1.0 ), 1.0 };
-        for( int i = 0; i < 4; i++ )
-        {
-            QColor color( c( 3 * i ), c( 3 * i + 1 ), c( 3 * i + 2 ) );
-            gradient.setColorAt( stops[i], color );
-            /* muted: desaturated */
+    for( int i = 0; i < 4; i++ )
+    {
+        QColor color( c( 3 * i ), c( 3 * i + 1 ), c( 3 * i + 2 ) );
+        if( b_isMuted )  /* desaturated */
             color.setHsvF( color.hueF(), 0.2, 0.5, 1.0 );
-            gradient2.setColorAt( stops[i], color );
-        }
-#undef c
+        gradient.setColorAt( stops[i], color );
     }
-
-    painter.begin( &pixGradient );
-    painter.setPen( Qt::NoPen );
-    painter.setBrush( gradient );
-    painter.drawRect( pixGradient.rect() );
-    painter.end();
-
-    painter.begin( &pixGradient2 );
-    painter.setPen( Qt::NoPen );
-    painter.setBrush( gradient2 );
-    painter.drawRect( pixGradient2.rect() );
-    painter.end();
-
-    pixGradient.setMask( mask );
-    pixGradient2.setMask( mask );
+#undef c
+    return gradient;
 }
 
 void SoundSlider::wheelEvent( QWheelEvent *event )
@@ -768,10 +673,11 @@ void SoundSlider::mouseMoveEvent( QMouseEvent *event )
     if ( isSliding && ( event->buttons() & ~Qt::RightButton ) == Qt::NoButton )
         processReleasedButton();
 
+    const QRect track = trackRect();
     if( isSliding )
     {
-        QRect rect( PADDINGL - 15,    -1,
-                    width() - PADDINGR + 15 * 2 , width() + 5 );
+        /* dragging far away from the track restores the old level */
+        QRect rect( track.left() - 15, -1, track.width() + 15 * 2, width() + 5 );
         if( !rect.contains( event->pos() ) )
         { /* We are outside */
             if ( !b_mouseOutside )
@@ -787,7 +693,7 @@ void SoundSlider::mouseMoveEvent( QMouseEvent *event )
     }
     else
     {
-        int i = ( ( event->x() - PADDINGL ) * maximum() ) / ( width() - ( PADDINGR + PADDINGL ) );
+        int i = ( ( event->x() - track.left() ) * maximum() ) / track.width();
         i = __MIN( __MAX( 0, i ), maximum() );
         setToolTip( QString("%1  %" ).arg( i ) );
     }
@@ -795,7 +701,8 @@ void SoundSlider::mouseMoveEvent( QMouseEvent *event )
 
 void SoundSlider::changeValue( int x )
 {
-    setValue( ( ( x - PADDINGL ) * maximum() ) / ( width() - ( PADDINGR + PADDINGL ) ) );
+    const QRect track = trackRect();
+    setValue( ( ( x - track.left() ) * maximum() + track.width() / 2 ) / track.width() );
 }
 
 void SoundSlider::setMuted( bool m )
@@ -806,29 +713,43 @@ void SoundSlider::setMuted( bool m )
 
 void SoundSlider::paintEvent( QPaintEvent *e )
 {
-    QPixmap *paintGradient;
-    if (b_isMuted)
-        paintGradient = &this->pixGradient2;
-    else
-        paintGradient = &this->pixGradient;
+    const Theme *theme = Theme::instance();
+    const QRect track = trackRect();
+    const qreal radius = track.height() / 2.;
+    QPainter painter( this );
+    painter.setRenderHint( QPainter::Antialiasing );
+    painter.setPen( Qt::NoPen );
 
-    painter.begin( this );
-
-    float f_scale = paintGradient->width() / float( width() );
+    painter.setBrush( theme->ink( RedesignTokens::InkAlpha::Track ) );
+    painter.drawRoundedRect( track, radius, radius );
     /* + max/2 rounds to the nearest pixel for any qt-max-volume */
-    const int offsetDst = int( ( ( width() - ( PADDINGR + PADDINGL ) ) * value() + maximum() / 2 ) / maximum() ) + PADDINGL;
-    const int offsetSrc = int( ( ( paintGradient->width() - ( PADDINGR + PADDINGL ) * f_scale ) * value() + maximum() / 2 ) / maximum() + PADDINGL * f_scale );
+    const int fill = ( track.width() * value() + maximum() / 2 ) / maximum();
+    if( fill > 0 )
+    {
+        painter.setBrush( fillBrush() );
+        painter.drawRoundedRect( QRect( track.left(), track.top(), fill, track.height() ), radius, radius );
+    }
+    if( maximum() > 100 )
+    {
+        const int tickH = theme->px( RedesignTokens::Deck::VolumeTickH );
+        painter.fillRect( QRect( track.left() + track.width() * 100 / maximum(), ( height() - tickH ) / 2,
+                                 RedesignTokens::Size::Hairline, tickH ),
+                          theme->ink( RedesignTokens::InkAlpha::VolumeTick ) );
+    }
+    if( hasFocus() )
+    {
+        /* the accent is 2.4:1 on light surfaces: rings take the accent text there */
+        const qreal inset = RedesignTokens::Size::FocusRing / 2.;
+        painter.setPen( QPen( theme->color( theme->isDark() ? Theme::Accent : Theme::AccentText ),
+                              RedesignTokens::Size::FocusRing ) );
+        painter.setBrush( Qt::NoBrush );
+        painter.drawRoundedRect( QRectF( rect() ).adjusted( inset, inset, -inset, -inset ),
+                                 theme->metric( Theme::RadiusSm ), theme->metric( Theme::RadiusSm ) );
+    }
 
-    /* the track is part of the outline pixmap: draw it below the fill */
-    painter.drawPixmap( 0, 0, width(), height(), pixOutside, 0, 0,  pixOutside.width(), pixOutside.height() );
-    painter.drawPixmap( 0, 0, offsetDst, height(), *paintGradient, 0, 0, offsetSrc, paintGradient->height() );
-
-    /* read at paint time: the theme can change while VLC runs */
-    painter.setPen( palette().color( QPalette::WindowText ) );
-    painter.setFont( textfont );
-    painter.drawText( textrect, Qt::AlignRight | Qt::AlignVCenter,
-                      QString::number( value() ) + '%' );
-
-    painter.end();
+    painter.setPen( theme->color( Theme::Text2 ) );
+    painter.setFont( theme->font( Theme::Meta ) );
+    painter.drawText( QRect( track.right() + 1, 0, width() - track.right() - 1, height() ),
+                      Qt::AlignRight | Qt::AlignVCenter, QString::number( value() ) + '%' );
     e->accept();
 }
