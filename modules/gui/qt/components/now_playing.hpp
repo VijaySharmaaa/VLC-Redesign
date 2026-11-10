@@ -40,7 +40,7 @@ class QPropertyAnimation;
 /* Shared with the library pages (components/library); timeString() is in
  * util/customwidgets.hpp */
 /* The striped placeholder at 135 degrees in the theme's two tints */
-void paintStripes( QPainter &, const QRectF &, qreal period );
+void paintStripes( QPainter &, const QRectF &, qreal period, bool onVideo = false );
 /* A theme font at a token px size */
 QFont fontAt( Theme::TypeRole, int tokenPx, bool semibold );
 
@@ -54,14 +54,16 @@ class ArtView : public QWidget
 {
     Q_OBJECT
 public:
-    /* stripe: the placeholder's stripe period, radius: corners (token px) */
-    ArtView( int stripe, int radius, QWidget *parent );
+    /* stripe: the placeholder's stripe period, radius: corners (token px),
+     * onVideo: stands for the video, so its placeholder stays dark */
+    ArtView( int stripe, int radius, QWidget *parent, bool onVideo = false );
     void setArt( const QString &url );  /* empty: placeholder */
 protected:
     void paintEvent( QPaintEvent * ) Q_DECL_OVERRIDE;
 private:
     QPixmap art;
     int stripe, radius;
+    bool onVideo;
 };
 
 /* The design's 3 px seek line: click or drag to seek, arrows step. Follows
