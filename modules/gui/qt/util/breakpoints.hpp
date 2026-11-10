@@ -28,7 +28,7 @@
  * (RedesignTokens::Breakpoint). On a change it sets the dynamic property
  * `breakpoint` ("XS", "S", "M" or "L") on the window and on every target,
  * re-polishes them so stylesheet selectors like [breakpoint="S"] apply,
- * then emits changed(). */
+ * then emits changed(); after a theme change always, the sizes may differ. */
 class BreakpointWatcher : public QObject
 {
     Q_OBJECT
@@ -51,6 +51,7 @@ protected:
 
 private:
     void apply( QWidget * ) const;
+    void update( bool always );
 
     QWidget *window;
     QList< QPointer<QWidget> > targets;

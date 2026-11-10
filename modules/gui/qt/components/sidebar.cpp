@@ -224,16 +224,22 @@ static QString tip( const QString &label, const QString &key )
     return qtr( "%1 (%2)" ).arg( label, key );
 }
 
+/* The sidebar's padding and gap, again when the scale changes */
+static void padNav( QLayout *layout, int spacing )
+{
+    const Theme *t = Theme::instance();
+    layout->setContentsMargins( t->px( Size::SidebarPadX ), t->px( Size::SidebarPadY ),
+                                t->px( Size::SidebarPadX ), t->px( Size::SidebarPadY ) );
+    layout->setSpacing( t->px( spacing ) );
+}
+
 /* A page of the sidebar's stack, with the sidebar's padding */
 static QVBoxLayout *navLayout( QStackedWidget *navs, int spacing )
 {
     QWidget *nav = new QWidget;
     navs->addWidget( nav );
     QVBoxLayout *layout = new QVBoxLayout( nav );
-    const Theme *t = Theme::instance();
-    layout->setContentsMargins( t->px( Size::SidebarPadX ), t->px( Size::SidebarPadY ),
-                                t->px( Size::SidebarPadX ), t->px( Size::SidebarPadY ) );
-    layout->setSpacing( t->px( spacing ) );
+    padNav( layout, spacing );
     return layout;
 }
 
@@ -406,6 +412,11 @@ int Sidebar::widthAt( BreakpointWatcher::Size bp )
 
 void Sidebar::setBreakpoint( BreakpointWatcher::Size bp )
 {
+    /* also after a change of scale (BreakpointWatcher); shortcut: the
+     * spacings after Open and Back keep the start scale, rebuild them when
+     * a few px there matter */
+    padNav( navs->widget( 0 )->layout(), Size::SidebarItemGap );
+    padNav( navs->widget( 1 )->layout(), Size::SidebarSectionGap );
     setFixedWidth( widthAt( bp ) );
     for( SidebarButton *b : buttons )
         b->setRail( bp < BreakpointWatcher::M );

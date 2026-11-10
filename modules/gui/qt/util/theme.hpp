@@ -30,6 +30,7 @@
 
 class QAction;
 class QApplication;
+class QScreen;
 class QWidget;
 
 /* The single source of the interface's look. One instance lives in the Qt
@@ -97,6 +98,10 @@ public:
     /* The only way to change the application style: wraps the named
      * QStyleFactory style (empty = Fusion) so the token painting stays. */
     void setBaseStyle(const QString &);
+    /* The metrics follow the logical dpi of the screen the main window is
+     * on: when it differs, re-applies the stylesheet and emits changed().
+     * Returns false when the scale stays the same. */
+    bool setScreen(const QScreen *);
 
     bool isDark() const { return dark; }
     bool isHighContrast() const { return highContrast; }

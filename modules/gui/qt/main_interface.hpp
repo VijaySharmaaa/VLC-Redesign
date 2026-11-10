@@ -167,6 +167,7 @@ protected:
     void setMinimalView( bool );
     void setInterfaceFullScreen( bool );
     void computeMinimumSize( bool b_minimal );
+    void followScreen();
     bool onPlayerPage() const;
     bool deckFloats() const;
     void updateDeckPlacement();

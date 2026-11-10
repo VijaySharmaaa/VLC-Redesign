@@ -106,6 +106,9 @@ OverlayHost::OverlayHost( QWidget *_target, QObject *parent )
     pending.setSingleShot( true );
     pending.setInterval( 0 );
     connect( &pending, &QTimer::timeout, this, &OverlayHost::changed );
+    /* another screen's scale: the overlays size and place themselves again */
+    connect( Theme::instance(), &Theme::changed, &pending,
+             static_cast<void (QTimer::*)()>( &QTimer::start ) );
     watchAncestors();
 }
 

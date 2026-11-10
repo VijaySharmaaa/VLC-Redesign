@@ -112,7 +112,7 @@ TitleBar::TitleBar( QWidget *_window )
     QAccessible::installFactory( titleBarFactory );
 
     Theme *t = Theme::instance();
-    cone = addButton( qtr( "Go to library" ), t->px( Size::TitleConeW ) );
+    cone = addButton( qtr( "Go to library" ) );
     connect( cone, &QToolButton::clicked, this, &TitleBar::libraryRequested );
 
     bar = new QMenuBar( this );
@@ -120,9 +120,9 @@ TitleBar::TitleBar( QWidget *_window )
     layout->addWidget( bar, 0, Qt::AlignVCenter );
     layout->addStretch();
 
-    minButton = addButton( qtr( "Minimize" ), t->metric( Theme::CaptionButtonW ) );
-    maxButton = addButton( QString(), t->metric( Theme::CaptionButtonW ) );
-    closeButton = addButton( qtr( "Close" ), t->metric( Theme::CaptionButtonW ) );
+    minButton = addButton( qtr( "Minimize" ) );
+    maxButton = addButton( QString() );
+    closeButton = addButton( qtr( "Close" ) );
     closeButton->setObjectName( "captionClose" );
     foreach( QToolButton *b, QList<QToolButton *>() << minButton << maxButton << closeButton )
         b->setProperty( "captionButton", true );
@@ -131,12 +131,13 @@ TitleBar::TitleBar( QWidget *_window )
     connect( closeButton, &QToolButton::clicked, window, &QWidget::close );
 
     window->installEventFilter( this );
-    connect( t, &Theme::changed, this, &TitleBar::updateIcons );
+    /* another screen's scale changes the sizes too */
+    connect( t, &Theme::changed, this, [this]() { updateIcons(); updateLayout(); } );
     updateIcons();
     updateLayout();
 }
 
-QToolButton *TitleBar::addButton( const QString &name, int width )
+QToolButton *TitleBar::addButton( const QString &name )
 {
     QToolButton *button = new QToolButton( this );
     button->setProperty( "role", "caption" );
@@ -145,7 +146,6 @@ QToolButton *TitleBar::addButton( const QString &name, int width )
      * library its shortcut); a focusable first child would also take the
      * window's initial focus, and with it Space (play/pause). */
     button->setFocusPolicy( Qt::NoFocus );
-    button->setFixedWidth( width );
     button->setSizePolicy( QSizePolicy::Fixed, QSizePolicy::Expanding );
     button->setAccessibleName( name );
     button->setToolTip( name );
@@ -160,6 +160,10 @@ void TitleBar::updateIcons()
     const QSize glyph( t->px( Size::CaptionGlyph ), t->px( Size::CaptionGlyph ) );
     const QSize small( t->px( Size::CaptionGlyphSmall ), t->px( Size::CaptionGlyphSmall ) );
 
+    /* the widths here, with the sizes: they follow the screen's scale */
+    cone->setFixedWidth( t->px( Size::TitleConeW ) );
+    foreach( QToolButton *b, QList<QToolButton *>() << minButton << maxButton << closeButton )
+        b->setFixedWidth( t->metric( Theme::CaptionButtonW ) );
     cone->setIconSize( coneSize );
     cone->setIcon( t->icon( RedesignIcons::IconCone, Theme::Text, coneSize ) );
     minButton->setIconSize( glyph );

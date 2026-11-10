@@ -649,6 +649,24 @@ int Theme::textNudge(const QFont &f) const
     return n;
 }
 
+bool Theme::setScreen(const QScreen *screen)
+{
+    if (!screen || qFuzzyCompare(screen->logicalDotsPerInchY() / 96., scale))
+        return false;
+    msg_Dbg(p_intf, "theme: screen %s, scale %.3f -> %.3f",
+            qtu(screen->name()), scale, screen->logicalDotsPerInchY() / 96.);
+    scale = screen->logicalDotsPerInchY() / 96.;
+    icons.clear();
+    nudges.clear();
+    if (!highContrast)
+        qApp->setStyleSheet(styleSheet());
+    /* shortcut: one scale for the whole application, the main window's; a
+     * dialog on another screen keeps it. Per-window scales need px() per
+     * widget: upgrade when dialogs often sit apart from the main window. */
+    emit changed();
+    return true;
+}
+
 const Palette &Theme::palette() const
 {
     return dark ? RedesignTokens::Dark : RedesignTokens::Light;
@@ -1069,8 +1087,13 @@ PrefsPage QComboBox { min-height: @prefsSelectInner@px; }
 #else
     const bool dwmRounds = false;
 #endif
-    const int lineH = QFontMetrics(font(Body)).height();
-    const int metaH = QFontMetrics(font(Meta)).height();
+    /* at this scale: QFontMetrics reads a point size at the primary
+     * screen's dpi, which is not the main window's after setScreen() */
+    QFont bodyAt = font(Body), metaAt = font(Meta);
+    bodyAt.setPixelSize(px(Type::Body));
+    metaAt.setPixelSize(px(Type::Meta));
+    const int lineH = QFontMetrics(bodyAt).height();
+    const int metaH = QFontMetrics(metaAt).height();
     /* the tab's ring takes 2 px at the top and the bottom: the padding
      * shares the rest evenly, the tab keeps its height */
     const int tabPadY = qMax(0, 2 * qMax(0, (px(Size::MenuItemH) - lineH) / 2) - Size::FocusRing);
