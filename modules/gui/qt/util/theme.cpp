@@ -100,7 +100,7 @@ namespace
         Motion::Dialog, Motion::PanelSlide, Motion::ViewChange, Motion::Toast, Motion::ToastHold,
         Motion::PausedBadge, Motion::MiniPlayer, Motion::DropTarget, Motion::SeekTick,
         Motion::VolumeFill, Motion::EqBand, Motion::Toggle, Motion::PlayPress,
-        Motion::ImmersiveIdle, Motion::ImmersiveFade,
+        Motion::ImmersiveIdle, Motion::ImmersiveFade, NowPlaying::SpectrumMotion,
     };
     static_assert(sizeof(durations) / sizeof(durations[0]) == Theme::MotionRoleCount,
                   "MotionRole and the duration table differ");
@@ -738,6 +738,18 @@ QLabel[role="hint"] { color: @mute@; }
 QToolButton[role="caption"] { border-radius: 0; }
 QToolButton[role="caption"][nchover="true"] { background: @hoverFill@; }
 QToolButton#captionClose:hover, QToolButton#captionClose:pressed { background: @closeHover@; }
+
+/* Phase 3: now playing, mini player, audio mode (components/now_playing.cpp) */
+QLabel[np="mute"] { color: @mute@; }
+QLabel[np="accent"] { color: @accent@; }
+QLabel[np="chip"] { background: @accentTint@; color: @accTx@; border-radius: @radiusXs@px; padding: @chipPadY@px @chipPadX@px; }
+QLabel[np="chip2"] { background: @divider@; color: @tx2@; border-radius: @radiusXs@px; padding: @chipPadY@px @chipPadX@px; }
+QToolButton[np="play"] { background: @accent@; border-radius: @playNowR@px; }
+QToolButton[np="play"]:hover { background: @accentHover@; }
+QToolButton[np="play"]:focus { border-color: @onAccent@; }
+QToolButton[np="pill"] { color: @tx2@; padding: 0 @pillPadR@px 0 @pillPadL@px; }
+QToolButton[np="overlay"] { background: @scrim@; }
+QListView[np="tracks"] { background: transparent; border: none; }
 )QSS";
 
     const Palette &p = palette();
@@ -803,6 +815,15 @@ QToolButton#captionClose:hover, QToolButton#captionClose:pressed { background: @
         { "knob", QString::number(px(Size::SeekKnob)) },
         { "knobRadius", QString::number(px(Size::SeekKnob) / 2) },
         { "knobMargin", QString::number(-(px(Size::SeekKnob) - px(Size::SeekTrack)) / 2) },
+        /* Phase 3: now playing, mini player, audio mode */
+        { "accTx", css(color(AccentText)) },
+        { "chipPadX", QString::number(px(NowPlaying::ChipPadX)) },
+        { "chipPadY", QString::number(px(NowPlaying::ChipPadY)) },
+        { "playNowR", QString::number(px(Size::PlayNowBar) / 2) },
+        { "pillPadL", QString::number(px(NowPlaying::PillPadLeft)) },
+        { "pillPadR", QString::number(px(NowPlaying::PillPadRight)) },
+        { "scrim", css(QColor::fromRgba(qRgba(qRed(VideoSurface), qGreen(VideoSurface), qBlue(VideoSurface),
+                                              NowPlaying::MiniRestoreBgAlpha))) },
     };
 
     QString out = QString::fromLatin1(qss);

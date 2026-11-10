@@ -311,6 +311,11 @@ static QString ChangeFiltersString( struct intf_thread_t *p_intf, const char *ps
                                     #endif
                                   );
 
+    /* playlist_EnableAudioFilter() copies the audio output's list, spectrum
+     * tap included (SpectrumWidget::setTap), into the playlist variable read
+     * above: keep it out of the string the Effects dialog saves */
+    list.removeAll( "qt_spectrum" );
+
     if( b_add && std::find(list.begin(), list.end(), psz_name) == list.end() )
         list << psz_name;
     else if (!b_add)

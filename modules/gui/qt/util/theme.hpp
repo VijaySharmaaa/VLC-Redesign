@@ -73,6 +73,7 @@ public:
         MenuDrop, Popover, ContextMenu, DialogBackdrop, Dialog, PanelSlide,
         ViewChange, Toast, ToastHold, PausedBadgeFade, MiniPlayer, DropTarget,
         SeekTick, VolumeFill, EqBand, Toggle, PlayPress, ImmersiveIdle, ImmersiveFade,
+        Spectrum,
         MotionRoleCount
     };
 

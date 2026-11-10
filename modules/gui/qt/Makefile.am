@@ -101,6 +101,7 @@ libqt_plugin_la_SOURCES = \
 	gui/qt/components/drop_overlay.cpp gui/qt/components/drop_overlay.hpp \
 	gui/qt/components/sidebar.cpp gui/qt/components/sidebar.hpp \
 	gui/qt/components/title_bar.cpp gui/qt/components/title_bar.hpp \
+	gui/qt/components/spectrum.cpp gui/qt/components/spectrum.hpp \
 	gui/qt/components/controller_widget.cpp \
 	gui/qt/components/controller_widget.hpp \
 	gui/qt/components/epg/EPGChannels.cpp \
@@ -144,6 +145,7 @@ libqt_plugin_la_SOURCES = \
 	gui/qt/util/pictureflow.cpp gui/qt/util/pictureflow.hpp \
 	gui/qt/util/validators.cpp gui/qt/util/validators.hpp \
 	gui/qt/util/redesign_icons.hpp \
+	gui/qt/util/spectrum_analysis.hpp \
 	gui/qt/util/buttons/BrowseButton.cpp \
 	gui/qt/util/buttons/BrowseButton.hpp \
 	gui/qt/util/buttons/DeckButtonsLayout.cpp \
@@ -222,6 +224,7 @@ nodist_libqt_plugin_la_SOURCES = \
 	gui/qt/components/toast.moc.cpp \
 	gui/qt/components/sidebar.moc.cpp \
 	gui/qt/components/title_bar.moc.cpp \
+	gui/qt/components/spectrum.moc.cpp \
 	gui/qt/components/controller_widget.moc.cpp \
 	gui/qt/components/epg/EPGChannels.moc.cpp \
 	gui/qt/components/epg/EPGProgram.moc.cpp \

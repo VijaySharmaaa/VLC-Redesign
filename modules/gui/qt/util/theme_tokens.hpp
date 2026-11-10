@@ -161,6 +161,40 @@ namespace RedesignTokens
         static const int DropInset = 8, DropBorder = 2, DropFillAlpha = 26; /* accent 0.10 */
         static const int DropCardPadX = 36, DropCardPadY = 28, DropGap = 10, DropIcon = 40;
     }
+
+    /* ---- Phase 3: now playing, mini player, audio mode (DESIGN_SPEC 4, 5, 9;
+     *      sizes from the prototype markup) ---- */
+    namespace NowPlaying
+    {
+        /* now-playing bar: NowPlayingBarH tall, PlayNowBar play button */
+        static const int PadX = 20, ColumnGap = 24, InfoGap = 12, TextGap = 3;
+        static const int ThumbW = 64, ThumbH = 40, ThumbStripe = 12; /* stripe period */
+        static const int SmallButton = 32, TransportGap = 12, RowGap = 4;
+        static const int CentreMinW = 280, CentreMaxW = 560, TimeW = 40, TimeGap = 10;
+        static const int ThinSeek = 3, ThinSeekHit = 12;
+
+        /* mini player */
+        static const int MiniW = 360, MiniH = 200, MiniPadX = 12, MiniPadY = 10, MiniGap = 6;
+        static const int MiniRestore = 30, MiniRestoreInset = 8, MiniMargin = 24;
+        static const int MiniRestoreBgAlpha = 140; /* black 0.55 behind the restore glyph */
+
+        /* audio mode, per breakpoint L / M / S / XS */
+        static const int ArtL = 420, ArtM = 340, ArtS = 280, ArtXS = 220;
+        static const int TitleL = 48, TitleM = 40, TitleS = 32, TitleXS = 28; /* Display at L */
+        static const int GapL = 56, GapM = 44, GapS = 32, GapXS = 24;
+        static const int PadTopL = 48, PadXL = 64, PadTopM = 36, PadXM = 44, PadXS = 24;
+        static const int ArtStripe = 24, ArtRadius = 10, ColumnInnerGap = 16;
+        static const int PillH = 30, PillPadLeft = 6, PillPadRight = 10;
+        static const int ChipPadX = 8, ChipPadY = 3, ChipGap = 8;
+        static const int HeaderTop = 46, TitleTop = 8, MetaTop = 8, ListTop = 24;
+        static const int TrackNumW = 28, TrackPadX = 10, TrackGap = 12, TrackIcon = 18, TrackTitle = 14;
+
+        /* spectrum strip: bars rise and fall at full height per 250 ms, linear */
+        static const int SpectrumH = 84, SpectrumBars = 64, SpectrumGap = 3, SpectrumPadX = 44;
+        static const int SpectrumMinBar = 3, SpectrumBarRadius = 2;
+        static const int SpectrumAlphaEven = 217, SpectrumAlphaOdd = 140; /* accent 0.85 / 0.55 */
+        static const int SpectrumMotion = 250, SpectrumFrame = 33;        /* ms, ~30 fps */
+    }
 }
 
 #endif
