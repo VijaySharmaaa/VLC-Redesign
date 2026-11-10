@@ -120,7 +120,7 @@ void SeekStyle::drawComplexControl( ComplexControl cc, const QStyleOptionComplex
     }
     if( sliderPos > 0 )
     {
-        painter->setBrush( enabled ? theme->color( Theme::Accent )
+        painter->setBrush( enabled ? theme->color( Theme::AccentFill )
                                    : theme->ink( RedesignTokens::InkAlpha::ToggleOff ) );
         painter->drawRoundedRect( QRectF( bar.left(), bar.top(), sliderPos, track ), radius, radius );
     }

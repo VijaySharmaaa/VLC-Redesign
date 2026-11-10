@@ -376,6 +376,9 @@ bool MainInterfaceWin32::nativeEventFilter(const QByteArray &, void *message, lo
     if (msg->message == WM_SETTINGCHANGE && msg->hwnd == WinId(this) && msg->lParam
         && wcscmp(reinterpret_cast<LPCWSTR>(msg->lParam), L"ImmersiveColorSet") == 0)
         Theme::instance()->reload();
+    /* shortcut: no reload on SPI_SETHIGHCONTRAST, Theme::reload() keeps the
+     * high contrast state read at start; call it here once reload() re-reads
+     * that state and rebuilds the palette for it */
 
     short cmd;
     bool handled = false;
