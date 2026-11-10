@@ -47,10 +47,13 @@ public:
         /* per theme (RedesignTokens::Palette) */
         Page, Chrome, Bg, Panel, Surface, Raised, Hover, Hover2,
         Text, Text2, Mute, Dim, AccentText, Ink, Glass, FxBg, Stripe1, Stripe2,
+        /* AccentFill: progress and "on" fills, where the accent itself is
+         * 2.4:1 on light surfaces; ControlLine: a field's only boundary */
+        AccentFill, OnAccentFill, VolumeBoost, DestructiveText, ControlLine,
         /* same in both themes */
         Accent, AccentHover, OnAccent, AccentTint12, AccentTint14, AccentBorder50,
-        AccentFocusRing, AccentKnobHalo, VolumeBoost, SeekKnobFill,
-        Error, ErrorTint, DestructiveText, WindowCloseHover, WindowCloseGlyph,
+        AccentFocusRing, AccentKnobHalo, SeekKnobFill,
+        Error, ErrorTint, WindowCloseHover, WindowCloseGlyph,
         VideoSurface, PausedBadgeBg, SubtitleBox, OnVideo,
         ColorRoleCount
     };

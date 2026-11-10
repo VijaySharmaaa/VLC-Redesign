@@ -25,12 +25,10 @@ namespace RedesignTokens
     static const QRgb AccentBorder50  = 0x80FF8A1F;
     static const QRgb AccentFocusRing = 0x2EFF8A1F; /* 18 % */
     static const QRgb AccentKnobHalo  = 0x59FF8A1F; /* 35 % */
-    static const QRgb VolumeBoost     = 0xFFFF5A1F;
 
     /* ---- Status ---- */
     static const QRgb Error            = 0xFFFF5A4E;
     static const QRgb ErrorTint        = 0x24FF5A4E;
-    static const QRgb DestructiveText  = 0xFFE5483C;
     static const QRgb WindowCloseHover = 0xFFC42B1C;
 
     /* ---- Video surfaces (both themes) ---- */
@@ -46,6 +44,11 @@ namespace RedesignTokens
         QRgb glass;    /* floating bars */
         QRgb fxbg;     /* effects sheet */
         QRgb stripe1, stripe2; /* placeholder thumbnails */
+        QRgb fill;     /* seek, volume and slider progress, switch and check box on */
+        QRgb onFill;   /* knob and check mark on fill */
+        QRgb boost;    /* volume above 100 % */
+        QRgb danger;   /* destructive menu text */
+        QRgb line;     /* outline of fields, selects, switches and check boxes */
     };
 
     static const Palette Dark = {
@@ -54,7 +57,9 @@ namespace RedesignTokens
         0xFFFFFFFF,
         0xB81E1D1B, /* rgba(30,29,27,0.72) */
         0xF71A1917, /* rgba(26,25,23,0.97) */
-        0xFF22201E, 0xFF1C1A18
+        0xFF22201E, 0xFF1C1A18,
+        0xFFFF8A1F, 0xFF1C1206, 0xFFFF5A1F, 0xFFFF7468,
+        0x59FFFFFF  /* rgba(255,255,255,0.35) */
     };
 
     static const Palette Light = {
@@ -63,7 +68,9 @@ namespace RedesignTokens
         0xFF000000,
         0xBDFAF9F7, /* rgba(250,249,247,0.74) */
         0xF7FFFFFF,
-        0xFFE7E3DD, 0xFFDFDAD3
+        0xFFE7E3DD, 0xFFDFDAD3,
+        0xFF9A4800, 0xFFFFFFFF, 0xFFD9400A, 0xFFB82818,
+        0x73000000  /* rgba(0,0,0,0.45) */
     };
 
     /* Alpha (0..255) applied to Palette::ink for overlays */

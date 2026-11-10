@@ -16,6 +16,12 @@
  * Deviation from tokens.json: the light theme's accTx is #9a4800, not
  * #b35300, so the active sidebar label (accTx on AccentTint12 over chrome)
  * reaches 4.8:1 instead of 3.8:1.
+ *
+ * Per theme since Phase 6 (WCAG 1.4.3 / 1.4.11): progress and switch fills,
+ * the volume boost, the destructive text and the outline of fields, selects
+ * and switches, which is their only boundary. Light fills take accTx (>= 4.4:1
+ * on the light surfaces) and outlines ink 0.45 (>= 3:1); the dark theme keeps
+ * the design's fills, and its outlines take the switch's ink 0.35 (>= 3:1).
  *****************************************************************************/
 
 #ifndef VLC_QT_THEME_TOKENS_HPP_
@@ -34,13 +40,11 @@ namespace RedesignTokens
     static const QRgb AccentBorder50  = 0x80FF8A1F;
     static const QRgb AccentFocusRing = 0x2EFF8A1F; /* 18 % */
     static const QRgb AccentKnobHalo  = 0x59FF8A1F; /* 35 % */
-    static const QRgb VolumeBoost     = 0xFFFF5A1F;
     static const QRgb SeekKnobFill    = 0xFFFFFFFF; /* DESIGN_SPEC 3: white in both themes */
 
     /* ---- Status ---- */
     static const QRgb Error            = 0xFFFF5A4E;
     static const QRgb ErrorTint        = 0x24FF5A4E;
-    static const QRgb DestructiveText  = 0xFFE5483C;
     static const QRgb WindowCloseHover = 0xFFC42B1C;
     static const QRgb WindowCloseGlyph = 0xFFFFFFFF; /* on WindowCloseHover, both themes */
 
@@ -57,6 +61,11 @@ namespace RedesignTokens
         QRgb glass;    /* floating bars */
         QRgb fxbg;     /* effects sheet */
         QRgb stripe1, stripe2; /* placeholder thumbnails */
+        QRgb fill;     /* seek, volume and slider progress, switch and check box on */
+        QRgb onFill;   /* knob and check mark on fill */
+        QRgb boost;    /* volume above 100 % */
+        QRgb danger;   /* destructive menu text, also on the hovered row (>= 4.5:1) */
+        QRgb line;     /* outline of fields, selects, switches and check boxes */
     };
 
     static const Palette Dark = {
@@ -65,7 +74,9 @@ namespace RedesignTokens
         0xFFFFFFFF,
         0xB81E1D1B, /* rgba(30,29,27,0.72) */
         0xF71A1917, /* rgba(26,25,23,0.97) */
-        0xFF22201E, 0xFF1C1A18
+        0xFF22201E, 0xFF1C1A18,
+        0xFFFF8A1F, 0xFF1C1206, 0xFFFF5A1F, 0xFFFF7468,
+        0x59FFFFFF  /* ink 0.35 */
     };
 
     static const Palette Light = {
@@ -74,7 +85,9 @@ namespace RedesignTokens
         0xFF000000,
         0xBDFAF9F7, /* rgba(250,249,247,0.74) */
         0xF7FFFFFF,
-        0xFFE7E3DD, 0xFFDFDAD3
+        0xFFE7E3DD, 0xFFDFDAD3,
+        0xFF9A4800, 0xFFFFFFFF, 0xFFD9400A, 0xFFB82818,
+        0x73000000  /* ink 0.45 */
     };
 
     /* Alpha (0..255) applied to Palette::ink for overlays */
