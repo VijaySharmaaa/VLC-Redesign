@@ -227,7 +227,8 @@ def names(args):
         unnamed = 0
         for c in v.main.descendants():
             info = c.element_info
-            if info.control_type in ('Button', 'Slider', 'MenuItem', 'Edit', 'ComboBox'):
+            if info.control_type in ('Button', 'Slider', 'MenuItem', 'Edit', 'ComboBox',
+                                     'RadioButton', 'CheckBox', 'ListItem', 'TreeItem', 'TabItem'):
                 name = info.name or ''
                 unnamed += not name
                 print('%-10s %r' % (info.control_type, name))
