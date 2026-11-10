@@ -355,28 +355,37 @@ void Theme::apply(QApplication &app)
     /* The user's style choice from the preferences wins over Fusion. */
     const QString style = getSettings()->value("MainWindow/QtStyle", "").toString();
 
+    setBaseStyle(style);
     if (highContrast)
     {
-        if (!style.isEmpty())
-            QApplication::setStyle(style);
         /* Keep the system style and colours; only report light or dark. */
         dark = app.palette().color(QPalette::Window).lightness() < 128;
         msg_Dbg(p_intf, "theme: high contrast, keeping the system colours");
     }
     else
     {
-        /* shortcut: a style picked live in Simple Preferences replaces this
-         * wrapper until the next start, upgrade when that panel is redesigned */
-        QApplication::setStyle(new ThemeStyle(
-            QStyleFactory::create(style.isEmpty() ? QString("Fusion") : style)));
         app.setFont(font(Body));
-        applyPalette();
-        app.setStyleSheet(styleSheet());
         msg_Dbg(p_intf, "theme: %s, font %s", dark ? "dark" : "light", qtu(uiFamily));
     }
 #ifdef _WIN32
     app.installEventFilter(this);
 #endif
+}
+
+void Theme::setBaseStyle(const QString &name)
+{
+    if (highContrast)
+    {
+        if (!name.isEmpty())
+            QApplication::setStyle(name);
+        return;
+    }
+    /* an unknown name (e.g. "System's default") gives NULL: the proxy then
+     * uses the platform style */
+    QApplication::setStyle(new ThemeStyle(
+        QStyleFactory::create(name.isEmpty() ? QString("Fusion") : name)));
+    applyPalette();
+    qApp->setStyleSheet(styleSheet());
 }
 
 void Theme::reload()

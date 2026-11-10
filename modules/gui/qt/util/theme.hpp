@@ -87,6 +87,9 @@ public:
     /* Re-reads the mode (options and Windows) and re-applies when it
      * changed; emits changed(). Call after WM_SETTINGCHANGE or a setting. */
     void reload();
+    /* The only way to change the application style: wraps the named
+     * QStyleFactory style (empty = Fusion) so the token painting stays. */
+    void setBaseStyle(const QString &);
 
     bool isDark() const { return dark; }
     bool isHighContrast() const { return highContrast; }

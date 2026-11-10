@@ -30,6 +30,7 @@
 #include "qt.hpp"
 #include "components/simple_preferences.hpp"
 #include "components/preferences_widgets.hpp"
+#include "util/theme.hpp"
 
 #include <vlc_config_cat.h>
 #include <vlc_configuration.h>
@@ -1221,7 +1222,7 @@ void SPrefsPanel::lastfm_Changed( int i_state )
 
 void SPrefsPanel::changeStyle( QString s_style )
 {
-    QApplication::setStyle( s_style );
+    Theme::instance()->setBaseStyle( s_style );
 
     /* force refresh on all widgets */
     QWidgetList widgets = QApplication::allWidgets();
