@@ -105,15 +105,12 @@ SeekSlider::SeekSlider( intf_thread_t *p_intf, Qt::Orientation q, QWidget *_pare
     /* Init to 0 */
     setPosition( -1.0, 0, 0 );
 
-    /* shortcut: stock 2000/500 ms; upgrade to Motion tokens when the theme
-     * lane adds them (SeekLoading, SeekLoadingDelay) */
+    /* durations are set in startAnimLoading(), where reduced motion is read */
     QPropertyAnimation *animLoadingIn = new QPropertyAnimation( this, "loadingProperty", this );
-    animLoadingIn->setDuration( 2000 );
     animLoadingIn->setStartValue( 0.0 );
     animLoadingIn->setEndValue( 1.0 );
     animLoadingIn->setEasingCurve( QEasingCurve::OutBounce );
     QPropertyAnimation *animLoadingOut = new QPropertyAnimation( this, "loadingProperty", this );
-    animLoadingOut->setDuration( 2000 );
     animLoadingOut->setStartValue( 1.0 );
     animLoadingOut->setEndValue( 0.0 );
     animLoadingOut->setEasingCurve( QEasingCurve::OutBounce );
@@ -124,7 +121,7 @@ SeekSlider::SeekSlider( intf_thread_t *p_intf, Qt::Orientation q, QWidget *_pare
     animLoading->setLoopCount( -1 );
     /* Windows animations turned off while it bounces: it stops at the next turn */
     connect( animLoading, &QAbstractAnimation::currentLoopChanged, this, [this]() {
-        if( Theme::instance()->duration( Theme::Spinner ) == 0 )
+        if( Theme::instance()->duration( Theme::SeekLoading ) == 0 )
         {
             animLoading->stop();
             mLoading = 0.0;
@@ -134,7 +131,7 @@ SeekSlider::SeekSlider( intf_thread_t *p_intf, Qt::Orientation q, QWidget *_pare
 
     startAnimLoadingTimer = new QTimer( this );
     startAnimLoadingTimer->setSingleShot( true );
-    startAnimLoadingTimer->setInterval( 500 );
+    startAnimLoadingTimer->setInterval( RedesignTokens::Motion::SeekLoadingDelay );
 
     connect( MainInputManager::getInstance(), &MainInputManager::inputChanged, this, &SeekSlider::inputUpdated );
     connect( this, &SeekSlider::sliderMoved, this, &SeekSlider::startSeekTimer );
@@ -548,8 +545,11 @@ inline float SeekSlider::getValuePercentageFromXPos( int posX )
 void SeekSlider::startAnimLoading()
 {
     /* reduced motion: an endless bounce is motion, the disabled bar says enough */
-    if( Theme::instance()->duration( Theme::Spinner ) == 0 )
+    const int ms = Theme::instance()->duration( Theme::SeekLoading );
+    if( ms == 0 )
         return;
+    for( int i = 0; i < animLoading->animationCount(); i++ )
+        static_cast<QPropertyAnimation *>( animLoading->animationAt( i ) )->setDuration( ms );
     animLoading->start();
 }
 
