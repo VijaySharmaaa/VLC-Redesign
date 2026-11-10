@@ -209,16 +209,24 @@ OpenDialog::OpenDialog( QWidget *parent,
         tile->setCheckable( true );
         tile->setSizePolicy( QSizePolicy::Expanding, QSizePolicy::Fixed );
         tile->setFixedHeight( t->px( RedesignTokens::Dialogs::TabTileH ) );
+        /* not a Tab stop until checked (toggled below); its Alt key still focuses it */
+        tile->setFocusPolicy( Qt::ClickFocus );
         tiles->addButton( tile, i );
         tile->installEventFilter( this );
         tileRow->addWidget( tile );
     }
-    tiles->button( ui.Tab->currentIndex() )->setChecked( true );
     ui.Tab->tabBar()->hide();
     ui.gridLayout->addLayout( tileRow, 0, 0, 1, 3 );
-    /* toggled, not clicked: an assistive tool may check a tile without a click */
+    /* toggled, not clicked: an assistive tool may check a tile without a click.
+     * Only the checked tile is a Tab stop (a tab list): Qt's exclusive group
+     * does not do this for tool buttons, and focus left on an unchecked tile
+     * made the arrows select the tile beside it (Capture from the last one) */
     connect( tiles, QOverload<int, bool>::of( &QButtonGroup::buttonToggled ),
-             ui.Tab, [this]( int i, bool on ) { if( on ) ui.Tab->setCurrentIndex( i ); } );
+             ui.Tab, [this]( int i, bool on ) {
+        tiles->button( i )->setFocusPolicy( on ? Qt::StrongFocus : Qt::ClickFocus );
+        if( on ) ui.Tab->setCurrentIndex( i );
+    } );
+    tiles->button( ui.Tab->currentIndex() )->setChecked( true );
     connect( ui.Tab, &QTabWidget::currentChanged, tiles,
              [this]( int i ) { tiles->button( i )->setChecked( true ); } );
 
@@ -314,8 +322,8 @@ OpenDialog::OpenDialog( QWidget *parent,
     resize( getSettings()->value( "OpenDialog/size", QSize( 500, 400 ) ).toSize() );
 }
 
-/* The tiles are a tab list: only the current tile is a Tab stop (Qt's
- * exclusive group), the arrows, Home and End move to a tile and open it */
+/* The tiles are a tab list: only the checked tile is a Tab stop (its focus
+ * policy, set on toggle), the arrows, Home and End move to a tile and open it */
 bool OpenDialog::eventFilter( QObject *obj, QEvent *e )
 {
     QAbstractButton *tile = qobject_cast<QAbstractButton *>( obj );
