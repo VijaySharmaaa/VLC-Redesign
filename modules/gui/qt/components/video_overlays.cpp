@@ -370,11 +370,13 @@ ImmersiveBar::ImmersiveBar( intf_thread_t *_p_intf, QWidget *owner, QWidget *_ar
      * them from the window (nativeEvent), nor does a show (the overlay's
      * WA_ShowWithoutActivating) */
     setWindowFlags( windowFlags() & ~Qt::WindowDoesNotAcceptFocus );
-    const Theme *t = Theme::instance();
     layout = new QVBoxLayout( this );
     layout->setSpacing( 0 );
-    layout->setContentsMargins( t->px( V::ImmersivePadX ), t->px( V::ImmersivePadTop ),
-                                t->px( V::ImmersivePadX ), t->px( V::ImmersivePadBottom ) );
+    /* the deck pads itself, as in the docked layout */
+    layout->setContentsMargins( 0, 0, 0, 0 );
+    /* the video sets its size (restingRect): a minimum from a wider deck,
+     * before it drops its optional items, would push it past the edge */
+    layout->setSizeConstraint( QLayout::SetNoConstraint );
     rebuild( advanced );
 
     host = new OverlayHost( area, this );
