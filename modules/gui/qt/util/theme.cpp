@@ -32,6 +32,7 @@
 #include <QFile>
 #include <QFontDatabase>
 #include <QFontMetrics>
+#include <QMenu>
 #include <QPainter>
 #include <QPalette>
 #include <QProxyStyle>
@@ -179,7 +180,10 @@ namespace
                                const QSize &size, const QWidget *w) const Q_DECL_OVERRIDE
         {
             const QStyleOptionMenuItem *mi = qstyleoption_cast<const QStyleOptionMenuItem *>(opt);
-            if (type != CT_MenuItem || !mi || mi->menuItemType == QStyleOptionMenuItem::Separator)
+            /* Combo box pop-ups ask for CT_MenuItem too, but pass the whole
+             * view's size, not the label's: leave those to the base style. */
+            if (type != CT_MenuItem || !mi || mi->menuItemType == QStyleOptionMenuItem::Separator
+             || !qobject_cast<const QMenu *>(w))
                 return QProxyStyle::sizeFromContents(type, opt, size, w);
             /* QMenu adds the shortcut column width (tabWidth) itself */
             int width = labelX() + size.width() + Size::MenuTitlePadX;
