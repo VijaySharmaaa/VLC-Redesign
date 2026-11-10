@@ -27,6 +27,7 @@
 #include <cassert>
 
 #include <QApplication>
+#include <QCheckBox>
 #include <QDir>
 #include <QEvent>
 #include <QFile>
@@ -36,6 +37,7 @@
 #include <QPainter>
 #include <QPalette>
 #include <QProxyStyle>
+#include <QRadioButton>
 #include <QSaveFile>
 #include <QSettings>
 #include <QStringList>
@@ -222,7 +224,7 @@ namespace
             const QSize iconSize(iconPx, iconPx);
             QPixmap pix;
             if (mi->checkType != QStyleOptionMenuItem::NotCheckable && mi->checked)
-                pix = t->icon(RedesignIcons::IconCheck, enabled ? Theme::Accent : Theme::Dim,
+                pix = t->icon(RedesignIcons::IconCheck, enabled ? strongAccent(t) : Theme::Dim,
                               iconSize).pixmap(iconSize);
             else if (!mi->icon.isNull())
                 pix = mi->icon.pixmap(iconSize, !enabled ? QIcon::Disabled
@@ -242,7 +244,7 @@ namespace
             const int tab = label.indexOf(QLatin1Char('\t'));
             if (tab >= 0)
             {
-                p->setPen(t->color(Theme::Dim));
+                p->setPen(t->color(Theme::Mute));
                 p->setFont(t->font(Theme::Meta));
                 p->drawText(textRect, flags | visualAlignment(dir, Qt::AlignRight), label.mid(tab + 1));
                 label.truncate(tab);
@@ -268,6 +270,19 @@ namespace
                            const QWidget *w) const Q_DECL_OVERRIDE
         {
             Theme *t = Theme::instance();
+            if (pe == PE_FrameFocusRect && t
+             && (qobject_cast<const QCheckBox *>(w) || qobject_cast<const QRadioButton *>(w)))
+            {
+                /* a 2 px accent ring like the other controls, not Fusion's faint box */
+                p->save();
+                p->setRenderHint(QPainter::Antialiasing);
+                p->setPen(QPen(t->color(strongAccent(t)), 2));
+                p->setBrush(Qt::NoBrush);
+                p->drawRoundedRect(QRectF(opt->rect).adjusted(1, 1, -1, -1),
+                                   Size::RadiusXs, Size::RadiusXs);
+                p->restore();
+                return;
+            }
             if ((pe != PE_IndicatorCheckBox && pe != PE_IndicatorRadioButton) || !t)
             {
                 QProxyStyle::drawPrimitive(pe, opt, p, w);
@@ -309,6 +324,12 @@ namespace
         }
 
     private:
+        /* The accent is 2.4:1 on the light theme's white: marks and focus
+         * rings take the darker accent text colour there (>= 3:1). */
+        static Theme::ColorRole strongAccent(const Theme *t)
+        {
+            return t->isDark() ? Theme::Accent : Theme::AccentText;
+        }
         /* the label starts after the 22 px icon column */
         static int labelX() { return 2 * Size::MenuTitlePadX + Size::MenuIconCol; }
     };
