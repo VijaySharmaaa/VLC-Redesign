@@ -63,6 +63,7 @@ QString withKey( intf_thread_t *p_intf, const QString &label, const char *hotkey
     free( psz );
     return key.isEmpty() ? label : qtr( "%1 (%2)" ).arg( label, key );
 }
+}
 
 QString timeString( int64_t secs )
 {
@@ -92,7 +93,8 @@ QFont fontAt( Theme::TypeRole role, int tokenPx, bool semibold )
     return f;
 }
 
-/* Short codec names for the format chip; others show their fourcc */
+/* Short codec names for the format chip and the library cards; others
+ * show their fourcc */
 QString codecName( const QString &fourcc )
 {
     static const struct { const char *fcc, *name; } names[] = {
@@ -100,12 +102,14 @@ QString codecName( const QString &fourcc )
         { "vorb", "Vorbis" }, { "opus", "Opus" }, { "alac", "ALAC" }, { "a52 ", "AC-3" },
         { "eac3", "E-AC-3" }, { "dts ", "DTS" }, { "wma2", "WMA" }, { "araw", "PCM" },
         { "s16l", "PCM" }, { "s24l", "PCM" }, { "s32l", "PCM" }, { "f32l", "PCM" },
+        { "h264", "H.264" }, { "hevc", "H.265" }, { "VP90", "VP9" }, { "VP80", "VP8" },
+        { "av01", "AV1" }, { "mp2v", "MPEG-2" }, { "mpgv", "MPEG-2" }, { "mp4v", "MPEG-4" },
+        { "WVC1", "VC-1" }, { "WMV3", "WMV" }, { "theo", "Theora" },
     };
     for( size_t i = 0; i < sizeof( names ) / sizeof( names[0] ); i++ )
         if( fourcc == QLatin1String( names[i].fcc ) )
             return QLatin1String( names[i].name );
     return fourcc.trimmed().toUpper();
-}
 }
 
 /**********************************************************************

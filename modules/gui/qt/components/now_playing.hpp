@@ -21,18 +21,29 @@
 
 #include "qt.hpp"
 #include "util/breakpoints.hpp"
+#include "util/theme.hpp"
 
 #include <QSlider>
 #include <QWidget>
 #include <QPixmap>
 
 class QLabel;
+class QPainter;
+class QRectF;
 class QListView;
 class QToolButton;
 class QBoxLayout;
 class QGridLayout;
 class QElidingLabel;
 class QPropertyAnimation;
+
+/* Shared with the library pages */
+QString timeString( int64_t secs );
+/* Stripes at 135 degrees in the theme's two placeholder tints */
+void paintStripes( QPainter &, const QRectF &, qreal period );
+/* A theme font at another token size */
+QFont fontAt( Theme::TypeRole, int tokenPx, bool semibold );
+QString codecName( const QString &fourcc );
 
 /* Cover art, cropped to fill, or the striped placeholder (DESIGN_SPEC 4) */
 class ArtView : public QWidget
