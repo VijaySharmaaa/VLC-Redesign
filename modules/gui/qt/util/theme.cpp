@@ -33,12 +33,15 @@
 #include <QFile>
 #include <QFontDatabase>
 #include <QFontMetrics>
+#include <QIconEngine>
+#include <QKeyEvent>
 #include <QMenu>
 #include <QPainter>
 #include <QPalette>
 #include <QProxyStyle>
 #include <QRadioButton>
 #include <QSaveFile>
+#include <QScreen>
 #include <QSettings>
 #include <QStringList>
 #include <QStyle>
@@ -169,6 +172,8 @@ namespace
         return QString(":/redesign/%1.svg").arg(QLatin1String(name));
     }
 
+    const char altSeenProperty[] = "vlcAltSeen";
+
     /* What the stylesheet cannot do (DESIGN_SPEC 7, 11): menu items whose
      * check is the accent `check` icon and whose shortcut column is dimmed,
      * and check boxes and radio buttons with an outline that stays visible
@@ -186,15 +191,16 @@ namespace
             /* Combo box pop-ups ask for CT_MenuItem too, but pass the whole
              * view's size, not the label's: leave those to the base style. */
             if (type != CT_MenuItem || !mi || mi->menuItemType == QStyleOptionMenuItem::Separator
-             || !qobject_cast<const QMenu *>(w))
+             || !qobject_cast<const QMenu *>(w) || !Theme::instance())
                 return QProxyStyle::sizeFromContents(type, opt, size, w);
+            const Theme *t = Theme::instance();
             /* QMenu adds the shortcut column width (tabWidth) itself */
-            int width = labelX() + size.width() + Size::MenuTitlePadX;
+            int width = labelX(t) + size.width() + t->px(Size::MenuTitlePadX);
             if (mi->text.contains(QLatin1Char('\t')))
-                width += 2 * Size::MenuTitlePadX;
+                width += 2 * t->px(Size::MenuTitlePadX);
             if (mi->menuItemType == QStyleOptionMenuItem::SubMenu)
-                width += Size::IconGlyph;
-            return QSize(width, qMax(size.height(), int(Size::MenuItemH)));
+                width += t->px(Size::IconGlyph);
+            return QSize(width, qMax(size.height(), t->metric(Theme::MenuItemH)));
         }
 
         void drawControl(ControlElement element, const QStyleOption *opt,
@@ -217,10 +223,11 @@ namespace
             {
                 p->setPen(Qt::NoPen);
                 p->setBrush(t->ink(InkAlpha::HoverFill));
-                p->drawRoundedRect(r, Size::RadiusSm, Size::RadiusSm);
+                p->drawRoundedRect(r, t->metric(Theme::RadiusSm), t->metric(Theme::RadiusSm));
             }
 
             /* icon column: checked items show the accent check instead */
+            const int padX = t->px(Size::MenuTitlePadX);
             const int iconPx = proxy()->pixelMetric(PM_SmallIconSize, opt, w);
             const QSize iconSize(iconPx, iconPx);
             QPixmap pix;
@@ -231,13 +238,13 @@ namespace
                 pix = mi->icon.pixmap(iconSize, !enabled ? QIcon::Disabled
                                       : (mi->state & State_Selected) ? QIcon::Active : QIcon::Normal);
             if (!pix.isNull())
-                drawItemPixmap(p, visualRect(dir, r, QRect(r.x() + Size::MenuTitlePadX, r.y(),
-                                                           Size::MenuIconCol, r.height())),
+                drawItemPixmap(p, visualRect(dir, r, QRect(r.x() + padX, r.y(),
+                                                           t->px(Size::MenuIconCol), r.height())),
                                Qt::AlignCenter, pix);
 
-            const int arrowW = mi->menuItemType == QStyleOptionMenuItem::SubMenu ? Size::IconGlyph : 0;
-            const QRect textRect = visualRect(dir, r, QRect(r.x() + labelX(), r.y(),
-                r.width() - labelX() - Size::MenuTitlePadX - arrowW, r.height()));
+            const int arrowW = mi->menuItemType == QStyleOptionMenuItem::SubMenu ? t->px(Size::IconGlyph) : 0;
+            const QRect textRect = visualRect(dir, r, QRect(r.x() + labelX(t), r.y(),
+                r.width() - labelX(t) - padX - arrowW, r.height()));
             int flags = Qt::AlignVCenter | Qt::TextShowMnemonic | Qt::TextDontClip | Qt::TextSingleLine;
             if (!proxy()->styleHint(SH_UnderlineShortcut, mi, w))
                 flags |= Qt::TextHideMnemonic;
@@ -260,7 +267,7 @@ namespace
                                         iconSize).pixmap(iconSize);
                 if (dir == Qt::RightToLeft)
                     arrow = QPixmap::fromImage(arrow.toImage().mirrored(true, false));
-                drawItemPixmap(p, visualRect(dir, r, QRect(r.right() + 1 - Size::MenuTitlePadX - arrowW,
+                drawItemPixmap(p, visualRect(dir, r, QRect(r.right() + 1 - padX - arrowW,
                                                            r.y(), arrowW, r.height())),
                                Qt::AlignCenter, arrow);
             }
@@ -277,10 +284,11 @@ namespace
                 /* a 2 px accent ring like the other controls, not Fusion's faint box */
                 p->save();
                 p->setRenderHint(QPainter::Antialiasing);
-                p->setPen(QPen(t->color(strongAccent(t)), 2));
+                const qreal inset = Size::FocusRing / 2.;
+                p->setPen(QPen(t->color(strongAccent(t)), Size::FocusRing));
                 p->setBrush(Qt::NoBrush);
-                p->drawRoundedRect(QRectF(opt->rect).adjusted(1, 1, -1, -1),
-                                   Size::RadiusXs, Size::RadiusXs);
+                p->drawRoundedRect(QRectF(opt->rect).adjusted(inset, inset, -inset, -inset),
+                                   t->metric(Theme::RadiusXs), t->metric(Theme::RadiusXs));
                 p->restore();
                 return;
             }
@@ -310,7 +318,7 @@ namespace
             }
             else
             {
-                p->drawRoundedRect(r, Size::RadiusXs, Size::RadiusXs);
+                p->drawRoundedRect(r, t->metric(Theme::RadiusXs), t->metric(Theme::RadiusXs));
                 if (opt->state & State_NoChange)
                 {
                     p->setPen(QPen(t->color(Theme::OnAccent), 2));
@@ -324,6 +332,27 @@ namespace
             p->restore();
         }
 
+        /* Windows shows access-key underlines only once Alt was pressed in
+         * the window (or always, with the keyboard cues setting); Fusion
+         * always does. Theme::eventFilter records the Alt press. */
+        int styleHint(StyleHint hint, const QStyleOption *opt, const QWidget *w,
+                      QStyleHintReturn *ret) const Q_DECL_OVERRIDE
+        {
+            if (hint != SH_UnderlineShortcut)
+                return QProxyStyle::styleHint(hint, opt, w, ret);
+#ifdef _WIN32
+            BOOL cues = FALSE;
+            if (SystemParametersInfoW(SPI_GETKEYBOARDCUES, 0, &cues, 0) && cues)
+                return 1;
+            /* a pop-up menu belongs to the window that opened it */
+            const QWidget *window = qobject_cast<const QMenu *>(w)
+                                  ? QApplication::activeWindow() : w ? w->window() : NULL;
+            return window && window->property(altSeenProperty).toBool();
+#else
+            return QProxyStyle::styleHint(hint, opt, w, ret);
+#endif
+        }
+
     private:
         /* The accent is 2.4:1 on the light theme's white: marks and focus
          * rings take the darker accent text colour there (>= 3:1). */
@@ -332,12 +361,15 @@ namespace
             return t->isDark() ? Theme::Accent : Theme::AccentText;
         }
         /* the label starts after the 22 px icon column */
-        static int labelX() { return 2 * Size::MenuTitlePadX + Size::MenuIconCol; }
+        static int labelX(const Theme *t)
+        {
+            return 2 * t->px(Size::MenuTitlePadX) + t->px(Size::MenuIconCol);
+        }
     };
 }
 
 Theme::Theme(intf_thread_t *_p_intf)
-    : p_intf(_p_intf), dark(false), highContrast(false)
+    : p_intf(_p_intf), dark(false), highContrast(false), scale(1.)
 {
     assert(s_instance == NULL);
     s_instance = this;
@@ -375,6 +407,13 @@ void Theme::apply(QApplication &app)
 {
     highContrast = systemHighContrast();
     dark = readDark();
+    /* Qt 5.6 scales by whole device pixel ratios only (1 at 125 %) while
+     * fonts in points follow the logical dpi: the metrics take its factor */
+    const QScreen *screen = QGuiApplication::primaryScreen();
+    if (screen)
+        scale = screen->logicalDotsPerInchY() / 96.;
+    msg_Dbg(p_intf, "theme: logical dpi %.0f, device pixel ratio %.2f, scale %.3f",
+            screen ? screen->logicalDotsPerInchY() : 0., app.devicePixelRatio(), scale);
     uiFamily = firstInstalled(Type::UiFamilies);
     monoFamily = firstInstalled(Type::MonoFamilies);
 
@@ -503,7 +542,7 @@ QFont Theme::font(TypeRole role) const
 
 int Theme::metric(SizeRole role) const
 {
-    return role >= 0 && role < SizeRoleCount ? sizes[role] : 0;
+    return role >= 0 && role < SizeRoleCount ? px(sizes[role]) : 0;
 }
 
 int Theme::duration(MotionRole role) const
@@ -516,8 +555,10 @@ int Theme::duration(MotionRole role) const
     return role >= 0 && role < MotionRoleCount ? durations[role] : 0;
 }
 
-QIcon Theme::icon(const QString &name, ColorRole role, const QSize &size)
+QIcon Theme::icon(const QString &name, ColorRole role, const QSize &requested)
 {
+    const QSize size = requested.isEmpty()
+                     ? QSize(px(Size::IconGlyph), px(Size::IconGlyph)) : requested;
     const QColor tint = color(role);
     const QString key = QString("%1|%2|%3x%4").arg(name).arg(tint.rgba())
                                               .arg(size.width()).arg(size.height());
@@ -533,6 +574,42 @@ QIcon Theme::icon(const QString &name, ColorRole role, const QSize &size)
         result = QIcon(tintedIcon(name, tint, size));
     icons.insert(key, result);  /* also caches a miss, so it warns once */
     return result;
+}
+
+namespace
+{
+    class ThemedIconEngine : public QIconEngine
+    {
+    public:
+        ThemedIconEngine(const char *_name, Theme::ColorRole _role)
+            : name(QLatin1String(_name)), role(_role) {}
+
+        QPixmap pixmap(const QSize &size, QIcon::Mode mode, QIcon::State state) Q_DECL_OVERRIDE
+        {
+            Theme *t = Theme::instance();
+            return t ? t->icon(name, role, size).pixmap(size, mode, state) : QPixmap();
+        }
+        void paint(QPainter *p, const QRect &rect, QIcon::Mode mode, QIcon::State state) Q_DECL_OVERRIDE
+        {
+            const qreal dpr = p->device()->devicePixelRatioF();
+            QPixmap pix = pixmap(rect.size() * dpr, mode, state);
+            pix.setDevicePixelRatio(dpr);
+            p->drawPixmap(rect, pix);
+        }
+        QIconEngine *clone() const Q_DECL_OVERRIDE
+        {
+            return new ThemedIconEngine(*this);
+        }
+
+    private:
+        QString name;
+        Theme::ColorRole role;
+    };
+}
+
+QIcon Theme::themedIcon(const char *name, ColorRole role)
+{
+    return QIcon(new ThemedIconEngine(name, role));
 }
 
 void Theme::applyPalette()
@@ -700,32 +777,32 @@ QToolButton#captionClose:hover, QToolButton#captionClose:pressed { background: @
         { "outline", css(ink(InkAlpha::Outline)) },
         { "trackInk", css(ink(InkAlpha::Track)) },
         { "toggleOff", css(ink(InkAlpha::ToggleOff)) },
-        { "radiusXs", QString::number(Size::RadiusXs) },
-        { "radiusSm", QString::number(Size::RadiusSm) },
-        { "radiusMd", QString::number(Size::RadiusMd) },
-        { "radiusLg", QString::number(Size::RadiusLg) },
-        { "menuPad", QString::number(Size::MenuPanelPadding) },
-        { "menuPadFocus", QString::number(Size::MenuPanelPadding - 1) },
-        { "menuSepX", QString::number(2 * Size::MenuPanelPadding) },
-        { "menuMinW", QString::number(Size::MenuMinW) },
-        { "menuTitlePadX", QString::number(Size::MenuTitlePadX) },
-        { "menuTitlePadY", QString::number(qMax(0, (Size::MenuTitleH - lineH) / 2)) },
-        { "menuItemPadY", QString::number(qMax(0, (Size::MenuItemH - lineH) / 2)) },
-        { "buttonPadX", QString::number(Size::ButtonPadX) },
-        { "buttonPadXFocus", QString::number(Size::ButtonPadX - 1) },
+        { "radiusXs", QString::number(px(Size::RadiusXs)) },
+        { "radiusSm", QString::number(px(Size::RadiusSm)) },
+        { "radiusMd", QString::number(px(Size::RadiusMd)) },
+        { "radiusLg", QString::number(px(Size::RadiusLg)) },
+        { "menuPad", QString::number(px(Size::MenuPanelPadding)) },
+        { "menuPadFocus", QString::number(px(Size::MenuPanelPadding) - 1) },
+        { "menuSepX", QString::number(2 * px(Size::MenuPanelPadding)) },
+        { "menuMinW", QString::number(px(Size::MenuMinW)) },
+        { "menuTitlePadX", QString::number(px(Size::MenuTitlePadX)) },
+        { "menuTitlePadY", QString::number(qMax(0, (px(Size::MenuTitleH) - lineH) / 2)) },
+        { "menuItemPadY", QString::number(qMax(0, (px(Size::MenuItemH) - lineH) / 2)) },
+        { "buttonPadX", QString::number(px(Size::ButtonPadX)) },
+        { "buttonPadXFocus", QString::number(px(Size::ButtonPadX) - 1) },
         { "groupTitleH", QString::number(metaH) },
-        { "scrollW", QString::number(Size::ScrollBarW) },
-        { "iconGlyph", QString::number(Size::IconGlyph) },
-        { "halfGlyph", QString::number(Size::IconGlyph / 2) },
+        { "scrollW", QString::number(px(Size::ScrollBarW)) },
+        { "iconGlyph", QString::number(px(Size::IconGlyph)) },
+        { "halfGlyph", QString::number(px(Size::IconGlyph) / 2) },
         { "arrowDown", tintedIconFile(p_intf, RedesignIcons::IconExpandMore, QColor::fromRgb(p.tx2), 0) },
         { "arrowUp", tintedIconFile(p_intf, RedesignIcons::IconExpandMore, QColor::fromRgb(p.tx2), 180) },
         { "arrowDownDim", tintedIconFile(p_intf, RedesignIcons::IconExpandMore, QColor::fromRgb(p.dim), 0) },
         { "arrowUpDim", tintedIconFile(p_intf, RedesignIcons::IconExpandMore, QColor::fromRgb(p.dim), 180) },
-        { "track", QString::number(Size::SeekTrack) },
-        { "trackRadius", QString::number(Size::SeekTrack / 2) },
-        { "knob", QString::number(Size::SeekKnob) },
-        { "knobRadius", QString::number(Size::SeekKnob / 2) },
-        { "knobMargin", QString::number(-(Size::SeekKnob - Size::SeekTrack) / 2) },
+        { "track", QString::number(px(Size::SeekTrack)) },
+        { "trackRadius", QString::number(px(Size::SeekTrack) / 2) },
+        { "knob", QString::number(px(Size::SeekKnob)) },
+        { "knobRadius", QString::number(px(Size::SeekKnob) / 2) },
+        { "knobMargin", QString::number(-(px(Size::SeekKnob) - px(Size::SeekTrack)) / 2) },
     };
 
     QString out = QString::fromLatin1(qss);
@@ -774,6 +851,18 @@ bool Theme::eventFilter(QObject *o, QEvent *e)
         QWidget *w = static_cast<QWidget *>(o);
         if (w->isWindow())
             applyWindowFrame(w);
+    }
+    else if (e->type() == QEvent::KeyPress && o->isWidgetType()
+          && static_cast<QKeyEvent *>(e)->key() == Qt::Key_Alt)
+    {
+        /* from now on this window shows its access keys (ThemeStyle) */
+        QWidget *window = static_cast<QWidget *>(o)->window();
+        if (!window->property(altSeenProperty).toBool())
+        {
+            window->setProperty(altSeenProperty, true);
+            foreach (QWidget *child, window->findChildren<QWidget *>())
+                child->update();
+        }
     }
 #endif
     return QObject::eventFilter(o, e);

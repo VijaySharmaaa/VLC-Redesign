@@ -97,10 +97,17 @@ public:
     QColor color(ColorRole) const;
     QColor ink(int alpha) const;     /* alpha from RedesignTokens::InkAlpha */
     QFont font(TypeRole) const;
+    /* A token's px (RedesignTokens::Size, Overlay, Breakpoint) in
+     * device-independent px: tokens are px at 96 dpi and fonts are in
+     * points, so metrics follow the logical dpi as the text does. */
+    int px(int tokenPx) const { return qRound(tokenPx * scale); }
     int metric(SizeRole) const;
     int duration(MotionRole) const;  /* 0 when Windows animations are off */
-    QIcon icon(const QString &name, ColorRole, const QSize &size =
-               QSize(RedesignTokens::Size::IconGlyph, RedesignTokens::Size::IconGlyph));
+    /* an empty size means the IconGlyph token */
+    QIcon icon(const QString &name, ColorRole, const QSize &size = QSize());
+    /* The same icon at any size, tinted with the colour the role has when
+     * it is drawn: for menus and actions that outlive a theme change. */
+    static QIcon themedIcon(const char *name, ColorRole);
 
 signals:
     void changed();
@@ -118,6 +125,7 @@ private:
     intf_thread_t *p_intf;
     bool dark;
     bool highContrast;
+    qreal scale;        /* logical dpi / 96, see px() */
     QString uiFamily, monoFamily;
     QHash<QString, QIcon> icons;
 };

@@ -7,8 +7,15 @@
  * them through Theme (util/theme.hpp). C++11 and Qt 5.6 compatible: plain QRgb
  * literals (0xAARRGGBB), no constexpr QColor.
  *
- * Sizes are device-independent pixels; Qt's high-DPI scaling
- * (AA_EnableHighDpiScaling, set in qt.cpp) handles the device ratio.
+ * Sizes are px at 96 dpi: widgets take them through Theme::px() or
+ * Theme::metric(), which follow the logical dpi like the fonts do; Qt's
+ * high-DPI scaling (AA_EnableHighDpiScaling, qt.cpp) adds the whole device
+ * ratio. Line widths (FocusRing, Hairline) stay whole device-independent
+ * pixels, like the stylesheet's borders.
+ *
+ * Deviation from tokens.json: the light theme's accTx is #9a4800, not
+ * #b35300, so the active sidebar label (accTx on AccentTint12 over chrome)
+ * reaches 4.8:1 instead of 3.8:1.
  *****************************************************************************/
 
 #ifndef VLC_QT_THEME_TOKENS_HPP_
@@ -63,7 +70,7 @@ namespace RedesignTokens
 
     static const Palette Light = {
         0xFFD6D2CC, 0xFFEBE8E4, 0xFFF6F4F1, 0xFFF1EEEA, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFE6E2DD, 0xFFDBD6D0,
-        0xFF1B1916, 0xFF3D3933, 0xFF5F5A53, 0xFF746E66, 0xFFB35300,
+        0xFF1B1916, 0xFF3D3933, 0xFF5F5A53, 0xFF746E66, 0xFF9A4800,
         0xFF000000,
         0xBDFAF9F7, /* rgba(250,249,247,0.74) */
         0xF7FFFFFF,
@@ -118,13 +125,16 @@ namespace RedesignTokens
         static const int ButtonH = 34, InputH = 34, UrlInputH = 38, SelectH = 32;
         static const int ToggleW = 40, ToggleH = 20, ChipH = 28;
         static const int ScrollBarW = 12; /* not in tokens.json: Windows 11 thin scroll bar */
+        static const int FocusRing = 2, Hairline = 1; /* line widths, not scaled */
         static const int RadiusXs = 4, RadiusSm = 5, RadiusMd = 6, RadiusLg = 8, RadiusXl = 10, RadiusTile = 12;
     }
 
     /* ---- Breakpoints by window width ---- */
     namespace Breakpoint
     {
-        static const int L = 1600, M = 1200, S = 960, XSMinW = 800, XSMinH = 600;
+        /* XSMinH is 480, not tokens.json's 600, for quarter snaps; the
+         * window also stays under half the work area high (main_interface) */
+        static const int L = 1600, M = 1200, S = 960, XSMinW = 800, XSMinH = 480;
     }
 
     /* ---- Motion (ms). Easing: cubic-bezier(0.2,0.8,0.2,1) -> QEasingCurve::BezierSpline
@@ -145,6 +155,8 @@ namespace RedesignTokens
     {
         static const int ToastPadX = 16, ToastPadY = 10, ToastGap = 10, ToastIcon = 18;
         static const int ToastMargin = 24;      /* above the bottom of the content area */
+        static const int ToastOverVideoPercent = 20; /* of the video's height: two subtitle
+                                                        lines at VLC's default size, and room */
         static const int ToastBorderAlpha = 26; /* ink 0.10 */
         static const int DropInset = 8, DropBorder = 2, DropFillAlpha = 26; /* accent 0.10 */
         static const int DropCardPadX = 36, DropCardPadY = 28, DropGap = 10, DropIcon = 40;

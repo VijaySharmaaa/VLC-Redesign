@@ -40,6 +40,7 @@ public:
      * changed() and read current() once. */
     void addTarget( QWidget * );
     Size current() const { return size; }
+    /* width in device-independent px; the breakpoints scale like Theme::px */
     static Size fromWidth( int );
 
 signals:

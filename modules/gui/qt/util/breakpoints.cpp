@@ -21,9 +21,7 @@
 #endif
 
 #include "util/breakpoints.hpp"
-#include "util/theme_tokens.hpp"
-
-#include <cassert>
+#include "util/theme.hpp"
 
 #include <QEvent>
 #include <QStyle>
@@ -34,19 +32,16 @@ static const char * const names[] = { "XS", "S", "M", "L" };
 BreakpointWatcher::BreakpointWatcher( QWidget *_window )
     : QObject( _window ), window( _window ), size( fromWidth( _window->width() ) )
 {
-    assert( fromWidth( RedesignTokens::Breakpoint::M ) == M
-         && fromWidth( RedesignTokens::Breakpoint::M - 1 ) == S
-         && fromWidth( RedesignTokens::Breakpoint::S - 1 ) == XS
-         && fromWidth( RedesignTokens::Breakpoint::L ) == L );
     apply( window );
     window->installEventFilter( this );
 }
 
 BreakpointWatcher::Size BreakpointWatcher::fromWidth( int width )
 {
-    if( width >= RedesignTokens::Breakpoint::L ) return L;
-    if( width >= RedesignTokens::Breakpoint::M ) return M;
-    if( width >= RedesignTokens::Breakpoint::S ) return S;
+    const Theme *t = Theme::instance();
+    if( width >= t->px( RedesignTokens::Breakpoint::L ) ) return L;
+    if( width >= t->px( RedesignTokens::Breakpoint::M ) ) return M;
+    if( width >= t->px( RedesignTokens::Breakpoint::S ) ) return S;
     return XS;
 }
 
