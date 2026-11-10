@@ -49,7 +49,7 @@ private:
 
     QLabel *title;
     QLabel *body;
-    QPushButton *retryButton;
+    QPushButton *retryButton, *closeButton;
     QCheckBox *stopShowing;
     QList<QPair<QString, QString> > entries; /* title, text */
     input_item_t *failedItem; /* held: the item whose open failed */
