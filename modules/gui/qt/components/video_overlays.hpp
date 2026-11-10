@@ -26,6 +26,7 @@
 #include "components/overlay_host.hpp"
 
 #include <QAtomicInt>
+#include <QHash>
 
 class QAbstractButton;
 class QVariantAnimation;
@@ -35,6 +36,11 @@ class QVBoxLayout;
 class InputControlsWidget;
 class ControlsWidget;
 class InputManager;
+
+/* Where the vout draws the current video inside area (global px): the
+ * track's size and aspect, or the user's aspect ratio, fitted and centred.
+ * area itself when no video size is known. */
+QRect videoPictureRect( intf_thread_t *, const QRect &area );
 
 /* Centre of the video while it is paused; a click resumes. */
 class PausedBadge : public OverlayWindow
@@ -110,6 +116,7 @@ private:
     void animate( bool in );
     void place();
     QRect restingRect() const;
+    void liftSubtitles();
 
     intf_thread_t *p_intf;
     QWidget *area;
@@ -118,6 +125,8 @@ private:
     InputControlsWidget *inputC;
     ControlsWidget *controls;
     QList<vout_thread_t *> vouts;
+    QHash<vout_thread_t *, int> userMargin; /* each vout's own "sub-margin" */
+    int lift;                   /* "sub-margin" added to it, in its units */
     QAtomicInt wakePosted;      /* one wake event in flight at a time */
     QTimer idle;
     QParallelAnimationGroup *anim;

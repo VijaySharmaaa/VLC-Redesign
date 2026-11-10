@@ -25,6 +25,8 @@
 
 #include "components/overlay_host.hpp"
 
+#include <QPointer>
+
 class QPropertyAnimation;
 class QParallelAnimationGroup;
 
@@ -55,6 +57,7 @@ private:
     void onSnapshot( const QString & );
 
     intf_thread_t *p_intf;
+    QPointer<QWidget> content;
     OverlayHost *host;
     QString text;
     QParallelAnimationGroup *enter;
