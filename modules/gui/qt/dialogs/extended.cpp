@@ -74,6 +74,8 @@ QScrollArea *scrolled( QWidget *page )
     area->setWidgetResizable( true );
     area->setFrameShape( QFrame::NoFrame );
     area->setHorizontalScrollBarPolicy( Qt::ScrollBarAlwaysOff );
+    /* not a Tab stop of its own: Tab scrolls to the control it reaches */
+    area->setFocusPolicy( Qt::NoFocus );
     area->setWidget( inner );
     return area;
 }
