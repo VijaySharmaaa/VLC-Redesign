@@ -81,3 +81,26 @@ Evidence is in `D:\Projects\VLC\spike-results\p1-edge\` (audit), `...\p1-fix\` (
 | Preferences Save/Cancel/Reset writing the same variables | **pass** (theme only) | The Theme combo writes `qt-redesign-theme` and clears `qt-dark-palette`; other panels unchanged in this phase. |
 
 **Known for later:** the Help dialog's links are blue in the dark theme (Phase 6); the Effects window now uses the normal dialog frame (it gains minimise/maximise buttons) so its title bar follows the theme (7b6701878a).
+
+## Phase 2: review and audit fixes (2026-11-10)
+Evidence: `spike-results\p2-fix\` (`before\`, `after\` from `probe.py`/`probe2.py`; `edge\fix_edge.py` + `fix_edge.log` for audit items A-G; `baseline-dark\`, `baseline-light\`, `names.txt`: 9 unnamed).
+
+### Manual test steps
+- At 125 % scaling: menu titles, sidebar labels and the page title keep their relative sizes (13/13/26 px × 1.25); caption buttons are 58 px wide.
+- Start VLC: Home is open and active, no focus ring; Space plays/pauses; Tab reaches "Open media".
+- Play a video, click Home, click Home again (or the cone): the video is back. Ctrl+L, Ctrl+L: the video is back.
+- F11: menus stay, window buttons hide; `f` then Esc while F11 is on: menus come back.
+- No access-key underlines until Alt is pressed; then menus and menu bar show them.
+- Minimal view (Ctrl+H), Alt+Tab away and back: the menus don't toggle (not reproduced automatically: Windows delivered no Alt release to VLC in either build).
+- Light theme: active sidebar label #9a4800, 4.8:1.
+- Explorer drag over the library, the video and the title bar: the drop overlay appears, the drop plays (only the window centre was automated).
+
+### Edge cases (rows added by the audit)
+| Case | Result | Notes |
+|---|---|---|
+| Quarter snap on a 1080p work area | **fixed** | client 1000×510 (`edge\d-quarter.png`). |
+| Maximised stock ini | **fixed** | zoomed, client = work area (`edge\c-old-ini-maximised-screen.png`). |
+| Leaving video fullscreen by end of media | **fixed** | back at y 150 like vlc-pkg-d (was 188). |
+| Docked playlist toggled across the rail breakpoint / minimal view | **fixed** | widths stable over 10 toggles; minimal keeps its height. From 1600 px the window returns at 1400 px with the same stack width (both widths fit the stored stack size; the smaller is taken). |
+| `TaskbarButtonCreated` twice | **fixed** | list and connections once, buttons re-added per message, no ThumbBar errors. |
+| Toast over the subtitle it announces | **fixed** | `edge\d03-srt-toast.png`. |
