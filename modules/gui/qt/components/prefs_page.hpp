@@ -22,6 +22,7 @@
 #include "qt.hpp"
 #include "components/simple_preferences.hpp"
 
+#include <QDateTime>
 #include <QWidget>
 
 class QLabel;
@@ -39,8 +40,13 @@ class PrefsPage : public QWidget
 public:
     explicit PrefsPage( intf_thread_t *, QWidget *parent = NULL );
 
+public slots:
+    /* drop the panels: the next view builds them from the configuration */
+    void rebuild();
+
 protected:
     void showEvent( QShowEvent * ) Q_DECL_OVERRIDE;
+    void keyPressEvent( QKeyEvent * ) Q_DECL_OVERRIDE;
     void resizeEvent( QResizeEvent * ) Q_DECL_OVERRIDE;
 
 private slots:
@@ -49,11 +55,10 @@ private slots:
     void cancel();
     void reset();
     void showAllSettings();
+    void configSaved();
 
 private:
     enum { Advanced = SPrefsMax, SectionCount };
-    /* drop the panels: the next view builds them from the configuration */
-    void rebuild();
     void updateIcons();
     void setRail( bool );
 
@@ -64,6 +69,8 @@ private:
     QWidget *advanced;
     SPrefsPanel *panels[SPrefsMax];
     bool rail;
+    QString configFile;     /* vlcrc */
+    QDateTime configTime;   /* its time when the panels last matched it */
 };
 
 #endif
