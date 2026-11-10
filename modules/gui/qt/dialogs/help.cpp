@@ -40,11 +40,13 @@
 
 #include <QApplication>
 #include <QTextBrowser>
+#include <QTextDocument>
 #include <QString>
 #include <QDialogButtonBox>
 #include <QEvent>
 #include <QDate>
 #include <QPushButton>
+#include <QIcon>
 
 #include <cassert>
 
@@ -57,9 +59,10 @@ HelpDialog::HelpDialog( intf_thread_t *_p_intf ) : QVLCFrame( _p_intf )
 
     QVBoxLayout *layout = new QVBoxLayout( this );
 
-    QTextBrowser *helpBrowser = new QTextBrowser( this );
+    helpBrowser = new QTextBrowser( this );
     helpBrowser->setOpenExternalLinks( true );
-    helpBrowser->setHtml( qtr(I_LONGHELP) );
+    applyTheme();
+    connect( Theme::instance(), &Theme::changed, this, &HelpDialog::applyTheme );
 
     QDialogButtonBox *closeButtonBox = new QDialogButtonBox( this );
     closeButtonBox->addButton(
@@ -78,6 +81,15 @@ HelpDialog::~HelpDialog()
     saveWidgetPosition( "Help" );
 }
 
+/* Rich text bakes the link colour in when parsed: parse again, in the
+ * theme's link colour, when the theme changes (as AboutDialog does) */
+void HelpDialog::applyTheme()
+{
+    helpBrowser->document()->setDefaultStyleSheet( QString( "a { color: %1; }" )
+        .arg( QApplication::palette().color( QPalette::Link ).name() ) );
+    helpBrowser->setHtml( qtr(I_LONGHELP) );
+}
+
 AboutDialog::AboutDialog( intf_thread_t *_p_intf)
             : QVLCDialog( (QWidget*)_p_intf->p_sys->p_mi, _p_intf ), b_advanced( false )
 {
@@ -87,14 +99,44 @@ AboutDialog::AboutDialog( intf_thread_t *_p_intf)
     setWindowRole( "vlc-about" );
     setWindowModality( Qt::WindowModal );
 
-    /* The frame keeps the window colour, the footer is a panel; both
-     * follow the application palette that Theme sets. */
+    /* a small modal sheet (2.6.2): Close only; the cone, the name, the
+     * version in mono, the blurb, the Authors / License / Credits links,
+     * and a panel footer with Close */
+    setWindowFlags( Qt::Dialog | Qt::WindowTitleHint | Qt::WindowSystemMenuHint |
+                    Qt::WindowCloseButtonHint );
+    Theme *t = Theme::instance();
+    /* shortcut: the cone and spacing reuse the library's empty-state tokens
+     * (56 px, the design shows 64); add Dialogs::AboutLogo if they differ */
+    const int pad = t->px( RedesignTokens::Library::EmptyPad );
+    ui.bodyLayout->setContentsMargins( pad, pad, pad, pad );
+    ui.bodyLayout->setSpacing( t->px( RedesignTokens::Library::EmptyGap ) );
+    const int cone = t->px( RedesignTokens::Library::EmptyCone );
+    ui.VLCcone->setPixmap( QIcon( ":/logo/vlc128.png" ).pixmap( cone, cone ) );
     ui.footer->setBackgroundRole( QPalette::AlternateBase );
     ui.footer->setAutoFillBackground( true );
-    ui.title->setFont( Theme::instance()->font( Theme::PageTitle ) );
+    ui.title->setFont( t->font( Theme::PanelTitle ) );
     ui.title->setText( qtr( "VLC media player" ) );
-    ui.version->setFont( Theme::instance()->font( Theme::PanelTitle ) );
-    ui.version->setText(qfu( " " VERSION_MESSAGE ) );
+    ui.version->setFont( t->font( Theme::Mono ) );
+    ui.version->setProperty( "role", "hint" );
+    ui.version->setText( qfu( VERSION_MESSAGE ) );
+    ui.MainBlabla->setFont( t->font( Theme::Body ) );
+    ui.MainBlabla->setProperty( "role", "hint" );
+
+    ui.authorsButton->setText( qtr( "Authors" ) );
+    ui.licenseButton->setText( qtr( "License" ) );
+    ui.creditsButton->setText( qtr( "Credits" ) );
+    QPushButton *const links[] = { ui.authorsButton, ui.licenseButton, ui.creditsButton };
+    for( QPushButton *link : links )
+    {
+        link->setProperty( "role", "link" );
+        link->setAutoDefault( false );
+    }
+    ui.closeButton->setText( qtr( "&Close" ) );
+    ui.closeButton->setDefault( true );
+    connect( ui.authorsButton, &QPushButton::clicked, this, &AboutDialog::showAuthors );
+    connect( ui.licenseButton, &QPushButton::clicked, this, &AboutDialog::showLicense );
+    connect( ui.creditsButton, &QPushButton::clicked, this, &AboutDialog::showCredit );
+    connect( ui.closeButton, &QPushButton::clicked, this, &AboutDialog::hide );
 
 #if 0
     if( QDate::currentDate().dayOfYear() >= QT_XMAS_JOKE_DAY && var_InheritBool( p_intf, "qt-icon-change" ) )
@@ -110,6 +152,7 @@ AboutDialog::AboutDialog( intf_thread_t *_p_intf)
 #endif
 
     /* GPL License */
+    ui.licensePage->setFont( t->font( Theme::Mono ) );
     ui.licensePage->setText( qfu( psz_license ) );
 
     /* People who helped */
@@ -118,9 +161,9 @@ AboutDialog::AboutDialog( intf_thread_t *_p_intf)
     /* People who wrote the software */
     ui.authorsPage->setText( qfu( psz_authors ) );
 
-    ui.licenseButton->installEventFilter( this );
-    ui.authorsButton->installEventFilter( this );
-    ui.creditsButton->installEventFilter( this );
+    ui.licensePage->setAccessibleName( qtr( "License" ) );
+    ui.authorsPage->setAccessibleName( qtr( "Authors" ) );
+    ui.creditPage->setAccessibleName( qtr( "Credits" ) );
     ui.version->installEventFilter( this );
 
     applyTheme();
@@ -136,10 +179,6 @@ void AboutDialog::applyTheme()
     translatedString.replace( QLatin1String( "#0057ae" ), link );
     ui.MainBlabla->setText("<html><head/><body>" + translatedString + "</p></body> </html>");
 
-    const QString button = QStringLiteral( "<span style=\" text-decoration: underline; color:%1;\">%2</span>" );
-    ui.licenseButton->setText( button.arg( link, qtr( "License" ) ) );
-    ui.authorsButton->setText( button.arg( link, qtr( "Authors" ) ) );
-    ui.creditsButton->setText( button.arg( link, qtr( "Credits" ) ) );
 }
 
 void AboutDialog::showLicense()
@@ -171,18 +210,11 @@ bool AboutDialog::eventFilter(QObject *obj, QEvent *event)
             }
             else
             {
-                ui.version->setText(qfu( " " VERSION_MESSAGE ) );
+                ui.version->setText(qfu( VERSION_MESSAGE ) );
                 b_advanced = false;
             }
             return true;
         }
-        else if( obj == ui.licenseButton )
-            showLicense();
-        else if( obj == ui.authorsButton )
-            showAuthors();
-        else if( obj == ui.creditsButton )
-            showCredit();
-
         return false;
     }
 

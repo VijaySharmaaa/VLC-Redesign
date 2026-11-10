@@ -36,6 +36,7 @@
 #include "ui/update.h"
 
 class QEvent;
+class QTextBrowser;
 
 class HelpDialog : public QVLCFrame, public Singleton<HelpDialog>
 {
@@ -43,6 +44,8 @@ class HelpDialog : public QVLCFrame, public Singleton<HelpDialog>
 private:
     HelpDialog( intf_thread_t * );
     virtual ~HelpDialog();
+    QTextBrowser *helpBrowser;
+    void applyTheme();
 
 public slots:
     void close() Q_DECL_OVERRIDE { toggleVisible(); }
