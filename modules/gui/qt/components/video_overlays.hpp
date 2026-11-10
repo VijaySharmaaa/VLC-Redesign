@@ -26,7 +26,6 @@
 #include "components/overlay_host.hpp"
 
 #include <QAtomicInt>
-#include <QHash>
 #include <QIcon>
 #include <QPointer>
 
@@ -128,8 +127,7 @@ private:
     InputControlsWidget *inputC;
     ControlsWidget *controls;
     QList<vout_thread_t *> vouts;
-    QHash<vout_thread_t *, int> userMargin; /* each vout's own "sub-margin" */
-    int lift;                   /* "sub-margin" added to it, in its units */
+    int lift;                   /* added to each vout's "sub-margin", in its units */
     QAtomicInt wakePosted;      /* one wake event in flight at a time */
     QTimer idle;
     QParallelAnimationGroup *anim;

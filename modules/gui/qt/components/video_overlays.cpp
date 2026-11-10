@@ -433,6 +433,14 @@ void ImmersiveBar::rebuild( bool advanced )
 }
 
 /* Qt thread: voutListChanged is emitted by InputManager::UpdateVout */
+/* The lift is added to the vout's "sub-margin", never cached: the subtitle
+ * position hotkeys (key-subpos-up/down) change the same variable meanwhile */
+static void shiftSubMargin( vout_thread_t *p_vout, int by )
+{
+    if( by )
+        var_SetInteger( p_vout, "sub-margin", var_GetInteger( p_vout, "sub-margin" ) + by );
+}
+
 void ImmersiveBar::setVoutList( vout_thread_t **pp_vout, int i_vout )
 {
     QList<vout_thread_t *> set;
@@ -444,7 +452,7 @@ void ImmersiveBar::setVoutList( vout_thread_t **pp_vout, int i_vout )
         {
             /* returns once no callback runs: none posts to us after it */
             var_DelCallback( p_vout, "mouse-moved", MouseMovedCB, this );
-            var_SetInteger( p_vout, "sub-margin", userMargin.take( p_vout ) );
+            shiftSubMargin( p_vout, -lift );
             vlc_object_release( p_vout );
         }
     foreach( vout_thread_t *p_vout, set )
@@ -452,9 +460,7 @@ void ImmersiveBar::setVoutList( vout_thread_t **pp_vout, int i_vout )
         {
             vlc_object_hold( p_vout );
             var_AddCallback( p_vout, "mouse-moved", MouseMovedCB, this );
-            userMargin.insert( p_vout, var_GetInteger( p_vout, "sub-margin" ) );
-            if( lift )
-                var_SetInteger( p_vout, "sub-margin", userMargin.value( p_vout ) + lift );
+            shiftSubMargin( p_vout, lift );
         }
     vouts = set;
     if( i_vout )
@@ -501,9 +507,9 @@ void ImmersiveBar::liftSubtitles()
                        up ? host->targetRect().bottom() + 1 - restingRect().top() : 0 );
     if( units == lift )
         return;
-    lift = units;
     foreach( vout_thread_t *p_vout, vouts )
-        var_SetInteger( p_vout, "sub-margin", userMargin.value( p_vout ) + lift );
+        shiftSubMargin( p_vout, units - lift );
+    lift = units;
 }
 
 /* vout thread: no widget access, only a posted event to the Qt thread */
