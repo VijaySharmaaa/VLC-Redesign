@@ -70,7 +70,7 @@ namespace
     const QRgb fixedColors[] = {
         Accent, AccentHover, OnAccent, AccentTint12, AccentTint14, AccentBorder50,
         AccentFocusRing, AccentKnobHalo, VolumeBoost, SeekKnobFill,
-        Error, ErrorTint, DestructiveText, WindowCloseHover,
+        Error, ErrorTint, DestructiveText, WindowCloseHover, WindowCloseGlyph,
         VideoSurface, PausedBadgeBg, SubtitleBox,
     };
     const int paletteCount = sizeof(paletteFields) / sizeof(paletteFields[0]);
@@ -470,7 +470,7 @@ QColor Theme::color(ColorRole role) const
         sys = QPalette::Highlight; break;
     case OnAccent: case SeekKnobFill:  /* both sit on the accent */
         sys = QPalette::HighlightedText; break;
-    case Error: case ErrorTint: case DestructiveText: case WindowCloseHover:
+    case Error: case ErrorTint: case DestructiveText: case WindowCloseHover: case WindowCloseGlyph:
     case VideoSurface: case PausedBadgeBg: case SubtitleBox:
         return c;  /* status and video colours keep their meaning */
     default:       /* the backgrounds: Page .. Hover2, Glass, FxBg, stripes */
@@ -656,6 +656,11 @@ QLabel[role="hint"] { color: @mute@; }
 .QSlider::sub-page:horizontal:disabled, .QSlider::add-page:vertical:disabled, .QSlider::handle:disabled { background: @toggleOff@; }
 .QSlider { border: 2px solid transparent; border-radius: @radiusSm@px; }
 .QSlider:focus { border-color: @focusRing@; }
+
+/* ---- Title bar (components/title_bar.cpp) ---- */
+QToolButton[role="caption"] { border-radius: 0; }
+QToolButton[role="caption"][nchover="true"] { background: @hoverFill@; }
+QToolButton#captionClose:hover, QToolButton#captionClose:pressed { background: @closeHover@; }
 )QSS";
 
     const Palette &p = palette();
@@ -683,6 +688,7 @@ QLabel[role="hint"] { color: @mute@; }
         /* the accent is 2.4:1 on light surfaces: focus rings need >= 3:1 */
         { "focusRing", css(color(dark ? Accent : AccentText)) },
         { "onAccent", css(color(OnAccent)) },
+        { "closeHover", css(color(WindowCloseHover)) },
         { "accentTint", css(color(AccentTint14)) },
         { "accentBorder", css(color(AccentBorder50)) },
         { "popupBorder", dwmRounds ? QString("none")
