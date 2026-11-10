@@ -78,7 +78,7 @@ namespace RedesignTokens
         0xF71A1917, /* rgba(26,25,23,0.97) */
         0xFF22201E, 0xFF1C1A18,
         0xFFFF8A1F, 0xFF1C1206, 0xFFFF5A1F, 0xFFFF7468,
-        0x59FFFFFF  /* ink 0.35 */
+        0x5CFFFFFF  /* ink 0.36: 3:1 on hover2 */
     };
 
     static const Palette Light = {
@@ -88,7 +88,7 @@ namespace RedesignTokens
         0xE0FAF9F7, /* rgba(250,249,247,0.88): tokens.json's 0.74 is under a blur Qt 5.6 lacks */
         0xF7FFFFFF,
         0xFFE7E3DD, 0xFFDFDAD3,
-        0xFF9A4800, 0xFFFFFFFF, 0xFFD9400A, 0xFFB82818,
+        0xFF9A4800, 0xFFFFFFFF, 0xFFD9400A, 0xFFB02515,
         0x73000000  /* ink 0.45 */
     };
 
