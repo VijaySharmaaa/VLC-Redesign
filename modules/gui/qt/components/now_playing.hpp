@@ -144,9 +144,11 @@ signals:
     void libraryRequested();
 protected:
     void resizeEvent( QResizeEvent * ) Q_DECL_OVERRIDE;
+    bool eventFilter( QObject *, QEvent * ) Q_DECL_OVERRIDE;
 private:
     void refresh();
     void fitArt();
+    void readInset();
     intf_thread_t *p_intf;
     NowPlayingInfo *info;
     QBoxLayout *columns;

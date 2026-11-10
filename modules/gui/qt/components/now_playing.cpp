@@ -298,7 +298,7 @@ void ThinSeekBar::paintEvent( QPaintEvent * )
         done.setWidth( track.width() * sliderPosition() / maximum() );
         if( layoutDirection() == Qt::RightToLeft )
             done.moveRight( track.right() );
-        p.setBrush( t->color( Theme::Accent ) );
+        p.setBrush( t->color( Theme::AccentFill ) );
         p.drawRoundedRect( done, h / 2, h / 2 );
     }
     if( hasFocus() )
@@ -624,7 +624,7 @@ public:
         else
         {
             p->setFont( fontAt( Theme::Meta, Type::Meta, true ) );
-            p->setPen( t->color( Theme::Dim ) );
+            p->setPen( t->color( ( opt.state & QStyle::State_MouseOver ) ? Theme::Mute : Theme::Dim ) );
             p->drawText( num, Qt::AlignCenter, QString::number( index.row() + 1 ) );
         }
 
@@ -664,6 +664,10 @@ AudioModePage::AudioModePage( intf_thread_t *_p_i, NowPlayingInfo *_info, QWidge
     outer->addLayout( columns, 1 );
     spectrum = new SpectrumWidget( p_intf, this );
     outer->addWidget( spectrum );
+    /* the immersive bar floats over the page's bottom: the spectrum keeps
+     * above it (the stack publishes the bar's height as immersiveInset) */
+    if( parent )
+        parent->installEventFilter( this );
 
     /* left: back to the library, art, chips */
     leftColumn = new QWidget( this );
@@ -772,9 +776,10 @@ void AudioModePage::fitArt()
     const Theme *t = Theme::instance();
     /* short pages: the track list keeps its rows, the spectrum goes first */
     const int listMin = TrackMinRows * t->metric( Theme::PlaylistRowH );
-    spectrum->setVisible( height() - tracks->y() - t->px( SpectrumH ) >= listMin );
+    const int h = height() - layout()->contentsMargins().bottom();  /* above the immersive bar */
+    spectrum->setVisible( h - tracks->y() - t->px( SpectrumH ) >= listMin );
     const int top = columns->contentsMargins().top();
-    const int room = height() - top - ( spectrum->isHidden() ? 0 : t->px( SpectrumH ) ) - t->px( PillH )
+    const int room = h - top - ( spectrum->isHidden() ? 0 : t->px( SpectrumH ) ) - t->px( PillH )
                    - formatChip->sizeHint().height() - 2 * t->px( ColumnInnerGap );
     const int side = qMax( 0, qMin( artMax, room ) );
     art->setFixedSize( side, side );
@@ -788,6 +793,24 @@ void AudioModePage::fitArt()
 void AudioModePage::resizeEvent( QResizeEvent *e )
 {
     QWidget::resizeEvent( e );
+    fitArt();
+}
+
+bool AudioModePage::eventFilter( QObject *o, QEvent *e )
+{
+    if( o == parent() && e->type() == QEvent::DynamicPropertyChange
+     && static_cast<QDynamicPropertyChangeEvent *>( e )->propertyName() == "immersiveInset" )
+        readInset();
+    return QWidget::eventFilter( o, e );
+}
+
+/* absent or 0 (bar hidden) gives the page its full height back */
+void AudioModePage::readInset()
+{
+    const int inset = qMax( 0, parent()->property( "immersiveInset" ).toInt() );
+    if( inset == layout()->contentsMargins().bottom() )
+        return;  /* set again on every subtitle lift */
+    layout()->setContentsMargins( 0, 0, 0, inset );
     fitArt();
 }
 

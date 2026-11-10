@@ -110,7 +110,7 @@ namespace
             if( !detail.isEmpty() )
             {
                 p->setFont( meta );
-                p->setPen( t->color( Theme::Dim ) );
+                p->setPen( t->color( enabled ? Theme::Mute : Theme::Dim ) );
                 p->drawText( QRect( text.left(), top + bodyH, text.width(), QFontMetrics( meta ).height() ),
                              Qt::AlignLeft | Qt::AlignVCenter,
                              QFontMetrics( meta ).elidedText( detail, Qt::ElideRight, text.width() ) );

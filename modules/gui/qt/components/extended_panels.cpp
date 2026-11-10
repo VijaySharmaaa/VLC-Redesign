@@ -1305,7 +1305,7 @@ void EqBandSlider::paintEvent( QPaintEvent * )
     const qreal zero = yOf( qBound( minimum(), 0, maximum() ) );
     p.fillRect( QRectF( 0, zero, width(), Size::Hairline ), t->ink( InkAlpha::Track ) );
     const qreal y = yOf( value() );
-    p.setBrush( t->color( Theme::Accent ) );
+    p.setBrush( t->color( Theme::AccentFill ) );
     p.drawRoundedRect( QRectF( groove.x(), qMin( y, zero ), track, qAbs( y - zero ) ),
                        track / 2, track / 2 );
     if( hasFocus() )
