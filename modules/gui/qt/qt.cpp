@@ -123,7 +123,7 @@ static void ShowDialog   ( intf_thread_t *, int, int, intf_dialog_args_t * );
 #define ERROR_TEXT N_( "Show unimportant error and warnings dialogs" )
 
 #define QT_DARK_TEXT N_( "Enable Dark Mode" )
-#define QT_DARK_LONGTEXT N_( "Applies a dark theme to the style." )
+#define QT_DARK_LONGTEXT N_( "Forces the dark theme while the theme follows the system." )
 
 #define QT_THEME_TEXT N_( "Theme" )
 #define QT_THEME_LONGTEXT N_( "Colours of the interface. \"Follow the system\" " \

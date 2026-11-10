@@ -148,12 +148,13 @@ namespace
     /* Stylesheet `image:` needs a file: write the tinted icon, at twice the
      * glyph size so it stays sharp at 200 %, to the temporary directory. The
      * colour is in the name, so a theme change gets a new url, not a stale
-     * cached image. */
+     * cached image; the version too, so another version's file is not reused. */
     QString tintedIconFile(intf_thread_t *p_intf, const char *name,
                            const QColor &tint, int rotation)
     {
         const QString path = QDir::temp().filePath(
-            QString("vlc-qt-%1-%2-%3.png").arg(QLatin1String(name))
+            QString("vlc-qt-%1-%2-%3-%4.png").arg(QLatin1String(PACKAGE_VERSION))
+                .arg(QLatin1String(name))
                 .arg(rotation).arg(tint.rgba(), 8, 16, QLatin1Char('0')));
         if (QFile::exists(path))
             return path;

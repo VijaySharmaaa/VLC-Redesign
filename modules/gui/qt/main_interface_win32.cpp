@@ -232,7 +232,10 @@ bool MainInterfaceWin32::nativeEventFilter(const QByteArray &, void *message, lo
     }
 
     /* Windows light/dark switch: sent to every top-level window, handle it once.
-     * reload() only re-applies when the effective mode changed. */
+     * reload() only re-applies when the effective mode changed.
+     * shortcut: only the main interface listens, so the skins2 dialog
+     * provider keeps its start-up theme; restart it to follow, or hook
+     * WM_SETTINGCHANGE in the dialogs provider if that ever matters. */
     if (msg->message == WM_SETTINGCHANGE && msg->hwnd == WinId(this) && msg->lParam
         && wcscmp(reinterpret_cast<LPCWSTR>(msg->lParam), L"ImmersiveColorSet") == 0)
         Theme::instance()->reload();
