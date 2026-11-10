@@ -133,7 +133,7 @@ class Vlc:
             return front()
         self.wait_for(ours, 'VLC to become the foreground window before sending ' + k, timeout=5)
         # The user may click another app at any moment: check again right before every key.
-        for action in keyboard.parse_keys(k):
+        for action in keyboard.parse_keys(k, with_spaces=True):
             if not front():
                 # Don't leave a modifier held down in the user's app.
                 for vk in (win32con.VK_SHIFT, win32con.VK_CONTROL, win32con.VK_MENU):
