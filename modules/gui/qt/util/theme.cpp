@@ -26,6 +26,7 @@
 
 #include <cassert>
 
+#include <QAction>
 #include <QApplication>
 #include <QCheckBox>
 #include <QDir>
@@ -173,6 +174,7 @@ namespace
     }
 
     const char altSeenProperty[] = "vlcAltSeen";
+    const char destructiveProperty[] = "vlcDestructive"; /* Theme::setDestructive */
 
     /* What the stylesheet cannot do (DESIGN_SPEC 7, 11): menu items whose
      * check is the accent `check` icon and whose shortcut column is dimmed,
@@ -257,7 +259,11 @@ namespace
                 p->drawText(textRect, flags | visualAlignment(dir, Qt::AlignRight), label.mid(tab + 1));
                 label.truncate(tab);
             }
-            p->setPen(t->color(enabled ? Theme::Text : Theme::Dim));
+            const QMenu *menu = qobject_cast<const QMenu *>(w);
+            const QAction *action = menu ? menu->actionAt(r.center()) : NULL;
+            p->setPen(t->color(!enabled ? Theme::Dim
+                               : action && action->property(destructiveProperty).toBool()
+                               ? Theme::DestructiveText : Theme::Text));
             p->setFont(mi->font);
             p->drawText(textRect, flags | visualAlignment(dir, Qt::AlignLeft), label);
 
@@ -610,6 +616,11 @@ namespace
 QIcon Theme::themedIcon(const char *name, ColorRole role)
 {
     return QIcon(new ThemedIconEngine(name, role));
+}
+
+void Theme::setDestructive(QAction *action)
+{
+    action->setProperty(destructiveProperty, true);
 }
 
 void Theme::applyPalette()

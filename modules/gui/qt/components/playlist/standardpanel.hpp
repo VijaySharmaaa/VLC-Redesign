@@ -70,6 +70,12 @@ public:
     int currentViewIndex() const;
 
     static QMenu *viewSelectionMenu(StandardPLPanel *obj);
+    /* The model's context menu entries for index, shared with the docked
+     * playlist panel; runModelAction() carries out the one picked from
+     * them, for the selected rows. */
+    static void addModelActions( QMenu *, VLCModel *, const QModelIndex &index );
+    static void runModelAction( intf_thread_t *, QWidget *parent, VLCModel *, QAction *,
+                                const QModelIndexList &selection, const QModelIndex &index );
 
 protected:
     VLCModel *model;

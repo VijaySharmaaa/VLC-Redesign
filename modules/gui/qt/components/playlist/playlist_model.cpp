@@ -1084,6 +1084,8 @@ bool PLModel::isSupportedAction( actions action, const QModelIndex &index ) cons
     case ACTION_SAVE:
     case ACTION_INFO:
         return item;
+    case ACTION_COPYPATH:
+        return item && !item->getURI().isEmpty();
     case ACTION_REMOVE:
         return item && !item->readOnly();
     case ACTION_EXPLORE:
