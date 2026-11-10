@@ -71,16 +71,18 @@ namespace
         &Palette::surface, &Palette::raised, &Palette::hover, &Palette::hover2,
         &Palette::tx, &Palette::tx2, &Palette::mute, &Palette::dim, &Palette::accTx,
         &Palette::ink, &Palette::glass, &Palette::fxbg, &Palette::stripe1, &Palette::stripe2,
+        &Palette::fill, &Palette::onFill, &Palette::boost, &Palette::danger, &Palette::line,
     };
     const QRgb fixedColors[] = {
         Accent, AccentHover, OnAccent, AccentTint12, AccentTint14, AccentBorder50,
-        AccentFocusRing, AccentKnobHalo, VolumeBoost, SeekKnobFill,
-        Error, ErrorTint, DestructiveText, WindowCloseHover, WindowCloseGlyph,
+        AccentFocusRing, AccentKnobHalo, SeekKnobFill,
+        Error, ErrorTint, WindowCloseHover, WindowCloseGlyph,
         VideoSurface, PausedBadgeBg, SubtitleBox, OnVideo,
     };
     const int paletteCount = sizeof(paletteFields) / sizeof(paletteFields[0]);
     static_assert(paletteCount + sizeof(fixedColors) / sizeof(fixedColors[0])
                   == Theme::ColorRoleCount, "ColorRole and the colour tables differ");
+    static_assert(paletteCount == Theme::Accent, "ColorRole and the palette table differ");
 
     /* Same order as Theme::SizeRole */
     const int sizes[] = {
@@ -103,7 +105,7 @@ namespace
         Motion::PausedBadge, Motion::MiniPlayer, Motion::DropTarget, Motion::SeekTick,
         Motion::VolumeFill, Motion::EqBand, Motion::Toggle, Motion::PlayPress,
         Motion::ImmersiveIdle, Motion::ImmersiveFade,
-        VideoOverlay::RingTurn, NowPlaying::SpectrumMotion,
+        VideoOverlay::RingTurn, NowPlaying::SpectrumMotion, Motion::SeekLoading,
     };
     static_assert(sizeof(durations) / sizeof(durations[0]) == Theme::MotionRoleCount,
                   "MotionRole and the duration table differ");
@@ -328,16 +330,16 @@ namespace
             p->setRenderHint(QPainter::Antialiasing);
             if (!(opt->state & State_Enabled))
                 p->setOpacity(0.35);  /* DESIGN_SPEC 3: disabled controls */
-            /* unchecked: ToggleOff outline, at least 3:1 against the window */
-            p->setPen(on ? t->color(Theme::Accent) : t->ink(InkAlpha::ToggleOff));
-            p->setBrush(on ? t->color(Theme::Accent) : t->color(Theme::Surface));
+            /* unchecked: the control outline, at least 3:1 against the window */
+            p->setPen(t->color(on ? Theme::AccentFill : Theme::ControlLine));
+            p->setBrush(t->color(on ? Theme::AccentFill : Theme::Surface));
             if (pe == PE_IndicatorRadioButton)
             {
                 p->drawEllipse(r);
                 if (on)
                 {
                     p->setPen(Qt::NoPen);
-                    p->setBrush(t->color(Theme::OnAccent));
+                    p->setBrush(t->color(Theme::OnAccentFill));
                     p->drawEllipse(r.center(), r.width() / 6, r.height() / 6);
                 }
             }
@@ -346,12 +348,12 @@ namespace
                 p->drawRoundedRect(r, t->metric(Theme::RadiusXs), t->metric(Theme::RadiusXs));
                 if (opt->state & State_NoChange)
                 {
-                    p->setPen(QPen(t->color(Theme::OnAccent), 2));
+                    p->setPen(QPen(t->color(Theme::OnAccentFill), 2));
                     p->drawLine(QPointF(r.left() + r.width() / 4, r.center().y()),
                                 QPointF(r.right() - r.width() / 4, r.center().y()));
                 }
                 else if (on)
-                    p->drawPixmap(opt->rect, t->icon(RedesignIcons::IconCheck, Theme::OnAccent,
+                    p->drawPixmap(opt->rect, t->icon(RedesignIcons::IconCheck, Theme::OnAccentFill,
                                                      opt->rect.size()).pixmap(opt->rect.size()));
             }
             p->restore();
@@ -428,7 +430,8 @@ namespace
 
     private:
         /* The prototype's switch: off, an outlined track and a Text2 knob;
-         * on, an accent track and an OnAccent knob */
+         * on, an accent track and an OnAccent knob. The light theme's
+         * darker fill takes a white knob (OnAccentFill). */
         static void drawToggle(Theme *t, const QStyleOption *opt, QPainter *p, const QWidget *w)
         {
             const bool on = opt->state & (State_On | State_NoChange);
@@ -448,14 +451,14 @@ namespace
             }
             if (!(opt->state & State_Enabled))
                 p->setOpacity(0.35);  /* DESIGN_SPEC 3: disabled controls */
-            p->setPen(on ? t->color(Theme::Accent) : t->ink(InkAlpha::ToggleOff));
-            p->setBrush(on ? t->color(Theme::Accent) : QColor(Qt::transparent));
+            p->setPen(t->color(on ? Theme::AccentFill : Theme::ControlLine));
+            p->setBrush(on ? t->color(Theme::AccentFill) : QColor(Qt::transparent));
             p->drawRoundedRect(track, track.height() / 2, track.height() / 2);
             const qreal d = t->px(Size::ToggleKnob);
             const qreal inset = (track.height() - d) / 2;
             const qreal x = track.left() + inset + at * (track.width() - d - 2 * inset);
             p->setPen(Qt::NoPen);
-            p->setBrush(t->color(on ? Theme::OnAccent : Theme::Text2));
+            p->setBrush(t->color(on ? Theme::OnAccentFill : Theme::Text2));
             p->drawEllipse(QRectF(x, track.top() + inset, d, d));
             p->restore();
         }
@@ -604,20 +607,24 @@ QColor Theme::color(ColorRole role) const
     switch (role)
     {
     case Text: case Text2: case Ink:
+    /* no system colour means "error": the text and icon carry it */
+    case Error: case ErrorTint: case DestructiveText:
         sys = QPalette::WindowText; break;
+    case ControlLine:  /* a solid outline, as the system's own fields */
+        return QApplication::palette().color(QPalette::WindowText);
     case Mute: case Dim:
         group = QPalette::Disabled; sys = QPalette::Text; break;
     case Surface:
         sys = QPalette::Base; break;
     case AccentText: case Accent: case AccentHover: case AccentTint12: case AccentTint14:
     case AccentBorder50: case AccentFocusRing: case AccentKnobHalo:
-    case VolumeBoost:
+    case AccentFill: case VolumeBoost:
         sys = QPalette::Highlight; break;
-    case OnAccent: case SeekKnobFill:  /* both sit on the accent */
+    case OnAccent: case OnAccentFill: case SeekKnobFill:  /* they sit on the accent */
         sys = QPalette::HighlightedText; break;
-    case Error: case ErrorTint: case DestructiveText: case WindowCloseHover: case WindowCloseGlyph:
+    case WindowCloseHover: case WindowCloseGlyph:
     case VideoSurface: case PausedBadgeBg: case SubtitleBox: case OnVideo:
-        return c;  /* status and video colours keep their meaning */
+        return c;  /* the close button and video colours keep their meaning */
     default:       /* the backgrounds: Page .. Hover2, Glass, FxBg, stripes */
         sys = QPalette::Window; break;
     }
@@ -784,13 +791,13 @@ QToolButton::menu-arrow { image: url("@arrowDown@"); width: @iconGlyph@px; heigh
 QToolButton::menu-arrow:disabled { image: url("@arrowDownDim@"); }
 
 QLineEdit, QAbstractSpinBox, QComboBox, QTextEdit, QPlainTextEdit {
-    background: @surface@; color: @tx@; border: 1px solid @outline@; border-radius: @radiusMd@px;
+    background: @surface@; color: @tx@; border: 1px solid @controlLine@; border-radius: @radiusMd@px;
     selection-background-color: @accent@; selection-color: @onAccent@; }
 QLineEdit, QAbstractSpinBox { padding: 1px @menuPad@px; }
 /* a combo's vertical padding becomes its pop-up's PM_MenuVMargin, which Qt 5.6
    leaves out of the pop-up height (one row short, with a scroller): use margin */
 QComboBox { margin: 1px 0; padding: 0 @menuPad@px; }
-QLineEdit:hover, QAbstractSpinBox:hover, QComboBox:hover { border-color: @toggleOff@; }
+QLineEdit:hover, QAbstractSpinBox:hover, QComboBox:hover { border-color: @mute@; }
 QLineEdit:disabled, QAbstractSpinBox:disabled, QComboBox:disabled { background: @panel@; color: @dim@; border-color: @divider@; }
 QComboBox::drop-down, QAbstractSpinBox::up-button, QAbstractSpinBox::down-button { border: none; background: transparent; width: @iconGlyph@px; }
 QComboBox::down-arrow { width: @iconGlyph@px; height: @iconGlyph@px; }
@@ -808,10 +815,12 @@ QToolButton:focus { border-color: @focusRing@; }
 QPushButton:focus { padding: @menuPadFocus@px @buttonPadXFocus@px; }
 
 QTabWidget::pane { background: @panel@; border: 1px solid @divider@; border-radius: @radiusLg@px; top: -1px; }
-QTabBar::tab { background: transparent; color: @mute@; border: none; border-bottom: 2px solid transparent; padding: @menuItemPadY@px @buttonPadX@px; }
+/* a transparent ring on every tab, so focus only colours it */
+QTabBar::tab { background: transparent; color: @mute@; border: 2px solid transparent;
+    padding: @tabPadY@px @tabPadX@px @menuItemPadY@px; }
 QTabBar::tab:hover { color: @tx@; }
-QTabBar::tab:selected { color: @tx@; border-bottom-color: @accent@; }
-QTabBar::tab:focus { color: @tx@; background: @hoverFill@; }
+QTabBar::tab:selected { color: @tx@; border-bottom-color: @fill@; }
+QTabBar::tab:focus { color: @tx@; background: @hoverFill@; border-color: @focusRing@; border-radius: @radiusSm@px; }
 
 QGroupBox { border: 1px solid @divider@; border-radius: @radiusLg@px; margin-top: @groupTitleH@px; padding-top: @menuPad@px; }
 QGroupBox::title { subcontrol-origin: margin; subcontrol-position: top left; left: @menuTitlePadX@px; padding: 0 @menuPad@px; color: @mute@; }
@@ -820,6 +829,9 @@ QAbstractItemView { background: @surface@; alternate-background-color: @panel@; 
     selection-background-color: @accentTint@; selection-color: @tx@; }
 QAbstractItemView::item:hover { background: @hoverFill@; }
 QAbstractItemView::item:selected { background: @accentTint@; color: @tx@; }
+/* views that draw their own row rings set [role] rules with no border, later */
+QAbstractItemView:focus { border: 2px solid @focusRing@; }
+QComboBox QAbstractItemView:focus { border: @popupBorder@; }
 QHeaderView::section { background: @panel@; color: @mute@; border: none; border-bottom: 1px solid @divider@; border-right: 1px solid @divider@; padding: @menuPad@px @menuTitlePadX@px; }
 
 QScrollBar:vertical { background: transparent; width: @scrollW@px; margin: 0; }
@@ -836,13 +848,15 @@ QStatusBar { background: @chrome@; color: @mute@; border-top: 1px solid @divider
 QStatusBar::item { border: none; }
 
 QLabel[role="hint"] { color: @mute@; }
+/* selectable hints (the error dialog's details) take focus */
+QLabel[role="hint"]:focus { border: 1px solid @focusRing@; border-radius: @radiusSm@px; }
 
 .QSlider::groove:horizontal { height: @track@px; background: @trackInk@; border-radius: @trackRadius@px; }
 .QSlider::groove:vertical { width: @track@px; background: @trackInk@; border-radius: @trackRadius@px; }
-.QSlider::sub-page:horizontal, .QSlider::add-page:vertical { background: @accent@; border-radius: @trackRadius@px; }
-.QSlider::handle:horizontal { width: @knob@px; margin: @knobMargin@px 0; border-radius: @knobRadius@px; background: @accent@; }
-.QSlider::handle:vertical { height: @knob@px; margin: 0 @knobMargin@px; border-radius: @knobRadius@px; background: @accent@; }
-.QSlider::handle:hover { background: @accentHover@; }
+.QSlider::sub-page:horizontal, .QSlider::add-page:vertical { background: @fill@; border-radius: @trackRadius@px; }
+.QSlider::handle:horizontal { width: @knob@px; margin: -@knobMarginA@px 0 -@knobMarginB@px; border-radius: @knobRadius@px; background: @fill@; }
+.QSlider::handle:vertical { height: @knob@px; margin: 0 -@knobMarginB@px 0 -@knobMarginA@px; border-radius: @knobRadius@px; background: @fill@; }
+.QSlider::handle:hover { background: @fillHover@; }
 .QSlider::sub-page:horizontal:disabled, .QSlider::add-page:vertical:disabled, .QSlider::handle:disabled { background: @toggleOff@; }
 .QSlider { border: 2px solid transparent; border-radius: @radiusSm@px; }
 .QSlider:focus { border-color: @focusRing@; }
@@ -909,8 +923,6 @@ QPushButton[role="primary"]:focus { border-color: @tx@; }
 /* Phase 4: library (components/library/) */
 QListView[role="library"], QScrollArea[role="library"] { background: transparent; border: none; outline: 0; }
 QScrollArea[role="library"] > QWidget > QWidget { background: transparent; }
-QLineEdit[role="librarySearch"] { border: 1px solid @border@; }
-QLineEdit[role="librarySearch"]:hover { border-color: @outline@; }
 QLineEdit[role="librarySearch"]:focus { border: 2px solid @focusRing@; }
 QPushButton[role="outline"] { background: transparent; }
 QPushButton[role="outline"]:hover { background: @hoverFill@; }
@@ -937,7 +949,8 @@ QToolButton[role="stepper"]:hover { background: @stepperHover@; }
 QToolButton[role="openTile"] { background: @raised@; color: @tx2@; border: 1px solid transparent; border-radius: @radiusLg@px; }
 QToolButton[role="openTile"]:hover { background: @hover@; color: @tx@; }
 QToolButton[role="openTile"]:checked { background: @accentTint@; color: @accTx@; border-color: @accentBorder@; }
-QToolButton[role="openTile"]:focus { border-color: @focusRing@; }
+/* 2 px, unlike the 1 px checked outline; the content stays centred */
+QToolButton[role="openTile"]:focus { border: 2px solid @focusRing@; }
 #OpenDisk QRadioButton { background: @raised@; border: 1px solid transparent; border-radius: @radiusMd@px; padding: @menuPad@px @buttonPadX@px; spacing: 0; }
 #OpenDisk QRadioButton::indicator { image: none; width: 0; height: 0; border: none; }
 #OpenDisk QRadioButton:hover { background: @hover@; }
@@ -948,6 +961,8 @@ QToolButton[role="split"][popupMode="1"] { padding-right: @splitPadR@px; }
 QToolButton[role="split"]:hover { background: @accentHover@; }
 QToolButton[role="split"]:focus { border-color: @onAccent@; }
 QToolButton[role="split"]::menu-arrow { image: url("@arrowDownOnAccent@"); }
+QToolButton[role="split"]:disabled { background: @panel@; color: @dim@; }
+QToolButton[role="split"]::menu-arrow:disabled { image: url("@arrowDownDim@"); }
 QLabel[role="errorIcon"] { background: @errorTint@; border-radius: @errorIconR@px; }
 QPushButton[role="link"] { background: transparent; color: @accTx@; border: 2px solid transparent; }
 QPushButton[role="link"]:hover { background: @hoverFill@; }
@@ -992,6 +1007,10 @@ PrefsPage QComboBox { min-height: @prefsSelectInner@px; }
         { "dim", css(QColor::fromRgb(p.dim)) },
         { "accent", css(color(Accent)) },
         { "accentHover", css(color(AccentHover)) },
+        { "fill", css(color(AccentFill)) },
+        /* the light fill has no lighter hover that keeps 3:1 */
+        { "fillHover", css(color(dark ? AccentHover : AccentFill)) },
+        { "controlLine", css(color(ControlLine)) },
         /* the accent is 2.4:1 on light surfaces: focus rings need >= 3:1 */
         { "focusRing", css(color(dark ? Accent : AccentText)) },
         { "onAccent", css(color(OnAccent)) },
@@ -1018,6 +1037,9 @@ PrefsPage QComboBox { min-height: @prefsSelectInner@px; }
         { "menuTitlePadX", QString::number(px(Size::MenuTitlePadX)) },
         { "menuTitlePadY", QString::number(qMax(0, (px(Size::MenuTitleH) - lineH) / 2)) },
         { "menuItemPadY", QString::number(qMax(0, (px(Size::MenuItemH) - lineH) / 2)) },
+        /* the tab's ring adds 2 px at the top and sides: keep the old size */
+        { "tabPadY", QString::number(qMax(0, (px(Size::MenuItemH) - lineH) / 2 - Size::FocusRing)) },
+        { "tabPadX", QString::number(px(Size::ButtonPadX) - Size::FocusRing) },
         { "buttonPadX", QString::number(px(Size::ButtonPadX)) },
         { "buttonPadXFocus", QString::number(px(Size::ButtonPadX) - 1) },
         { "groupTitleH", QString::number(metaH) },
@@ -1032,7 +1054,11 @@ PrefsPage QComboBox { min-height: @prefsSelectInner@px; }
         { "trackRadius", QString::number(px(Size::SeekTrack) / 2) },
         { "knob", QString::number(px(Size::SeekKnob)) },
         { "knobRadius", QString::number(px(Size::SeekKnob) / 2) },
-        { "knobMargin", QString::number(-(px(Size::SeekKnob) - px(Size::SeekTrack)) / 2) },
+        /* the knob is exactly @knob@ thick: Qt drops a radius over half the
+           side (qNormalizeRadii), which squared it when knob - track is odd */
+        { "knobMarginA", QString::number((px(Size::SeekKnob) - px(Size::SeekTrack)) / 2) },
+        { "knobMarginB", QString::number(px(Size::SeekKnob) - px(Size::SeekTrack)
+                                         - (px(Size::SeekKnob) - px(Size::SeekTrack)) / 2) },
         /* Phase 3: now playing, mini player, audio mode */
         { "accTx", css(color(AccentText)) },
         { "chipPadX", QString::number(px(NowPlaying::ChipPadX)) },

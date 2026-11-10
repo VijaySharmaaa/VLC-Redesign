@@ -15,7 +15,14 @@
  *
  * Deviation from tokens.json: the light theme's accTx is #9a4800, not
  * #b35300, so the active sidebar label (accTx on AccentTint12 over chrome)
- * reaches 4.8:1 instead of 3.8:1.
+ * reaches 4.8:1 instead of 3.8:1. The light glass is 0.88 opaque, not
+ * 0.74: the design blurs what is under it, which Qt 5.6 widgets cannot.
+ *
+ * Per theme since Phase 6 (WCAG 1.4.3 / 1.4.11): progress and switch fills,
+ * the volume boost, the destructive text and the outline of fields, selects
+ * and switches, which is their only boundary. Light fills take accTx (>= 4.4:1
+ * on the light surfaces) and outlines ink 0.45 (>= 3:1); the dark theme keeps
+ * the design's fills, and its outlines take the switch's ink 0.35 (>= 3:1).
  *****************************************************************************/
 
 #ifndef VLC_QT_THEME_TOKENS_HPP_
@@ -34,13 +41,11 @@ namespace RedesignTokens
     static const QRgb AccentBorder50  = 0x80FF8A1F;
     static const QRgb AccentFocusRing = 0x2EFF8A1F; /* 18 % */
     static const QRgb AccentKnobHalo  = 0x59FF8A1F; /* 35 % */
-    static const QRgb VolumeBoost     = 0xFFFF5A1F;
     static const QRgb SeekKnobFill    = 0xFFFFFFFF; /* DESIGN_SPEC 3: white in both themes */
 
     /* ---- Status ---- */
     static const QRgb Error            = 0xFFFF5A4E;
     static const QRgb ErrorTint        = 0x24FF5A4E;
-    static const QRgb DestructiveText  = 0xFFE5483C;
     static const QRgb WindowCloseHover = 0xFFC42B1C;
     static const QRgb WindowCloseGlyph = 0xFFFFFFFF; /* on WindowCloseHover, both themes */
 
@@ -57,6 +62,11 @@ namespace RedesignTokens
         QRgb glass;    /* floating bars */
         QRgb fxbg;     /* effects sheet */
         QRgb stripe1, stripe2; /* placeholder thumbnails */
+        QRgb fill;     /* seek, volume and slider progress, switch and check box on */
+        QRgb onFill;   /* knob and check mark on fill */
+        QRgb boost;    /* volume above 100 % */
+        QRgb danger;   /* destructive menu text, also on the hovered row (>= 4.5:1) */
+        QRgb line;     /* outline of fields, selects, switches and check boxes */
     };
 
     static const Palette Dark = {
@@ -65,16 +75,20 @@ namespace RedesignTokens
         0xFFFFFFFF,
         0xB81E1D1B, /* rgba(30,29,27,0.72) */
         0xF71A1917, /* rgba(26,25,23,0.97) */
-        0xFF22201E, 0xFF1C1A18
+        0xFF22201E, 0xFF1C1A18,
+        0xFFFF8A1F, 0xFF1C1206, 0xFFFF5A1F, 0xFFFF7468,
+        0x59FFFFFF  /* ink 0.35 */
     };
 
     static const Palette Light = {
         0xFFD6D2CC, 0xFFEBE8E4, 0xFFF6F4F1, 0xFFF1EEEA, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFE6E2DD, 0xFFDBD6D0,
         0xFF1B1916, 0xFF3D3933, 0xFF5F5A53, 0xFF746E66, 0xFF9A4800,
         0xFF000000,
-        0xBDFAF9F7, /* rgba(250,249,247,0.74) */
+        0xE0FAF9F7, /* rgba(250,249,247,0.88): tokens.json's 0.74 is under a blur Qt 5.6 lacks */
         0xF7FFFFFF,
-        0xFFE7E3DD, 0xFFDFDAD3
+        0xFFE7E3DD, 0xFFDFDAD3,
+        0xFF9A4800, 0xFFFFFFFF, 0xFFD9400A, 0xFFB82818,
+        0x73000000  /* ink 0.45 */
     };
 
     /* Alpha (0..255) applied to Palette::ink for overlays */
@@ -155,6 +169,8 @@ namespace RedesignTokens
         static const int PausedBadge = 180, MiniPlayer = 240, DropTarget = 150;
         static const int SeekTick = 250, VolumeFill = 120, EqBand = 150, Toggle = 150, PlayPress = 100;
         static const int ImmersiveIdle = 2500, ImmersiveFade = 300;
+        /* the seek bar's loading bounce: one sweep, shown after the delay */
+        static const int SeekLoading = 2000, SeekLoadingDelay = 500;
         static const int SlideOffset = 28, RiseOffset = 8, DropOffset = 6, ToastOffset = 12;
     }
 
@@ -353,6 +369,8 @@ namespace RedesignTokens
         static const int ErrorW = 480, ErrorH = 190;
         /* Go to time: the timecode field */
         static const int JumpInputH = 44, JumpFont = 20;
+        /* About: the cone and the card width */
+        static const int AboutLogo = 64, AboutW = 440;
     }
 
     /* ---- Phase 5: Preferences page (DESIGN_SPEC 8; sizes from the
@@ -366,6 +384,8 @@ namespace RedesignTokens
         /* selects and fields on the right of a row: the prototype's selW
          * (it narrows to 180 at XS) */
         static const int ControlMinW = 240;
+        /* not in tokens.json: the Hotkeys table shows at least this many rows */
+        static const int HotkeysMinRows = 10;
     }
 }
 
