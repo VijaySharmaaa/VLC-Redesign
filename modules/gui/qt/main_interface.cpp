@@ -419,6 +419,10 @@ MainInterface::MainInterface( intf_thread_t *_p_intf, bool customFrame ) : QVLCM
      * maximised window to it, a fake maximise */
     computeMinimumSize( b_minimalView );
     QVLCTools::restoreWidgetPosition( settings, this, minimumSize() );
+    /* P6-6: the theme takes the scale of the screen the window is on */
+    winId();
+    connect( windowHandle(), &QWindow::screenChanged, this, [this]() { followScreen(); } );
+    followScreen();
 
     b_interfaceFullScreen = isFullScreen();
 
@@ -500,6 +504,21 @@ void MainInterface::computeMinimumSize( bool b_minimal )
     setMinimumSize( qMin( work.width(), qMax( t->px( RedesignTokens::Breakpoint::XSMinW ),
                                               controls->compactWidth() ) ),
                     qMin( work.height() / 2, t->px( RedesignTokens::Breakpoint::XSMinH ) ) );
+}
+
+/* Once per change of screen: the sizes there, then the decks rebuilt at
+ * them (later, not in the middle of a move). shortcut: text, stylesheet
+ * sizes, icons, painted rows, decks, title bar, sidebar and overlays follow;
+ * pages and panels keep the layout margins and fixed sizes they were built
+ * with until restart; rebuild them on Theme::changed if those few px matter. */
+void MainInterface::followScreen()
+{
+    const QList<QScreen *> screens = QGuiApplication::screens();
+    const int n = QApplication::desktop()->screenNumber( this );
+    if( n < 0 || n >= screens.size() || !Theme::instance()->setScreen( screens.at( n ) ) )
+        return;
+    computeMinimumSize( b_minimalView );
+    toolBarConfUpdated();
 }
 
 QMenuBar *MainInterface::menuBar() const

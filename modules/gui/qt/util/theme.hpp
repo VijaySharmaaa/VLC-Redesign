@@ -30,6 +30,7 @@
 
 class QAction;
 class QApplication;
+class QScreen;
 class QWidget;
 
 /* The single source of the interface's look. One instance lives in the Qt
@@ -97,6 +98,10 @@ public:
     /* The only way to change the application style: wraps the named
      * QStyleFactory style (empty = Fusion) so the token painting stays. */
     void setBaseStyle(const QString &);
+    /* The metrics follow the logical dpi of the screen the main window is
+     * on: when it differs, re-applies the stylesheet and emits changed().
+     * Returns false when the scale stays the same. */
+    bool setScreen(const QScreen *);
 
     bool isDark() const { return dark; }
     bool isHighContrast() const { return highContrast; }
@@ -110,6 +115,10 @@ public:
     int px(int tokenPx) const { return qRound(tokenPx * scale); }
     int metric(SizeRole) const;
     int duration(MotionRole) const;  /* 0 when Windows animations are off */
+    /* How far a vertically centred line of this font must move up so its
+     * capitals, not its line box, sit on the centre: Segoe UI's capitals
+     * are about 0.064 em below the line box's centre. */
+    int textNudge(const QFont &) const;
     /* an empty size means the IconGlyph token */
     QIcon icon(const QString &name, ColorRole, const QSize &size = QSize());
     /* The same icon at any size, tinted with the colour the role has when
@@ -137,6 +146,7 @@ private:
     qreal scale;        /* logical dpi / 96, see px() */
     QString uiFamily, monoFamily;
     QHash<QString, QIcon> icons;
+    mutable QHash<QString, int> nudges;  /* textNudge(), by font and pixel size */
 };
 
 #endif

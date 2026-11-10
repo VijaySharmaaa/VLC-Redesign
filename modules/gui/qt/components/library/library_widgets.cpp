@@ -454,11 +454,11 @@ void CardDelegate::paintCard( QPainter *p, const QStyleOptionViewItem &option,
     const QRect metaRect( x, titleRect.bottom() + 1 + t->px( Library::CardMetaGap ), cardW, metaFm.height() );
     p->setFont( titleFont );
     p->setPen( t->color( Theme::Text ) );
-    p->drawText( titleRect, Qt::AlignLeft | Qt::AlignVCenter,
+    p->drawText( titleRect.translated( 0, -t->textNudge( p->font() ) ), Qt::AlignLeft | Qt::AlignVCenter,
                  titleFm.elidedText( index.data().toString(), Qt::ElideRight, cardW ) );
     p->setFont( metaFont );
     p->setPen( t->color( Theme::Mute ) );
-    p->drawText( metaRect, Qt::AlignLeft | Qt::AlignVCenter,
+    p->drawText( metaRect.translated( 0, -t->textNudge( p->font() ) ), Qt::AlignLeft | Qt::AlignVCenter,
                  metaFm.elidedText( metaLine( input, source ), Qt::ElideRight, cardW ) );
 }
 
@@ -498,11 +498,12 @@ void CardDelegate::paintRow( QPainter *p, const QStyleOptionViewItem &option,
                            timeRect.left() - iconRect.right() - 1 - gap, option.rect.height() );
     p->setPen( t->color( Theme::Text ) );
     /* the alignments follow the painter's direction, the rects do not */
-    p->drawText( QStyle::visualRect( option.direction, option.rect, titleRect ),
+    const int nudge = t->textNudge( p->font() );
+    p->drawText( QStyle::visualRect( option.direction, option.rect, titleRect ).translated( 0, -nudge ),
                  Qt::AlignLeft | Qt::AlignVCenter,
                  fm.elidedText( index.data().toString(), Qt::ElideRight, titleRect.width() ) );
     p->setPen( t->color( Theme::Mute ) );
-    p->drawText( QStyle::visualRect( option.direction, option.rect, timeRect ),
+    p->drawText( QStyle::visualRect( option.direction, option.rect, timeRect ).translated( 0, -nudge ),
                  Qt::AlignRight | Qt::AlignVCenter, time );
 }
 

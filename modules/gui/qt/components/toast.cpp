@@ -193,6 +193,6 @@ void Toast::paintEvent( QPaintEvent * )
     const QRect textRect = rect().adjusted( padX + iconPx + theme->px( O::ToastGap ), 0,
                                             -padX, 0 );
     p.setPen( theme->color( Theme::Text ) );
-    p.drawText( textRect, Qt::AlignVCenter | Qt::AlignLeft,
+    p.drawText( textRect.translated( 0, -theme->textNudge( p.font() ) ), Qt::AlignVCenter | Qt::AlignLeft,
                 fontMetrics().elidedText( text, Qt::ElideMiddle, textRect.width() ) );
 }

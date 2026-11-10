@@ -108,12 +108,14 @@ void NetworkTile::paintEvent( QPaintEvent * )
     const int y = ( height() - textH ) / 2;
     p.setFont( nameFont );
     p.setPen( t->color( Theme::Text ) );
-    p.drawText( QStyle::visualRect( layoutDirection(), rect(), QRect( x, y, w, nameFm.height() ) ),
+    p.drawText( QStyle::visualRect( layoutDirection(), rect(),
+                                    QRect( x, y - t->textNudge( p.font() ), w, nameFm.height() ) ),
                 Qt::AlignLeft | Qt::AlignVCenter, nameFm.elidedText( text(), Qt::ElideRight, w ) );
     p.setFont( subFont );
     p.setPen( t->color( Theme::Dim ) );
     p.drawText( QStyle::visualRect( layoutDirection(), rect(),
-                                    QRect( x, y + textH - subFm.height(), w, subFm.height() ) ),
+                                    QRect( x, y + textH - subFm.height() - t->textNudge( p.font() ),
+                                           w, subFm.height() ) ),
                 Qt::AlignLeft | Qt::AlignVCenter, subFm.elidedText( address, Qt::ElideRight, w ) );
 }
 

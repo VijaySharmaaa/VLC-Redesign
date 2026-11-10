@@ -105,13 +105,15 @@ namespace
                             - ( detail.isEmpty() ? 0 : QFontMetrics( meta ).height() ) ) / 2;
             p->setFont( body );
             p->setPen( t->color( enabled ? Theme::Text : Theme::Dim ) );
-            p->drawText( QRect( text.left(), top, text.width(), bodyH ), Qt::AlignLeft | Qt::AlignVCenter,
+            p->drawText( QRect( text.left(), top - t->textNudge( p->font() ), text.width(), bodyH ),
+                         Qt::AlignLeft | Qt::AlignVCenter,
                          QFontMetrics( body ).elidedText( index.data().toString(), Qt::ElideRight, text.width() ) );
             if( !detail.isEmpty() )
             {
                 p->setFont( meta );
                 p->setPen( t->color( enabled ? Theme::Mute : Theme::Dim ) );
-                p->drawText( QRect( text.left(), top + bodyH, text.width(), QFontMetrics( meta ).height() ),
+                p->drawText( QRect( text.left(), top + bodyH - t->textNudge( p->font() ), text.width(),
+                                    QFontMetrics( meta ).height() ),
                              Qt::AlignLeft | Qt::AlignVCenter,
                              QFontMetrics( meta ).elidedText( detail, Qt::ElideRight, text.width() ) );
             }

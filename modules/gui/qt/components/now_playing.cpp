@@ -633,14 +633,14 @@ public:
         const QRect durRect = QStyle::visualRect( opt.direction, r,
             QRect( r.right() - padX - durW, r.y(), durW, r.height() ) );
         p->setPen( t->color( Theme::Mute ) );
-        p->drawText( durRect, Qt::AlignVCenter | Qt::AlignRight, duration );
+        p->drawText( durRect.translated( 0, -t->textNudge( p->font() ) ), Qt::AlignVCenter | Qt::AlignRight, duration );
 
         /* between the two, on either side; the alignments follow the painter */
         const QRect titleRect( qMin( num.right(), durRect.right() ) + 1 + gap, r.y(),
                                r.width() - num.width() - durW - 2 * padX - 2 * gap, r.height() );
         p->setFont( fontAt( Theme::Body, NowPlaying::TrackTitle, false ) );
         p->setPen( t->color( current ? Theme::AccentText : Theme::Text ) );
-        p->drawText( titleRect, Qt::AlignVCenter | Qt::AlignLeft,
+        p->drawText( titleRect.translated( 0, -t->textNudge( p->font() ) ), Qt::AlignVCenter | Qt::AlignLeft,
                      p->fontMetrics().elidedText( index.data( Qt::DisplayRole ).toString(),
                                                   Qt::ElideRight, titleRect.width() ) );
         p->restore();

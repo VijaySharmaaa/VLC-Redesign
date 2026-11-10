@@ -72,7 +72,7 @@ protected:
     void paintEvent( QPaintEvent * ) Q_DECL_OVERRIDE;
 
 private:
-    QToolButton *addButton( const QString &name, int width );
+    QToolButton *addButton( const QString &name );
     void updateIcons();
     void updateLayout();
 

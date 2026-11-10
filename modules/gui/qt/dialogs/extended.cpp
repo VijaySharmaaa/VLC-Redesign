@@ -40,7 +40,6 @@
 #include "util/theme.hpp"
 #include "util/redesign_icons.hpp"
 
-#include <QAccessible>
 #include <QApplication>
 #include <QBoxLayout>
 #include <QGridLayout>
@@ -346,16 +345,8 @@ ExtendedDialog::ExtendedDialog( intf_thread_t *_p_intf )
                                                    .remove( QLatin1Char( ':' ) ).trimmed() );
     }
 
-    /* A checkable group box disables each child while that child is still
-     * being constructed (QGroupBox::childEvent); with a screen reader on,
-     * the state event caches the child's accessible interface as a plain
-     * QWidget's (see QAccessible::updateAccessibility), so the effects'
-     * sliders were no sliders. Drop those interfaces: Qt makes them again,
-     * now from the finished widgets. */
-    if( QAccessible::isActive() )
-        foreach( QWidget *w, content->findChildren<QWidget *>() )
-            if( QAccessibleInterface *iface = QAccessible::queryAccessibleInterface( w ) )
-                QAccessible::deleteAccessibleInterface( QAccessible::uniqueId( iface ) );
+    /* the filter groups are checkable group boxes */
+    dropEarlyAccessibles( content );
 
     connect( THEMIM->getIM(), &InputManager::playingStatusChanged, this, &ExtendedDialog::changedItem );
     connect( t, &Theme::changed, this, static_cast<void (QWidget::*)()>( &QWidget::update ) );

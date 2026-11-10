@@ -153,6 +153,8 @@ QString VLCKeyToString( unsigned val, bool );
 QString hotkeyText( intf_thread_t *, const char *id );
 /* "9:36" under an hour, "1:02:03" above: no leading zero (DESIGN_SPEC 3) */
 QString timeString( int64_t secs );
+/* Call once the widgets under root are built: see customwidgets.cpp */
+void dropEarlyAccessibles( QWidget *root );
 
 /**
  * @brief The WheelToVLCConverter class aggregates wheel events and

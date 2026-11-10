@@ -34,6 +34,8 @@ BreakpointWatcher::BreakpointWatcher( QWidget *_window )
 {
     apply( window );
     window->installEventFilter( this );
+    /* another screen's scale moves the breakpoints */
+    connect( Theme::instance(), &Theme::changed, this, [this]() { update( true ); } );
 }
 
 BreakpointWatcher::Size BreakpointWatcher::fromWidth( int width )
@@ -62,17 +64,19 @@ void BreakpointWatcher::apply( QWidget *w ) const
 bool BreakpointWatcher::eventFilter( QObject *obj, QEvent *event )
 {
     if( obj == window && event->type() == QEvent::Resize )
-    {
-        const Size now = fromWidth( window->width() );
-        if( now != size )
-        {
-            size = now;
-            apply( window );
-            for( const QPointer<QWidget> &w : targets )
-                if( w )
-                    apply( w );
-            emit changed( size );
-        }
-    }
+        update( false );
     return QObject::eventFilter( obj, event );
+}
+
+void BreakpointWatcher::update( bool always )
+{
+    const Size now = fromWidth( window->width() );
+    if( now == size && !always )
+        return;
+    size = now;
+    apply( window );
+    for( const QPointer<QWidget> &w : targets )
+        if( w )
+            apply( w );
+    emit changed( size );
 }

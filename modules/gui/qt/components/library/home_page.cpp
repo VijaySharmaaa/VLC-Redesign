@@ -364,12 +364,12 @@ void ResumeCard::paintEvent( QPaintEvent * )
     int y = thumbH + t->px( Home::CardTextGap );
     p.setFont( tf );
     p.setPen( t->color( Theme::Text ) );
-    p.drawText( QRect( 0, y, width(), tfm.height() ), Qt::AlignLeft | Qt::AlignVCenter,
+    p.drawText( QRect( 0, y - t->textNudge( p.font() ), width(), tfm.height() ), Qt::AlignLeft | Qt::AlignVCenter,
                 tfm.elidedText( text(), Qt::ElideRight, width() ) );
     y += tfm.height() + t->px( Home::CardMetaGap );
     p.setFont( mf );
     p.setPen( t->color( Theme::Mute ) );
-    p.drawText( QRect( 0, y, width(), mfm.height() ), Qt::AlignLeft | Qt::AlignVCenter,
+    p.drawText( QRect( 0, y - t->textNudge( p.font() ), width(), mfm.height() ), Qt::AlignLeft | Qt::AlignVCenter,
                 mfm.elidedText( meta, Qt::ElideRight, width() ) );
 }
 

@@ -67,7 +67,15 @@ public:
         setAttribute( Qt::WA_Hover );
     }
 
-    void setRail( bool b ) { rail = b; update(); }
+    /* rail: the square sizeHint, centred, so Open and the highlights keep
+     * their shape at every rail width; expanded: the whole row */
+    void setRail( bool b )
+    {
+        rail = b;
+        if( parentWidget() && parentWidget()->layout() )
+            parentWidget()->layout()->setAlignment( this, b ? Qt::AlignHCenter : Qt::Alignment() );
+        update();
+    }
 
     QSize sizeHint() const Q_DECL_OVERRIDE
     {
@@ -189,7 +197,7 @@ void SidebarButton::paintEvent( QPaintEvent * )
                           width() - iconRect.right() - 1 - gap - padX, height() );
     p.setFont( font );
     p.setPen( t->color( ink ) );
-    p.drawText( QStyle::visualRect( layoutDirection(), rect(), textRect ),
+    p.drawText( QStyle::visualRect( layoutDirection(), rect(), textRect ).translated( 0, -t->textNudge( p.font() ) ),
                 Qt::AlignVCenter | Qt::AlignLeft,
                 fm.elidedText( text(), Qt::ElideRight, textRect.width() ) );
 }
@@ -216,16 +224,22 @@ static QString tip( const QString &label, const QString &key )
     return qtr( "%1 (%2)" ).arg( label, key );
 }
 
+/* The sidebar's padding and gap, again when the scale changes */
+static void padNav( QLayout *layout, int spacing )
+{
+    const Theme *t = Theme::instance();
+    layout->setContentsMargins( t->px( Size::SidebarPadX ), t->px( Size::SidebarPadY ),
+                                t->px( Size::SidebarPadX ), t->px( Size::SidebarPadY ) );
+    layout->setSpacing( t->px( spacing ) );
+}
+
 /* A page of the sidebar's stack, with the sidebar's padding */
 static QVBoxLayout *navLayout( QStackedWidget *navs, int spacing )
 {
     QWidget *nav = new QWidget;
     navs->addWidget( nav );
     QVBoxLayout *layout = new QVBoxLayout( nav );
-    const Theme *t = Theme::instance();
-    layout->setContentsMargins( t->px( Size::SidebarPadX ), t->px( Size::SidebarPadY ),
-                                t->px( Size::SidebarPadX ), t->px( Size::SidebarPadY ) );
-    layout->setSpacing( t->px( spacing ) );
+    padNav( layout, spacing );
     return layout;
 }
 
@@ -398,6 +412,11 @@ int Sidebar::widthAt( BreakpointWatcher::Size bp )
 
 void Sidebar::setBreakpoint( BreakpointWatcher::Size bp )
 {
+    /* also after a change of scale (BreakpointWatcher); shortcut: the
+     * spacings after Open and Back keep the start scale, rebuild them when
+     * a few px there matter */
+    padNav( navs->widget( 0 )->layout(), Size::SidebarItemGap );
+    padNav( navs->widget( 1 )->layout(), Size::SidebarSectionGap );
     setFixedWidth( widthAt( bp ) );
     for( SidebarButton *b : buttons )
         b->setRail( bp < BreakpointWatcher::M );

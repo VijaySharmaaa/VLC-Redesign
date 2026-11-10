@@ -33,9 +33,11 @@
 #include <QEvent>
 #include <QFile>
 #include <QFontDatabase>
+#include <QFontInfo>
 #include <QFontMetrics>
 #include <QIconEngine>
 #include <QKeyEvent>
+#include <QLineEdit>
 #include <QMenu>
 #include <QPainter>
 #include <QPalette>
@@ -182,6 +184,7 @@ namespace
     /* the knob's place while it slides (0 off, 1 on); unset at rest */
     const char toggleKnobProperty[] = "vlcToggleKnob";
     const char toggleHookedProperty[] = "vlcToggleHooked";
+    const char editNudgeProperty[] = "vlcTextNudge";  /* the nudge in a line edit's margins */
 
     /* DESIGN_SPEC 3: a QCheckBox with role="toggle" is drawn as a switch;
      * it stays a check box for the keyboard and accessibility */
@@ -262,16 +265,24 @@ namespace
             const int arrowW = mi->menuItemType == QStyleOptionMenuItem::SubMenu ? t->px(Size::IconGlyph) : 0;
             const QRect textRect = visualRect(dir, r, QRect(r.x() + labelX(t), r.y(),
                 r.width() - labelX(t) - padX - arrowW, r.height()));
-            int flags = Qt::AlignVCenter | Qt::TextShowMnemonic | Qt::TextDontClip | Qt::TextSingleLine;
+            int flags = Qt::AlignTop | Qt::TextShowMnemonic | Qt::TextDontClip | Qt::TextSingleLine;
             if (!proxy()->styleHint(SH_UnderlineShortcut, mi, w))
                 flags |= Qt::TextHideMnemonic;
+            /* the label centred by its capitals; the smaller shortcut on its
+             * baseline, not centred on its own (a pixel higher) */
+            p->setFont(mi->font);
+            const QFontMetricsF labelFm(p->font());
+            const qreal baseline = textRect.top() + (textRect.height() - labelFm.height()) / 2
+                                 + labelFm.ascent() - t->textNudge(p->font());
             QString label = mi->text;
             const int tab = label.indexOf(QLatin1Char('\t'));
             if (tab >= 0)
             {
                 p->setPen(t->color(Theme::Mute));
                 p->setFont(t->font(Theme::Meta));
-                p->drawText(textRect, flags | visualAlignment(dir, Qt::AlignRight), label.mid(tab + 1));
+                const QFontMetricsF keyFm(p->font());
+                p->drawText(QRectF(textRect.left(), baseline - keyFm.ascent(), textRect.width(), keyFm.height()),
+                            flags | visualAlignment(dir, Qt::AlignRight), label.mid(tab + 1));
                 label.truncate(tab);
             }
             const QMenu *menu = qobject_cast<const QMenu *>(w);
@@ -280,7 +291,8 @@ namespace
                                : action && action->property(destructiveProperty).toBool()
                                ? Theme::DestructiveText : Theme::Text));
             p->setFont(mi->font);
-            p->drawText(textRect, flags | visualAlignment(dir, Qt::AlignLeft), label);
+            p->drawText(QRectF(textRect.left(), baseline - labelFm.ascent(), textRect.width(), labelFm.height()),
+                        flags | visualAlignment(dir, Qt::AlignLeft), label);
 
             if (arrowW)
             {
@@ -293,6 +305,31 @@ namespace
                                Qt::AlignCenter, arrow);
             }
             p->restore();
+        }
+
+        /* Labels, buttons, check boxes, tabs, group titles and combo boxes:
+         * the stylesheet style hands their text to its base style, this one */
+        void drawItemText(QPainter *p, const QRect &rect, int flags, const QPalette &pal,
+                          bool enabled, const QString &text,
+                          QPalette::ColorRole textRole) const Q_DECL_OVERRIDE
+        {
+            const Theme *t = Theme::instance();
+            QRect at = rect;
+            if (t && (flags & Qt::AlignVCenter))
+                at.translate(0, -t->textNudge(p->font()));
+            QProxyStyle::drawItemText(p, at, flags, pal, enabled, text, textRole);
+        }
+
+        /* item view rows (lists, trees, tables, combo pop-ups) */
+        QRect subElementRect(SubElement se, const QStyleOption *opt,
+                             const QWidget *w) const Q_DECL_OVERRIDE
+        {
+            QRect r = QProxyStyle::subElementRect(se, opt, w);
+            const QStyleOptionViewItem *item = qstyleoption_cast<const QStyleOptionViewItem *>(opt);
+            const Theme *t = Theme::instance();
+            if (se == SE_ItemViewItemText && item && t && (item->displayAlignment & Qt::AlignVCenter))
+                r.translate(0, -t->textNudge(item->font));
+            return r;
         }
 
         void drawPrimitive(PrimitiveElement pe, const QStyleOption *opt, QPainter *p,
@@ -395,6 +432,17 @@ namespace
         void polish(QWidget *w) Q_DECL_OVERRIDE
         {
             QProxyStyle::polish(w);
+            QLineEdit *edit = qobject_cast<QLineEdit *>(w);
+            if (edit && Theme::instance())
+            {
+                /* the text up by the nudge, the field's height unchanged;
+                 * a repolish (another scale) replaces the earlier nudge */
+                const int n = Theme::instance()->textNudge(edit->font());
+                const int was = edit->property(editNudgeProperty).toInt();
+                const QMargins m = edit->textMargins();
+                edit->setTextMargins(m.left(), m.top() + was - n, m.right(), m.bottom() - was + n);
+                edit->setProperty(editNudgeProperty, n);
+            }
             if (!isToggle(w) || w->property(toggleHookedProperty).toBool())
                 return;
             w->setProperty(toggleHookedProperty, true);
@@ -584,6 +632,39 @@ void Theme::reload()
             applyWindowFrame(w);
 #endif
     emit changed();
+}
+
+int Theme::textNudge(const QFont &f) const
+{
+    /* at the font's own dpi: a widget's or a painter's font carries its screen's */
+    const QString key = f.key() + QLatin1Char('|') + QString::number(QFontInfo(f).pixelSize());
+    QHash<QString, int>::const_iterator it = nudges.constFind(key);
+    if (it != nudges.constEnd())
+        return it.value();
+    /* capHeight() is Qt 5.8: the tight box of a capital instead */
+    const QFontMetricsF fm(f);
+    const qreal capH = fm.tightBoundingRect(QStringLiteral("H")).height();
+    const int n = qMax(0, qRound((fm.ascent() - fm.descent() - capH) / 2));
+    nudges.insert(key, n);
+    return n;
+}
+
+bool Theme::setScreen(const QScreen *screen)
+{
+    if (!screen || qFuzzyCompare(screen->logicalDotsPerInchY() / 96., scale))
+        return false;
+    msg_Dbg(p_intf, "theme: screen %s, scale %.3f -> %.3f",
+            qtu(screen->name()), scale, screen->logicalDotsPerInchY() / 96.);
+    scale = screen->logicalDotsPerInchY() / 96.;
+    icons.clear();
+    nudges.clear();
+    if (!highContrast)
+        qApp->setStyleSheet(styleSheet());
+    /* shortcut: one scale for the whole application, the main window's; a
+     * dialog on another screen keeps it. Per-window scales need px() per
+     * widget: upgrade when dialogs often sit apart from the main window. */
+    emit changed();
+    return true;
 }
 
 const Palette &Theme::palette() const
@@ -818,7 +899,7 @@ QPushButton:focus { padding: @menuPadFocus@px @buttonPadXFocus@px; }
 QTabWidget::pane { background: @panel@; border: 1px solid @divider@; border-radius: @radiusLg@px; top: -1px; }
 /* a transparent ring on every tab, so focus only colours it */
 QTabBar::tab { background: transparent; color: @mute@; border: 2px solid transparent;
-    padding: @tabPadY@px @tabPadX@px @menuItemPadY@px; }
+    padding: @tabPadTop@px @tabPadX@px @tabPadBottom@px; }
 QTabBar::tab:hover { color: @tx@; }
 QTabBar::tab:selected { color: @tx@; border-bottom-color: @fill@; }
 QTabBar::tab:focus { color: @tx@; background: @hoverFill@; border-color: @focusRing@; border-radius: @radiusSm@px; }
@@ -934,6 +1015,9 @@ QLabel[role="libraryDim"] { color: @dim@; }
 /* Phase 5: effects (dialogs/extended.cpp, components/extended_panels.cpp) */
 #effectsSheet QTabWidget::pane { background: transparent; border: none; }
 #effectsSheet QTabWidget#effectsTabs::pane { border-top: 1px solid @divider@; }
+/* the corner sits on the pane, which overlaps the bar by its 1 px line:
+   up by that line, "More" is on the tabs' line */
+#effectsSheet QTabWidget#effectsTabs::right-corner { top: -1px; }
 QToolButton#effectsMore { padding-right: @iconGlyph@px; }
 QToolButton#effectsMore::menu-indicator { image: url("@arrowDown@"); subcontrol-origin: padding; subcontrol-position: center right;
     width: @iconGlyph@px; height: @iconGlyph@px; }
@@ -1003,8 +1087,16 @@ PrefsPage QComboBox { min-height: @prefsSelectInner@px; }
 #else
     const bool dwmRounds = false;
 #endif
-    const int lineH = QFontMetrics(font(Body)).height();
-    const int metaH = QFontMetrics(font(Meta)).height();
+    /* at this scale: QFontMetrics reads a point size at the primary
+     * screen's dpi, which is not the main window's after setScreen() */
+    QFont bodyAt = font(Body), metaAt = font(Meta);
+    bodyAt.setPixelSize(px(Type::Body));
+    metaAt.setPixelSize(px(Type::Meta));
+    const int lineH = QFontMetrics(bodyAt).height();
+    const int metaH = QFontMetrics(metaAt).height();
+    /* the tab's ring takes 2 px at the top and the bottom: the padding
+     * shares the rest evenly, the tab keeps its height */
+    const int tabPadY = qMax(0, 2 * qMax(0, (px(Size::MenuItemH) - lineH) / 2) - Size::FocusRing);
     const struct { const char *name; QString value; } vars[] = {
         { "chrome", css(QColor::fromRgb(p.chrome)) },
         { "panel", css(QColor::fromRgb(p.panel)) },
@@ -1047,9 +1139,8 @@ PrefsPage QComboBox { min-height: @prefsSelectInner@px; }
         { "menuMinW", QString::number(px(Size::MenuMinW)) },
         { "menuTitlePadX", QString::number(px(Size::MenuTitlePadX)) },
         { "menuTitlePadY", QString::number(qMax(0, (px(Size::MenuTitleH) - lineH) / 2)) },
-        { "menuItemPadY", QString::number(qMax(0, (px(Size::MenuItemH) - lineH) / 2)) },
-        /* the tab's ring adds 2 px at the top and sides: keep the old size */
-        { "tabPadY", QString::number(qMax(0, (px(Size::MenuItemH) - lineH) / 2 - Size::FocusRing)) },
+        { "tabPadTop", QString::number(tabPadY / 2) },
+        { "tabPadBottom", QString::number(tabPadY - tabPadY / 2) },
         { "tabPadX", QString::number(px(Size::ButtonPadX) - Size::FocusRing) },
         { "buttonPadX", QString::number(px(Size::ButtonPadX)) },
         { "buttonPadXFocus", QString::number(px(Size::ButtonPadX) - 1) },

@@ -31,6 +31,7 @@
 #include "customwidgets.hpp"
 
 #include <QtMath>  // for wheel deadzone calculation
+#include <QAccessible>
 #include <QPainter>
 #include <QRect>
 #include <QKeyEvent>
@@ -561,4 +562,19 @@ void WheelToVLCConverter::wheelEvent( const QWheelEvent* e )
     {
         m_scrollAmount = p;
     }
+}
+
+/* A checkable group box disables each child while that child is still
+ * being constructed (QGroupBox::childEvent); with a screen reader or
+ * another UI Automation client on, the state event caches the child's
+ * accessible interface as a plain QWidget's (QAccessible::updateAccessibility),
+ * so its sliders, edits and buttons were no such things. Drop the
+ * interfaces: Qt makes them again, now from the finished widgets. */
+void dropEarlyAccessibles( QWidget *root )
+{
+    if( !QAccessible::isActive() )
+        return;
+    foreach( QWidget *w, root->findChildren<QWidget *>() )
+        if( QAccessibleInterface *iface = QAccessible::queryAccessibleInterface( w ) )
+            QAccessible::deleteAccessibleInterface( QAccessible::uniqueId( iface ) );
 }
