@@ -3,13 +3,16 @@
     py redesign/tools/harness.py baseline --vlc <package dir>\\vlc.exe --out <dir>
     py redesign/tools/harness.py names    --vlc <package dir>\\vlc.exe
 
-VLC runs with a throwaway APPDATA, so the user's real VLC settings are never
-read or written. Player state is set through VLC's rc interface; keys go
+VLC runs in its own portable mode: each session starts with an empty
+`portable` folder next to vlc.exe, so the user's real %APPDATA%\\vlc settings
+are never read or written. (Setting APPDATA does NOT work: VLC finds its
+config dir with SHGetFolderPath, src/win32/dirs.c.) Player state is set through VLC's rc interface; keys go
 through pywinauto (UIA), which also shows which controls have accessible names.
 """
 import argparse
 import msvcrt
 import os
+import shutil
 import socket
 import subprocess
 import sys
@@ -25,6 +28,7 @@ from pywinauto import Application
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 MEDIA = os.path.join(HERE, '..', '.local', 'media')
+PACKAGES = os.path.abspath(os.path.join(HERE, '..', '..', '..'))  # D:\Projects\VLC: vlc-pkg*
 RC_PORT = 4212
 
 
@@ -45,13 +49,19 @@ def _desktop_lock(timeout=1800):
 
 class Vlc:
     def __init__(self, exe, extra=()):
+        exe = os.path.abspath(exe)
+        # Only the project's own test packages: a portable folder must never be
+        # created next to the user's installed VLC.
+        if not os.path.normcase(exe).startswith(os.path.normcase(PACKAGES)):
+            raise RuntimeError('refusing to run %s: not under %s' % (exe, PACKAGES))
         self.lock = _desktop_lock()
-        self.profile = tempfile.mkdtemp(prefix='vlc-harness-')
-        env = dict(os.environ, APPDATA=self.profile)
+        self.profile = os.path.join(os.path.dirname(exe), 'portable')
+        shutil.rmtree(self.profile, ignore_errors=True)     # every session starts clean
+        os.makedirs(self.profile)
         self.proc = subprocess.Popen(
             [exe, '--no-qt-privacy-ask', '--no-qt-updates-notif',
              '--extraintf=rc', '--rc-quiet', '--rc-host=127.0.0.1:%d' % RC_PORT,
-             *extra], env=env)
+             *extra])
         try:
             self.sock = self._connect()
             self.app = Application(backend='uia').connect(process=self.proc.pid, timeout=20)

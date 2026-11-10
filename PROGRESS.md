@@ -27,3 +27,20 @@
 ### Manual test steps
 - Run `py redesign/tools/harness.py baseline --vlc D:\Projects\VLC\vlc-pkg\vlc.exe`: 7 PNGs are written and no error is printed.
 - Run `py redesign/tools/harness.py names --vlc D:\Projects\VLC\vlc-pkg\vlc.exe`: every control is listed, with a count of unnamed ones (9 at baseline).
+
+## Step 3: spikes (2026-11-10)
+Each spike is a throwaway branch. Full reports and evidence are in `D:\Projects\VLC\spike-results\<a-d>\` (not committed).
+
+| Spike | Branch | Result |
+|---|---|---|
+| a. Frameless window, 40 px title bar | `spike/a-frameless-titlebar` | Works. Remove only the caption with Qt's `WindowsCustomMargins` and hit-test the title bar in `WM_NCHITTEST` (main HWND only). Snap layouts, Aero snap, resize, shadow, Alt+Space, maximize, F11 and dialogs all hold. **Don't use `DwmExtendFrameIntoClientArea`: it suppresses the snap-layouts flyout.** Gaps: minimal view keeps the bar; hiding the bar kills menu shortcuts. |
+| b. Overlays above the video | `spike/b-video-overlay` | Works. One host tracks `VideoWidget`, with one frameless translucent `Qt::Tool` window per overlay (badge, bar, toast). The video shows through, positions track every layout change, the overlays aren't topmost and don't take focus, and there's no measurable CPU cost. Gap: drops on the bar must be forwarded. |
+| c. Mica / dark title bar | `spike/c-mica-dark-titlebar` | Works with a limit. The runtime-loaded dark title bar follows the system setting. Mica needs the frame extended, which must cover only the title bar and sidebar: over the video area, the letterbox turns see-through. The forced Windows 10 and no-dwmapi fallbacks paint solid `--chrome`. Tie the palette and the title bar to one theme setting. |
+| d. Spectrum visualizer | `spike/d-visualizer` | Works. A pass-through `qt_spectrum` audio filter submodule in the Qt plugin feeds time-stamped band levels to a bars widget. Tones light the right bars, silence and pause are flat, and it costs about 1.5% of one core. The `visual` module can't be styled. |
+
+**Conflict between a and c:** spike c's Mica needs `DwmExtendFrameIntoClientArea`, which spike a found suppresses the snap-layouts flyout. Phase 2 must test whether extending only a 40 px top strip keeps the flyout; if not, use solid `--chrome` instead of Mica.
+
+### Harness fix
+- **Root cause:** setting `APPDATA` doesn't redirect VLC's config dir on Windows (`SHGetFolderPath`, `src/win32/dirs.c:282`), so test runs wrote the developer's real `vlc-qt-interface.ini`.
+- **Fix:** the harness now uses VLC's portable mode (`dirs.c:260-275`) with a fresh `portable\` folder per session, and refuses any vlc.exe outside the project.
+- **Verified:** a full baseline left the real `%APPDATA%\vlc` byte-for-byte unchanged.
