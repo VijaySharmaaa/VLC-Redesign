@@ -77,6 +77,8 @@ MetaPanel::MetaPanel( QWidget *parent,
     label->setContentsMargins( 3, 2, 0, 0 );                              \
     metaLayout->addWidget( label, line++, col, 1, colspan );              \
     widget = new QLineEdit;                                               \
+    label->setBuddy( widget );                                            \
+    widget->setAccessibleName( qfu( string ) );                           \
     metaLayout->addWidget( widget, line, col, 1, colspan );               \
     connect( widget, &QLineEdit::textEdited, this, &MetaPanel::enterEditMode ); \
 }
@@ -93,6 +95,8 @@ MetaPanel::MetaPanel( QWidget *parent,
 
     /* Date (Should be in years) */
     date_text = new QLineEdit;
+    date_text->setAccessibleName( qfu( VLC_META_DATE ) );
+    label->setBuddy( date_text );
     date_text->setAlignment( Qt::AlignRight );
     date_text->setInputMask("0000");
     date_text->setMaximumWidth( 140 );
@@ -109,6 +113,8 @@ MetaPanel::MetaPanel( QWidget *parent,
     metaLayout->addWidget( label, line - 1, 7, 1, 3  );
 
     seqnum_text = new QLineEdit;
+    seqnum_text->setAccessibleName( qfu( VLC_META_TRACK_NUMBER ) );
+    label->setBuddy( seqnum_text );
     seqnum_text->setMaximumWidth( 64 );
     seqnum_text->setAlignment( Qt::AlignRight );
     metaLayout->addWidget( seqnum_text, line, 7, 1, 1 );
@@ -117,6 +123,7 @@ MetaPanel::MetaPanel( QWidget *parent,
     metaLayout->addWidget( label, line, 8, 1, 1 );
 
     seqtot_text = new QLineEdit;
+    seqtot_text->setAccessibleName( qtr( "Track total" ) );
     seqtot_text->setMaximumWidth( 64 );
     seqtot_text->setAlignment( Qt::AlignRight );
     metaLayout->addWidget( seqtot_text, line, 9, 1, 1 );
@@ -156,6 +163,8 @@ MetaPanel::MetaPanel( QWidget *parent,
     label->setContentsMargins( 3, 2, 0, 0 );
     metaLayout->addWidget( label, line++, 0, 1, 7 );
     description_text = new QTextEdit;
+    description_text->setAccessibleName( qtr( "Comments" ) );
+    label->setBuddy( description_text );
     description_text->setAcceptRichText( false );
     metaLayout->addWidget( description_text, line, 0, 1, 7 );
     connect( description_text, &QTextEdit::textChanged, this, &MetaPanel::enterEditMode );
@@ -380,6 +389,7 @@ ExtraMetaPanel::ExtraMetaPanel( QWidget *parent ) : QWidget( parent )
      layout->addWidget( topLabel, 0, 0 );
 
      extraMeta = new QTableWidget( this );
+     extraMeta->setAccessibleName( qtr( "Metadata" ) );
      extraMeta->setAlternatingRowColors( true );
      extraMeta->setColumnCount( 2 );
      extraMeta->horizontalHeader()->hide();
@@ -477,10 +487,15 @@ InfoPanel::InfoPanel( QWidget *parent ) : QWidget( parent )
      topLabel->setWordWrap( true );
      layout->addWidget( topLabel, 0, 0 );
 
+     /* 2.1.4: a key / value grid under "STREAM 0 · VIDEO" headings */
      InfoTree = new QTreeWidget(this);
-     InfoTree->setColumnCount( 1 );
+     InfoTree->setColumnCount( 2 );
      InfoTree->header()->hide();
-     InfoTree->header()->setSectionResizeMode(QHeaderView::ResizeToContents);
+     InfoTree->header()->setSectionResizeMode( 0, QHeaderView::ResizeToContents );
+     InfoTree->setRootIsDecorated( false );
+     InfoTree->setItemsExpandable( false );
+     InfoTree->setSelectionMode( QAbstractItemView::NoSelection );
+     InfoTree->setAccessibleName( qtr( "Codec" ) );
      layout->addWidget(InfoTree, 1, 0 );
 }
 
@@ -496,27 +511,37 @@ void InfoPanel::update( input_item_t *p_item)
     }
 
     InfoTree->clear();
-    QTreeWidgetItem *current_item = NULL;
-    QTreeWidgetItem *child_item = NULL;
+    Theme *t = Theme::instance();
+    const QFont overline = t->font( Theme::Overline );
+    const QColor mute = t->color( Theme::Mute );
+    /* the core names the type with the same catalogue: _("Type") */
+    const QString typeKey = qtr( "Type" );
 
     vlc_mutex_locker locker( &p_item->lock );
 
     for( int i = 0; i< p_item->i_categories ; i++)
     {
-        current_item = new QTreeWidgetItem();
-        current_item->setText( 0, qfu(p_item->pp_categories[i]->psz_name) );
+        const info_category_t *cat = p_item->pp_categories[i];
+        QString heading = qfu( cat->psz_name );
+        QTreeWidgetItem *current_item = new QTreeWidgetItem();
         InfoTree->addTopLevelItem( current_item );
+        current_item->setFirstColumnSpanned( true );
+        current_item->setFont( 0, overline );
+        current_item->setForeground( 0, mute );
 
-        for( int j = 0 ; j < p_item->pp_categories[i]->i_infos ; j++ )
+        for( int j = 0 ; j < cat->i_infos ; j++ )
         {
-            child_item = new QTreeWidgetItem ();
-            child_item->setText( 0,
-                    qfu(p_item->pp_categories[i]->pp_infos[j]->psz_name)
-                    + ": "
-                    + qfu(p_item->pp_categories[i]->pp_infos[j]->psz_value));
-
+            const QString name = qfu( cat->pp_infos[j]->psz_name );
+            const QString value = qfu( cat->pp_infos[j]->psz_value );
+            if( name == typeKey )
+                heading += QString::fromUtf8( " \xC2\xB7 " ) + value;   /* middle dot */
+            QTreeWidgetItem *child_item = new QTreeWidgetItem();
+            child_item->setText( 0, name );
+            child_item->setForeground( 0, mute );
+            child_item->setText( 1, value );
             current_item->addChild(child_item);
         }
+        current_item->setText( 0, heading.toUpper() );
         current_item->setExpanded(true);
     }
 }
