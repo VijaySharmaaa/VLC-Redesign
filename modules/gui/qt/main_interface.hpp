@@ -236,6 +236,7 @@ protected:
     bool                 b_videoFullScreen;     ///< --fullscreen
     bool                 b_hideAfterCreation;
     bool                 b_minimalView;         ///< Minimal video
+    int                  i_minimalSidebarW;     ///< the sidebar width minimal view took
     bool                 b_interfaceFullScreen;
     bool                 b_interfaceOnTop;      ///keep UI on top
     bool                 b_pauseOnMinimize;
