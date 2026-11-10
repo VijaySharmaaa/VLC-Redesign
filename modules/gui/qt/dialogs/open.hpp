@@ -53,6 +53,7 @@ enum {
 
 
 class QString;
+class QButtonGroup;
 
 class OpenDialog : public QVLCDialog
 {
@@ -73,6 +74,7 @@ public:
 
     QStringList getMRLs( bool b = true );
     QString getOptions();
+    bool eventFilter( QObject *, QEvent * ) Q_DECL_OVERRIDE;
 
 public slots:
     void selectSlots();
@@ -105,6 +107,7 @@ private:
 
     QPushButton *cancelButton, *selectButton;
     QToolButton *playButton;
+    QButtonGroup *tiles;
 
 private slots:
     void setMenuAction();
