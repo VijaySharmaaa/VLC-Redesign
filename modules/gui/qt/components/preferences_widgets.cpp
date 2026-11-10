@@ -1154,6 +1154,9 @@ KeySelectorControl::KeySelectorControl( vlc_object_t *_p_this,
     table->setSelectionBehavior( QAbstractItemView::SelectItems );
 
     table->installEventFilter( this );
+    actionSearch->setAccessibleName( qtr( "Search" ) );
+    searchOption->setAccessibleName( qtr( "Search in" ) );
+    table->setAccessibleName( qtr( "Hotkeys" ) );
 
     /* Find the top most widget */
     QWidget *parent, *rootWidget = p;

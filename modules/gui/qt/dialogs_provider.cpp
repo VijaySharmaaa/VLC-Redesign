@@ -248,9 +248,15 @@ void DialogsProvider::playlistDialog()
     PlaylistDialog::getInstance( p_intf )->toggleVisible();
 }
 
+/* The Preferences page of the window; the dialog when the complete tree is
+ * asked for (it opens on it) or the window can't show the page */
 void DialogsProvider::prefsDialog()
 {
-    PrefsDialog *p = new PrefsDialog( (QWidget *)p_intf->p_sys->p_mi, p_intf );
+    MainInterface *mi = p_intf->p_sys->p_mi;
+    if( mi && !var_InheritBool( p_intf, "qt-advanced-pref" )
+           && !var_InheritBool( p_intf, "advanced" ) && mi->showPreferences() )
+        return;
+    PrefsDialog *p = new PrefsDialog( (QWidget *)mi, p_intf );
     p->toggleVisible();
 }
 

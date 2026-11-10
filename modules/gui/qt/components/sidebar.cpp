@@ -25,6 +25,7 @@
 #include "components/library/home_page.hpp"
 #include "components/library/media_page.hpp"
 #include "components/library/network_page.hpp"
+#include "components/prefs_page.hpp"
 #include "dialogs_provider.hpp"
 #include "util/theme.hpp"
 #include "util/redesign_icons.hpp"
@@ -167,7 +168,8 @@ static QString tip( const QString &label, const char *shortcut )
         QKeySequence( QLatin1String( shortcut ) ).toString( QKeySequence::NativeText ) );
 }
 
-Sidebar::Sidebar( intf_thread_t *p_intf, QWidget *parent ) : QWidget( parent )
+Sidebar::Sidebar( intf_thread_t *p_intf, QWidget *parent )
+    : QWidget( parent ), currentPage( NULL )
 {
     setAccessibleName( qtr( "Library" ) );
     QVBoxLayout *layout = new QVBoxLayout( this );
@@ -186,14 +188,14 @@ Sidebar::Sidebar( intf_thread_t *p_intf, QWidget *parent ) : QWidget( parent )
     layout->addSpacing( t->px( Size::SidebarOpenBelow ) );
     buttons.append( open );
 
-    static const struct { const char *label; const char *icon; } nav[PageCount] = {
+    static const struct { const char *label; const char *icon; } nav[Preferences] = {
         { N_( "Home" ),    RedesignIcons::IconNavHome },
         { N_( "Videos" ),  RedesignIcons::IconNavVideos },
         { N_( "Music" ),   RedesignIcons::IconNavMusic },
         { N_( "Network" ), RedesignIcons::IconNavNetwork },
     };
     group = new QButtonGroup( this ); /* exclusive; arrow keys move within it */
-    for( int i = 0; i < PageCount; i++ )
+    for( int i = 0; i < Preferences; i++ )
     {
         const QString label = qtr( nav[i].label );
         switch( i )
@@ -219,7 +221,16 @@ Sidebar::Sidebar( intf_thread_t *p_intf, QWidget *parent ) : QWidget( parent )
     SidebarButton *prefs = new SidebarButton( qtr( "Preferences" ),
                                               RedesignIcons::IconSettings, false, this );
     prefs->setToolTip( tip( qtr( "Preferences" ), "Ctrl+P" ) );
-    connect( prefs, &QAbstractButton::clicked, this, []() { THEDP->prefsDialog(); } );
+    prefs->setCheckable( true );
+    prefs->setAutoExclusive( true );
+    group->addButton( prefs, Preferences );
+    pages[Preferences] = new PrefsPage( p_intf );
+    /* the menu's way, which opens the complete tree in a dialog when it is
+     * asked for: then the item the click checked goes back */
+    connect( prefs, &QAbstractButton::clicked, this, [this]() {
+        THEDP->prefsDialog();
+        setCurrentWidget( currentPage );
+    } );
     layout->addWidget( prefs );
     buttons.append( prefs );
 
@@ -229,11 +240,12 @@ Sidebar::Sidebar( intf_thread_t *p_intf, QWidget *parent ) : QWidget( parent )
 void Sidebar::showPage( int i )
 {
     if( i >= 0 && i < PageCount )
-        group->button( i )->click();
+        emit pageRequested( pages[i] );
 }
 
 void Sidebar::setCurrentWidget( QWidget *w )
 {
+    currentPage = w;
     for( int i = 0; i < PageCount; i++ )
         if( pages[i] == w )
         {
