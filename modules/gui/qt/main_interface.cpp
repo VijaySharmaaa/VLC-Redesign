@@ -995,8 +995,14 @@ inline void MainInterface::showTab( QWidget *widget, bool video_closing )
     }
 
     stackCentralW->setCurrentWidget( widget );
-    /* a widget shown for the first time keeps the current size */
-    if( b_autoresize && stackWidgetsSizes.contains( widget ) )
+    /* a widget shown for the first time keeps the current size, and so does
+     * every switch from or to a library page or Preferences: the sizes per
+     * view are stock's, for its own views */
+    const auto stockView = [this]( QWidget *w ) {
+        return w == bgWidget || w == videoWidget || w == playlistWidget;
+    };
+    if( b_autoresize && stockView( stackCentralOldWidget ) && stockView( widget )
+     && stackWidgetsSizes.contains( widget ) )
         resizeStack( stackWidgetsSizes[widget].width(), stackWidgetsSizes[widget].height() );
 
 #ifdef DEBUG_INTF
