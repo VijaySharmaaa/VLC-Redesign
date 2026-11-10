@@ -132,3 +132,27 @@ Evidence: `D:\Projects\VLC\spike-results\p2-edge\` (audit on the merged build, `
 
 **Deviations recorded:** minimum height 480 px instead of 600, so Windows quarter snaps fit on 1080p screens; light-theme accent text `#9a4800` instead of `#B35300` (4.79:1 on the active fill); no "hold Shift to add" hint on the drop target (D2).
 **Not Phase 2:** Ctrl+C (Open Capture Device) freezes the UI for over 90 s while probing devices, also in the stock build (`vlc-pkg-d`), so this predates the redesign.
+
+## Phase 3: review fixes (2026-11-10)
+
+Evidence: `D:\Projects\VLC\spike-results\p3-fix\` (scripts `p3fix.py`, `audit_queue.py`, logs `dark-log.txt`, `queue-log.txt`).
+
+### Manual test steps
+1. Speed: open the speed popover, drag its slider or press Slower/Faster: the deck label shows the exact rate (e.g. 0.70×), no preset is checked; Reset (1×) returns to 1.00× and checks 1.00×.
+2. Speed popover open, then Tools > Customize Interface > Close: the popover closes with no warning in `-vv` (its button was deleted).
+3. View > Minimal Interface is unchecked on a library page with the now-playing bar, checked after Ctrl+H, also in the right-click popup of the video.
+4. Advanced Controls off, Ctrl+H, Shift+L twice: A–B shows accent after leaving minimal view; Shift+L once more clears it.
+5. Mini player up, `qt-auto-raise` = video, add a video: the mini player comes forward, the main window stays hidden. F in the mini player: the mini player goes, the video is full screen; Esc; View > Mini Player is unchecked.
+6. Immersive layout, video playing: Tab from the window puts the keys on the bar's first control (visible focus); Tab moves along the screen order; Space toggles play; Esc gives the keys back. Hovering or clicking the bar never takes them.
+7. Ctrl+L / Ctrl+E: the deck's playlist / effects button shows open (accent glyph, fill) while the panel / dialog is up, also after closing them with their own close button.
+8. Width 860–1280 px with Advanced Controls on: nothing clips; stop, loop, random, speed, mini player and full screen drop out (they stay in the menus) and come back when the window widens or the expert row goes.
+9. Aspect badge: pick 16:9 from its menu, then press A (hotkey): the badge follows.
+10. Focus the now-playing bar's mute or audio mode's Library pill with Tab and press Space: play/pause toggles, the button does nothing; Enter activates it.
+11. Toast: drop a short-named .srt: the full name shows (no ellipsis) at 100 % and 125 % scaling.
+
+### Deviations
+- The deck's centre status label of the prototype is not built (not in DESIGN_SPEC).
+- Segoe UI has no 500 weight: playlist row titles ask for QFont::Medium and Windows renders its nearest face.
+- `qt_spectrum` shows in Preferences > Audio > Filters: VLC 3 has no flag to hide a module there (comment in `qt.cpp`).
+- While the immersive bar has the keys, Qt shortcuts of the main window's menus (Ctrl+L...) wait until Esc; VLC hotkeys still work.
+- Mini player restore button over a cyan frame looks teal: it is the black 0.55 scrim token over the picture, as designed.
