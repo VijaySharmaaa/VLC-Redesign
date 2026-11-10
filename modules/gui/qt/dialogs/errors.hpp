@@ -27,27 +27,32 @@
 #include "util/qvlcframe.hpp"
 #include "util/singleton.hpp"
 
+#include <QList>
+#include <QPair>
+
 class QCheckBox;
 class QPushButton;
 class QLabel;
-class QTextEdit;
 
 class ErrorsDialog : public QVLCDialog, public Singleton<ErrorsDialog>
 {
     Q_OBJECT
 public:
 
-    void addError( const QString&, const QString&, bool retry = false );
+    void addError( const QString&, const QString&, bool fromCore = false );
     /*void addWarning( QString, QString );*/
 private:
-    virtual ~ErrorsDialog() {}
+    virtual ~ErrorsDialog();
     ErrorsDialog( intf_thread_t * );
     void add( bool, const QString&, const QString& );
+    void setFailedItem( input_item_t * );
 
     QLabel *title;
+    QLabel *body;
     QPushButton *retryButton;
     QCheckBox *stopShowing;
-    QTextEdit *messages;
+    QList<QPair<QString, QString> > entries; /* title, text */
+    input_item_t *failedItem; /* held: the item whose open failed */
 private slots:
     void close();
     void clear();
