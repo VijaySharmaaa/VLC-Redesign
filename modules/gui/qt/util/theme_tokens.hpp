@@ -53,6 +53,7 @@ namespace RedesignTokens
     static const QRgb VideoSurface  = 0xFF000000;
     static const QRgb PausedBadgeBg = 0x8C000000; /* 55 % */
     static const QRgb SubtitleBox   = 0xA6000000; /* 65 % */
+    static const QRgb HeaderScrim   = 0x99000000; /* 60 %, fading to none below */
 
     struct Palette
     {
@@ -203,6 +204,11 @@ namespace RedesignTokens
         static const int ImmersivePadTop = 10, ImmersivePadX = 16, ImmersivePadBottom = 12;
         static const int ImmersiveBorderAlpha = 26; /* ink 0.10 */
         static const int ImmersiveOffset = 12;    /* the idle hide sinks it 12 px */
+        /* the player header over the top of the video: back, title, meta */
+        static const int HeaderPadY = 16, HeaderPadX = 18, HeaderGap = 12;
+        static const int HeaderBack = 34, HeaderBackGlyph = 20;
+        static const int HeaderBackAlpha = 20, HeaderBackHoverAlpha = 41; /* white 0.08, 0.16 */
+        static const int HeaderTitle = 15;        /* semibold; the meta is Type::Meta */
     }
 
     /* ---- Phase 3: playlist panel (DESIGN_SPEC 6; sizes from the prototype markup) ---- */
