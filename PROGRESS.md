@@ -156,3 +156,7 @@ Evidence: `D:\Projects\VLC\spike-results\p3-fix\` (scripts `p3fix.py`, `audit_qu
 - `qt_spectrum` shows in Preferences > Audio > Filters: VLC 3 has no flag to hide a module there (comment in `qt.cpp`).
 - While the immersive bar has the keys, Qt shortcuts of the main window's menus (Ctrl+L...) wait until Esc; VLC hotkeys still work.
 - Mini player restore button over a cyan frame looks teal: it is the black 0.55 scrim token over the picture, as designed.
+
+### Audit rows without a code change
+- F (immersive bar muted at 100 %): Windows keeps the app's audio session mute across runs (mmdevice reports it at start). A session muted with M starts the next fresh-profile session muted in every volume widget; M again clears it (`p3-fix/queue-log.txt`, `F-*.png`). The widgets follow the real state.
+- H (handle growth): 100 playlist-panel toggles: GDI 60 → 69 on the first (the panel is built), flat to 100, back to 59. Mini player: 60 → 68 on the first cycle (the window is built and kept), flat to 10; longer runs lost the window to the automation, so cycles 11-100 are a manual step (open/close the mini player 100 times, Task Manager GDI objects stay flat).
