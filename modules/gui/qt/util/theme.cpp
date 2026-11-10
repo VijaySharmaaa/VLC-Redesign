@@ -569,6 +569,8 @@ QSplitter::handle { background: @divider@; }
 QStatusBar { background: @chrome@; color: @mute@; border-top: 1px solid @divider@; }
 QStatusBar::item { border: none; }
 
+QLabel[role="hint"] { color: @mute@; }
+
 .QSlider::groove:horizontal { height: @track@px; background: @trackInk@; border-radius: @trackRadius@px; }
 .QSlider::groove:vertical { width: @track@px; background: @trackInk@; border-radius: @trackRadius@px; }
 .QSlider::sub-page:horizontal, .QSlider::add-page:vertical { background: @accent@; border-radius: @trackRadius@px; }
