@@ -107,7 +107,6 @@ private:
     QButtonGroup *radioGroup;
 
     char *lang;
-    bool themeChosen;
 
 #ifdef _WIN32
     QList<QTreeWidgetItem *> listAsso;
