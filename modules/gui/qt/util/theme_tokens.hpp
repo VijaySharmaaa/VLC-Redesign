@@ -124,6 +124,7 @@ namespace RedesignTokens
         static const int PlaylistRowH = 40, PlaylistL = 360, PlaylistM = 320, PlaylistS = 300;
         static const int ButtonH = 34, InputH = 34, UrlInputH = 38, SelectH = 32;
         static const int ToggleW = 40, ToggleH = 20, ChipH = 28;
+        static const int ToggleKnob = 12; /* the switch's knob, centred in ToggleH */
         static const int ScrollBarW = 12; /* not in tokens.json: Windows 11 thin scroll bar */
         static const int FocusRing = 2, Hairline = 1; /* line widths, not scaled */
         static const int RadiusXs = 4, RadiusSm = 5, RadiusMd = 6, RadiusLg = 8, RadiusXl = 10, RadiusTile = 12;
@@ -356,6 +357,9 @@ namespace RedesignTokens
         /* the card and its rows */
         static const int CardRadius = 8, RowMinH = 60, RowPadX = 18, RowPadY = 12;
         static const int RowGap = 20, DescGap = 3, ButtonGap = 8;
+        /* selects and fields on the right of a row: the prototype's selW
+         * (it narrows to 180 at XS) */
+        static const int ControlMinW = 240;
     }
 }
 
