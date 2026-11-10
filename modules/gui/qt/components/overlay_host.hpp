@@ -33,14 +33,17 @@
 
 /* A frameless, per-pixel translucent tool window owned by the main window.
  * The video is a native child HWND, so only a separate top-level can paint
- * over it. It never takes focus or input (drags and drops fall through to
- * the window below) and, being owned rather than topmost, stays above its
- * owner only. */
+ * over it. It never takes focus and, being owned rather than topmost, stays
+ * above its owner only. By default it takes no input either (drags and drops
+ * fall through to the window below); TakeInput gets clicks and hands drags
+ * and drops to the owner, so a drop on it plays as a drop on the window. */
 class OverlayWindow : public QWidget
 {
 public:
-    explicit OverlayWindow( QWidget *owner );
+    enum InputMode { PassInput, TakeInput };
+    explicit OverlayWindow( QWidget *owner, InputMode = PassInput );
 protected:
+    bool event( QEvent * ) Q_DECL_OVERRIDE;
     static QEasingCurve enterCurve();   /* the tokens' enter easing */
 };
 

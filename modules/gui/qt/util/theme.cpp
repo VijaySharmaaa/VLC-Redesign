@@ -74,7 +74,7 @@ namespace
         Accent, AccentHover, OnAccent, AccentTint12, AccentTint14, AccentBorder50,
         AccentFocusRing, AccentKnobHalo, VolumeBoost, SeekKnobFill,
         Error, ErrorTint, DestructiveText, WindowCloseHover, WindowCloseGlyph,
-        VideoSurface, PausedBadgeBg, SubtitleBox,
+        VideoSurface, PausedBadgeBg, SubtitleBox, OnVideo,
     };
     const int paletteCount = sizeof(paletteFields) / sizeof(paletteFields[0]);
     static_assert(paletteCount + sizeof(fixedColors) / sizeof(fixedColors[0])
@@ -101,6 +101,7 @@ namespace
         Motion::PausedBadge, Motion::MiniPlayer, Motion::DropTarget, Motion::SeekTick,
         Motion::VolumeFill, Motion::EqBand, Motion::Toggle, Motion::PlayPress,
         Motion::ImmersiveIdle, Motion::ImmersiveFade,
+        VideoOverlay::RingTurn,
     };
     static_assert(sizeof(durations) / sizeof(durations[0]) == Theme::MotionRoleCount,
                   "MotionRole and the duration table differ");
@@ -510,7 +511,7 @@ QColor Theme::color(ColorRole role) const
     case OnAccent: case SeekKnobFill:  /* both sit on the accent */
         sys = QPalette::HighlightedText; break;
     case Error: case ErrorTint: case DestructiveText: case WindowCloseHover: case WindowCloseGlyph:
-    case VideoSurface: case PausedBadgeBg: case SubtitleBox:
+    case VideoSurface: case PausedBadgeBg: case SubtitleBox: case OnVideo:
         return c;  /* status and video colours keep their meaning */
     default:       /* the backgrounds: Page .. Hover2, Glass, FxBg, stripes */
         sys = QPalette::Window; break;

@@ -25,15 +25,35 @@
 
 #include <QEvent>
 
-OverlayWindow::OverlayWindow( QWidget *owner )
+OverlayWindow::OverlayWindow( QWidget *owner, InputMode input )
     : QWidget( owner, Qt::Tool | Qt::FramelessWindowHint | Qt::NoDropShadowWindowHint
-                      | Qt::WindowDoesNotAcceptFocus | Qt::WindowTransparentForInput )
+                      | Qt::WindowDoesNotAcceptFocus
+                      | ( input == PassInput ? Qt::WindowTransparentForInput
+                                             : Qt::WindowFlags() ) )
 {
+    setAcceptDrops( input == TakeInput );
     setAttribute( Qt::WA_TranslucentBackground );
     setAttribute( Qt::WA_ShowWithoutActivating );
     setFocusPolicy( Qt::NoFocus );
     connect( Theme::instance(), &Theme::changed,
              this, static_cast<void (QWidget::*)()>( &QWidget::update ) );
+}
+
+bool OverlayWindow::event( QEvent *e )
+{
+    switch( e->type() )
+    {
+    case QEvent::DragEnter:
+    case QEvent::DragMove:
+    case QEvent::DragLeave:
+    case QEvent::Drop:
+        /* only an input-taking overlay accepts drops. Straight to the owner's
+         * handlers (they do not read the position): sendEvent() would route
+         * the drag back to its current target, this window, forever. */
+        return parentWidget() && static_cast<QObject *>( parentWidget() )->event( e );
+    default:
+        return QWidget::event( e );
+    }
 }
 
 QEasingCurve OverlayWindow::enterCurve()
