@@ -679,8 +679,8 @@ AudioModePage::AudioModePage( intf_thread_t *_p_i, NowPlayingInfo *_info, QWidge
     back->setIcon( backIcon( Theme::Text2 ) );
     back->setIconSize( QSize( t->px( NowPlaying::TrackIcon ), t->px( NowPlaying::TrackIcon ) ) );
     back->setText( qtr( "Library" ) );
-    back->setAccessibleName( qtr( "Go to library" ) );
-    back->setToolTip( qtr( "Go to library" ) );
+    back->setAccessibleName( qtr( "Back to library" ) );
+    back->setToolTip( qtr( "Back to library" ) );
     back->setFixedHeight( t->px( NowPlaying::PillH ) );
     back->setProperty( "np", "pill" );
     back->setFocusPolicy( Qt::TabFocus );
