@@ -361,12 +361,9 @@ static void toRows( QWidget *box, const QString &orphan, bool inCard, bool place
             if( list && !inCard )
             {
                 /* a list (Hotkeys) takes the page's free height, enough for
-                 * a screenful of rows at least (its header about one more).
-                 * shortcut: the row count is not a token, move it to
-                 * Prefs:: in theme_tokens.hpp */
-                static const int ListMinRows = 10;
+                 * a screenful of rows at least (its header about one more) */
                 list->setSizePolicy( list->sizePolicy().horizontalPolicy(), QSizePolicy::Expanding );
-                list->setMinimumHeight( ( ListMinRows + 1 ) * t->metric( Theme::PlaylistRowH ) );
+                list->setMinimumHeight( ( Prefs::HotkeysMinRows + 1 ) * t->metric( Theme::PlaylistRowH ) );
                 list->setItemDelegate( new ListRowDelegate( list ) );
                 filled = true;
             }

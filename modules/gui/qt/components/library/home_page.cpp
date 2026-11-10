@@ -223,24 +223,31 @@ class ResumeCard : public QAbstractButton
 {
 public:
     ResumeCard( const QString &_mrl, const QString &title, const QString &_path,
-                const char *_icon, int64_t timeMs, int64_t lengthMs, QWidget *parent )
+                const char *_icon, int64_t _timeMs, int64_t lengthMs, QWidget *parent )
         : QAbstractButton( parent ), mrl( _mrl ), path( _path ), icon( _icon ),
-          progress( -1 ), missing( false )
+          timeMs( _timeMs ), progress( -1 ), missing( false )
     {
         setText( title );
         meta = qtr( "Resume from %1" ).arg( timeString( timeMs / 1000 ) );
-        if( lengthMs > timeMs )
-        {
-            badge = qtr( "%1 left" ).arg( timeString( ( lengthMs - timeMs ) / 1000 ) );
-            progress = qreal( timeMs ) / lengthMs;
-        }
         setAccessibleName( title );
         /* Tab only: a click must not take the keys from the player */
         setFocusPolicy( Qt::TabFocus );
         setAttribute( Qt::WA_Hover );
         setCursor( Qt::PointingHandCursor );
         setContextMenuPolicy( Qt::CustomContextMenu );
-        setMissing( false );
+        setLength( lengthMs );
+    }
+
+    void setLength( int64_t lengthMs )
+    {
+        badge.clear();
+        progress = -1;
+        if( lengthMs > timeMs )
+        {
+            badge = qtr( "%1 left" ).arg( timeString( ( lengthMs - timeMs ) / 1000 ) );
+            progress = qreal( timeMs ) / lengthMs;
+        }
+        setMissing( missing );
     }
 
     void setMissing( bool b )
@@ -281,6 +288,7 @@ protected:
 private:
     QString path, meta, badge;
     const char *icon;
+    const int64_t timeMs;
     qreal progress;     /* 0..1, -1 when the length is unknown */
     bool missing;
 };
@@ -501,9 +509,22 @@ HomePage::HomePage( intf_thread_t *_p_intf, QWidget *parent )
         if( len <= 0 || !input )
             return;
         char *uri = input_item_GetURI( input_GetItem( input ) );
-        if( uri )
-            RecentsMRL::getInstance( p_intf )->setLength( qfu( uri ), int64_t( len ) * 1000 );
+        const QString mrl = qfu( uri );
         free( uri );
+        const int64_t lengthMs = int64_t( len ) * 1000;
+        /* in place: a rebuild once a second would take the focus and the
+         * screen reader's place */
+        if( !RecentsMRL::getInstance( p_intf )->setLength( mrl, lengthMs ) )
+            return;
+        foreach( ResumeCard *card, cards )
+            if( card->mrl == mrl )
+                card->setLength( lengthMs );
+        for( int i = 0; i < table->topLevelItemCount(); i++ )
+        {
+            QTreeWidgetItem *item = table->topLevelItem( i );
+            if( item->data( TitleCol, MrlRole ).toString() == mrl )
+                item->setText( DurationCol, timeString( lengthMs / 1000 ) );
+        }
     } );
 
     rebuild();

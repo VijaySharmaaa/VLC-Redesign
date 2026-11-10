@@ -63,7 +63,7 @@ GotoTimeDialog::GotoTimeDialog( intf_thread_t *_p_intf)
     setWindowRole( "vlc-goto-time" );
 
     /* DESIGN_SPEC 7 (2.1.6): the title, an h:mm:ss field, a hint naming
-     * the media length, then Cancel and the accent Go */
+     * the media length, then Reset, Cancel and the accent Go */
     QVBoxLayout *mainLayout = new QVBoxLayout( this );
     mainLayout->setSizeConstraint( QLayout::SetFixedSize );
 
@@ -93,7 +93,11 @@ GotoTimeDialog::GotoTimeDialog( intf_thread_t *_p_intf)
     gotoButton->setDefault( true );
     QPushButton *cancelButton = new QPushButton( qtr( "&Cancel" ) );
     cancelButton->setAutoDefault( false ); /* Go stays the default button */
+    /* stock's Reset (to 0:00:00), a secondary text button at the start */
+    QPushButton *resetButton = new QPushButton( qtr( "Reset" ) );
+    resetButton->setAutoDefault( false );
     QHBoxLayout *foot = new QHBoxLayout;
+    foot->addWidget( resetButton );
     foot->addStretch( 1 );
     foot->addWidget( cancelButton );
     foot->addWidget( gotoButton );
@@ -105,6 +109,7 @@ GotoTimeDialog::GotoTimeDialog( intf_thread_t *_p_intf)
 
     BUTTONACT( gotoButton, close );
     BUTTONACT( cancelButton, cancel );
+    BUTTONACT( resetButton, reset );
 
     QVLCTools::restoreWidgetPosition( p_intf, "gototimedialog", this );
 }
