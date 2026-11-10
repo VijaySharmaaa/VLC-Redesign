@@ -43,9 +43,11 @@ ExtendedDialog::ExtendedDialog( intf_thread_t *_p_intf )
 {
 #ifdef __APPLE__
     setWindowFlags( Qt::Drawer );
-#else
+#elif !defined( _WIN32 )
     setWindowFlags( Qt::Tool );
 #endif
+    /* Windows keeps QVLCDialog's dialog frame: a tool window's small caption
+     * and close glyph are not themed by DWM like the other dialogs' */
 
     setWindowOpacity( var_InheritFloat( p_intf, "qt-opacity" ) );
     setWindowTitle( qtr( "Adjustments and Effects" ) );
