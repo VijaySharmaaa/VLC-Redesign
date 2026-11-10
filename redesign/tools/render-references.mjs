@@ -21,8 +21,10 @@ const server = http.createServer((req, res) => {
   if (!p.startsWith(protoDir) || !fs.existsSync(p) || fs.statSync(p).isDirectory()) { res.writeHead(404); return res.end(); }
   res.writeHead(200, { 'content-type': types[path.extname(p)] || 'application/octet-stream' });
   fs.createReadStream(p).pipe(res);
-}).listen(0);
-const base = `http://localhost:${server.address().port}/`;
+});
+// loopback only, so Windows doesn't ask to open the firewall
+await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+const base = `http://127.0.0.1:${server.address().port}/`;
 
 const pages = [
   ['00-icon', 'VLC Icon.dc.html', 1440],
