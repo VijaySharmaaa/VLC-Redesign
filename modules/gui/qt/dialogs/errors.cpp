@@ -60,7 +60,7 @@ ErrorsDialog::ErrorsDialog( intf_thread_t *_p_intf )
 
     /* DESIGN_SPEC 7 (1.6.5): a round error icon, the latest title, the
      * explanation in the body font with only the MRL in mono */
-    QLabel *icon = new QLabel;
+    icon = new QLabel;
     icon->setProperty( "role", "errorIcon" );
     icon->setFixedSize( t->px( Dialogs::ErrorIcon ), t->px( Dialogs::ErrorIcon ) );
     icon->setAlignment( Qt::AlignCenter );
@@ -84,12 +84,19 @@ ErrorsDialog::ErrorsDialog( intf_thread_t *_p_intf )
     body->setFocusPolicy( Qt::NoFocus );
     body->setAccessibleName( qtr( "Error details" ) );
     /* plain text, no box: it scrolls only once several errors pile up */
-    QScrollArea *scroll = new QScrollArea;
+    scroll = new QScrollArea;
     scroll->setFrameShape( QFrame::NoFrame );
     scroll->setWidgetResizable( true );
     scroll->setHorizontalScrollBarPolicy( Qt::ScrollBarAlwaysOff );
     scroll->setWidget( body );
     scroll->setFocusPolicy( Qt::NoFocus );
+
+    /* after Clear: the list says it is empty, centred where it was */
+    empty = new QLabel( qtr( "No errors" ) );
+    empty->setFont( t->font( Theme::Body ) );
+    empty->setProperty( "role", "hint" );
+    empty->setAlignment( Qt::AlignCenter );
+    empty->hide();
 
     stopShowing = new QCheckBox( qtr( "Hide future errors" ) );
     /* checked means hidden: the option says whether errors show */
@@ -100,7 +107,7 @@ ErrorsDialog::ErrorsDialog( intf_thread_t *_p_intf )
     QPushButton *logButton = new QPushButton( qtr( "Show &log" ), this );
     logButton->setProperty( "role", "link" );
     logButton->setToolTip( qtr( "Open the messages window" ) );
-    QPushButton *clearButton = new QPushButton( qtr( "Cl&ear" ), this );
+    clearButton = new QPushButton( qtr( "Cl&ear" ), this );
     clearButton->setProperty( "role", "link" );
     clearButton->setToolTip( qtr( "Clear the errors listed" ) );
     closeButton = new QPushButton( qtr( "&Close" ), this );
@@ -124,6 +131,7 @@ ErrorsDialog::ErrorsDialog( intf_thread_t *_p_intf )
     layout->addWidget( icon, 0, 0, 2, 1, Qt::AlignTop );
     layout->addWidget( title, 0, 1 );
     layout->addWidget( scroll, 1, 1 );
+    layout->addWidget( empty, 0, 0, 2, 2 );
     layout->addWidget( stopShowing, 2, 1 );
     layout->addLayout( foot, 3, 0, 1, 2 );
     layout->setColumnStretch( 1, 1 );
@@ -182,6 +190,7 @@ void ErrorsDialog::addError( const QString& title, const QString& text, bool fro
 
 void ErrorsDialog::add( bool, const QString& title, const QString& text )
 {
+    showEmpty( false );
     this->title->setText( title );
     entries.append( qMakePair( title, text ) );
 
@@ -227,6 +236,17 @@ void ErrorsDialog::clear()
     body->clear();
     title->clear();
     setFailedItem( NULL );
+    showEmpty( true );
+    closeButton->setFocus();  /* Clear, disabled now, had it */
+}
+
+void ErrorsDialog::showEmpty( bool b )
+{
+    empty->setVisible( b );
+    icon->setVisible( !b );
+    title->setVisible( !b );
+    scroll->setVisible( !b );
+    clearButton->setEnabled( !b );
 }
 
 /* P5-3: open the media that failed again, while it is in the playlist */
