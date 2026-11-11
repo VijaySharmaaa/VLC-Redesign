@@ -410,6 +410,9 @@ namespace RedesignTokens
     {
         /* not in tokens.json: Open media, a tile's icon above its label */
         static const int TabTileTextGap = 4;
+        /* not in tokens.json: Capture device, how long the device list may
+         * take before its boxes offer the default device (a stuck scan) */
+        static const int DshowScanWaitMs = 5000;
     }
 }
 

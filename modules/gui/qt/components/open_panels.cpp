@@ -32,6 +32,7 @@
 
 /* before vlc_threads.h, which makes a macro of QThread::msleep's name */
 #include <QThread>
+#include <QTimer>
 
 #include "qt.hpp"
 #include "components/open_panels.hpp"
@@ -906,6 +907,11 @@ void CaptureOpenPanel::initialize()
     connect( dshowScan, &QThread::finished, this, &CaptureOpenPanel::fillDshowDevices );
     if( dshowScan->isFinished() )
         fillDshowDevices();
+    else   /* a scan that never returns still leaves the default device */
+        QTimer::singleShot( RedesignTokens::Dialogs::DshowScanWaitMs, this, [this]() {
+            if( !dshowScan->isFinished() )
+                fillDshowDevices();
+        } );
 
     /* dshow Properties */
     QLabel *dshowVSizeLabel = new QLabel( qtr( "Video size" ) );
@@ -1257,14 +1263,15 @@ void CaptureOpenPanel::fillDshowDevices()
         char *current = config_GetPsz( p_intf, dshowDevOptions[i] );
         const QString value = qfu( current ? current : "" );
         free( current );
-        const QList<QPair<QString, QString> > &devices = dshowScan->devices[i];
-        for( const auto &device : devices )
-        {
-            combo->addItem( device.first, device.second );
-            if( device.second == value )
-                combo->setCurrentIndex( combo->count() - 1 );
-        }
-        if( combo->count() == 0 )   /* the module failed to load */
+        /* the list is the scan's until it ends */
+        if( dshowScan->isFinished() )
+            for( const auto &device : dshowScan->devices[i] )
+            {
+                combo->addItem( device.first, device.second );
+                if( device.second == value )
+                    combo->setCurrentIndex( combo->count() - 1 );
+            }
+        if( combo->count() == 0 )   /* the module failed to load, or no list yet */
             combo->addItem( qtr( "Default" ), QString() );
         combo->setEnabled( true );
     }
