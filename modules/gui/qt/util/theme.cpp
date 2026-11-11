@@ -1023,7 +1023,7 @@ QPushButton:hover { background: @hover@; }
 QPushButton:pressed, QPushButton:checked { background: @accentTint@; border-color: @accentBorder@; }
 QPushButton:default { background: @accent@; color: @onAccent@; border-color: @accent@; }
 QPushButton:default:hover { background: @accentHover@; }
-QPushButton:disabled { background: @panel@; color: @dim@; border-color: @divider@; }
+QPushButton:disabled { background: @panel@; color: @dim@; border-color: @dividerLine@; }
 
 QToolButton { background: transparent; border: @ring@px solid transparent; border-radius: @radiusMd@px; }
 QToolButton:hover { background: @hoverFill@; }
@@ -1042,7 +1042,7 @@ QLineEdit, QAbstractSpinBox { padding: 1px @menuPad@px; }
    leaves out of the pop-up height (one row short, with a scroller): use margin */
 QComboBox { margin: 1px 0; padding: 0 @menuPad@px; }
 QLineEdit:hover, QAbstractSpinBox:hover, QComboBox:hover { border-color: @mute@; }
-QLineEdit:disabled, QAbstractSpinBox:disabled, QComboBox:disabled { background: @panel@; color: @dim@; border-color: @divider@; }
+QLineEdit:disabled, QAbstractSpinBox:disabled, QComboBox:disabled { background: @panel@; color: @dim@; border-color: @dividerLine@; }
 QComboBox::drop-down, QAbstractSpinBox::up-button, QAbstractSpinBox::down-button { border: none; background: transparent; width: @iconGlyph@px; }
 QComboBox::down-arrow { width: @iconGlyph@px; height: @iconGlyph@px; }
 QAbstractSpinBox::up-arrow, QAbstractSpinBox::down-arrow { width: @iconGlyph@px; height: @halfGlyph@px; }
@@ -1059,7 +1059,7 @@ QTextEdit:focus, QPlainTextEdit:focus, QPushButton:focus { border: @ring@px soli
 QToolButton:focus { border-color: @focusRing@; }
 QPushButton:focus { padding: @menuPadFocus@px @buttonPadXFocus@px; }
 
-QTabWidget::pane { background: @panel@; border: 1px solid @divider@; border-radius: @radiusLg@px; top: -1px; }
+QTabWidget::pane { background: @panel@; border: 1px solid @dividerLine@; border-radius: @radiusLg@px; top: -1px; }
 /* a transparent ring on every tab, so focus only colours it */
 QTabBar::tab { background: transparent; color: @mute@; border: @ring@px solid transparent;
     padding: @tabPadTop@px @tabPadX@px @tabPadBottom@px; }
@@ -1069,11 +1069,11 @@ QTabBar::tab:focus { color: @tx@; background: @hoverFill@; border-color: @focusR
 
 /* the title's box starts at the top (origin margin), the frame half a line
    lower: the title sits centred on the frame's top line, the content below it */
-QGroupBox { border: 1px solid @divider@; border-radius: @radiusLg@px; margin-top: @groupTitleHalf@px; padding-top: @groupPadTop@px; }
+QGroupBox { border: 1px solid @dividerLine@; border-radius: @radiusLg@px; margin-top: @groupTitleHalf@px; padding-top: @groupPadTop@px; }
 QGroupBox::title { subcontrol-origin: margin; subcontrol-position: top left; left: @menuTitlePadX@px; padding: 0 @menuPad@px; color: @mute@; }
 
 /* the focus ring's second px comes from the padding: the content stays put */
-QAbstractItemView { background: @surface@; alternate-background-color: @panel@; border: 1px solid @divider@; padding: 1px;
+QAbstractItemView { background: @surface@; alternate-background-color: @panel@; border: 1px solid @cardLine@; padding: 1px;
     selection-background-color: @accentTint@; selection-color: @tx@; }
 QAbstractItemView::item:hover { background: @hoverFill@; }
 QAbstractItemView::item:selected { background: @accentTint@; color: @tx@; }
@@ -1190,7 +1190,7 @@ QPushButton[role="chip"] { background: transparent; color: @tx2@; border: 1px so
 QPushButton[role="chip"]:hover { background: @hoverFill@; }
 QPushButton[role="chip"]:checked { background: @accentTint@; color: @accTx@; border-color: @accentBorder@; }
 QPushButton[role="chip"]:focus { border: @ring@px solid @focusRing@; padding: 0 @fxChipPadXFocus@px; }
-QPushButton[role="chip"]:disabled { background: transparent; color: @dim@; border-color: @divider@; }
+QPushButton[role="chip"]:disabled { background: transparent; color: @dim@; border-color: @dividerLine@; }
 QFrame[role="fxRow"] { background: @raised@; border-radius: @fxRowRadius@px; }
 QToolButton[role="stepper"] { background: @stepperFill@; }
 QToolButton[role="stepper"]:hover { background: @stepperHover@; }
@@ -1214,7 +1214,7 @@ QToolButton[role="split"]:focus { border-color: @onAccent@; }
 QToolButton[role="split"]::menu-arrow { image: url("@arrowDownOnAccent@"); }
 /* as QPushButton:disabled: on the dialog's own panel colour the outline is
    what is left of the button */
-QToolButton[role="split"]:disabled { background: @panel@; color: @dim@; border-color: @divider@; }
+QToolButton[role="split"]:disabled { background: @panel@; color: @dim@; border-color: @dividerLine@; }
 QToolButton[role="split"]::menu-arrow:disabled { image: url("@arrowDownDim@"); }
 QLabel[role="errorIcon"] { background: @errorTint@; border-radius: @errorIconR@px; }
 QPushButton[role="link"] { background: transparent; color: @accTx@; border: @ring@px solid transparent; }
@@ -1231,7 +1231,7 @@ QListWidget[role="netRecent"]:focus { border: @ring@px solid @focusRing@; border
 /* Phase 5: preferences (components/prefs_page.cpp): the Simple Preferences
    group boxes as cards of rows */
 PrefsPage QScrollArea, PrefsPage QScrollArea > QWidget > QWidget { background: transparent; }
-PrefsPage QGroupBox, QFrame[role="prefsCard"] { background: @surface@; border: 1px solid @divider@; border-radius: @prefsCardR@px; }
+PrefsPage QGroupBox, QFrame[role="prefsCard"] { background: @surface@; border: 1px solid @cardLine@; border-radius: @prefsCardR@px; }
 QFrame[role="prefsRow"], QFrame[role="prefsRowNext"] { background: transparent; border: none; }
 QFrame[role="prefsRowNext"] { border-top: 1px solid @prefsRowLine@; }
 /* the select height less the combo's 1 px border and 1 px margin, each side */
@@ -1271,20 +1271,26 @@ PrefsPage QComboBox { min-height: @prefsSelectInner@px; }
         { "accentHover", css(color(AccentHover)) },
         { "fill", css(color(AccentFill)) },
         { "fillHover", css(color(AccentHover)) },
-        { "controlLine", css(color(ControlLine)) },
+        /* QSS draws a rounded border as edges and corner arcs that overlap
+           (qDrawBorder): a translucent colour paints the overlaps twice and
+           the corners look beaded. Border colours are opaque, flattened on
+           the background they sit on. */
+        { "controlLine", css(over(color(ControlLine), p.surface)) },
         /* the accent is 2.4:1 on light surfaces: focus rings need >= 3:1 */
         { "focusRing", css(color(dark ? Accent : AccentText)) },
         { "onAccent", css(color(OnAccent)) },
         { "closeHover", css(color(WindowCloseHover)) },
         { "accentTint", css(color(AccentTint14)) },
-        { "accentBorder", css(color(AccentBorder50)) },
+        { "accentBorder", css(over(color(AccentBorder50), over(color(AccentTint14), p.panel).rgb())) },
         { "popupBorder", dwmRounds ? QString("none")
                                    : QString("1px solid %1").arg(css(ink(InkAlpha::Border))) },
         { "hoverFill", css(ink(InkAlpha::HoverFill)) },
         { "openFill", css(ink(InkAlpha::OpenFill)) },
         { "divider", css(ink(InkAlpha::Divider)) },
+        { "dividerLine", css(over(ink(InkAlpha::Divider), p.panel)) },
+        { "cardLine", css(over(ink(InkAlpha::Divider), p.surface)) },
         { "border", css(ink(InkAlpha::Border)) },
-        { "outline", css(ink(InkAlpha::Outline)) },
+        { "outline", css(over(ink(InkAlpha::Outline), p.raised)) },
         { "trackInk", css(ink(InkAlpha::Track)) },
         { "toggleOff", css(ink(InkAlpha::ToggleOff)) },
         { "toggleOffSolid", css(over(ink(InkAlpha::ToggleOff), p.surface)) },
@@ -1345,7 +1351,7 @@ PrefsPage QComboBox { min-height: @prefsSelectInner@px; }
         { "homeRowPad", QString::number(px(Home::RowPadX)) },
         { "homeRowLine", css(ink(InkAlpha::RowLine)) },
         /* Phase 5: effects */
-        { "chipBorder", css(ink(InkAlpha::ChipBorder)) },
+        { "chipBorder", css(over(ink(InkAlpha::ChipBorder), p.fxbg)) },
         { "chipRadius", QString::number(px(Size::ChipH) / 2) },
         { "fxChipPadX", QString::number(px(Effects::ChipPadX)) },
         { "fxChipPadXFocus", QString::number(px(Effects::ChipPadX) - 1) },
