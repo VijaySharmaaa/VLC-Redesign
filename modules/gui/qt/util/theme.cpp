@@ -1370,10 +1370,11 @@ PrefsPage QComboBox { min-height: @prefsSelectInner@px; }
         { "playNowR", QString::number(px(Size::PlayNowBar) / 2) },
         { "pillPadL", QString::number(px(NowPlaying::PillPadLeft)) },
         { "pillPadR", QString::number(px(NowPlaying::PillPadRight)) },
-        { "scrim", css(QColor::fromRgba(qRgba(qRed(VideoSurface), qGreen(VideoSurface), qBlue(VideoSurface),
-                                              NowPlaying::MiniRestoreBgAlpha))) },
-        { "onVideoHover", css(QColor::fromRgba(qRgba(qRed(OnVideo), qGreen(OnVideo), qBlue(OnVideo),
-                                                     VideoOverlay::HeaderBackHoverAlpha))) },
+        /* the tokens, not Theme's ColorRole values of the same names (they made the scrim blue) */
+        { "scrim", css(QColor::fromRgba(qRgba(qRed(RedesignTokens::VideoSurface), qGreen(RedesignTokens::VideoSurface),
+                                              qBlue(RedesignTokens::VideoSurface), NowPlaying::MiniRestoreBgAlpha))) },
+        { "onVideoHover", css(QColor::fromRgba(qRgba(qRed(RedesignTokens::OnVideo), qGreen(RedesignTokens::OnVideo),
+                                                     qBlue(RedesignTokens::OnVideo), VideoOverlay::HeaderBackHoverAlpha))) },
         { "miniRestoreR", QString::number(px(NowPlaying::MiniRestoreChip) / 2) },
         /* Phase 3: deck */
         { "separatorInk", css(ink(InkAlpha::Separator)) },
