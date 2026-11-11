@@ -1625,6 +1625,10 @@ void MainInterface::displayNormalView()
     sidebar->setVisible( false );
     showPlaylistPanel( false );   /* setMinimalView() brings it back */
     controls->setVisible( false );
+    /* full screen from a library page: the bar shown there would stay
+     * under the video, its controls Tab stops (setMinimalView() brings
+     * it back) */
+    nowPlayingBar->setVisible( false );
 #ifndef QT_NO_STATUSBAR
     statusBar()->setVisible( false );
 #endif
