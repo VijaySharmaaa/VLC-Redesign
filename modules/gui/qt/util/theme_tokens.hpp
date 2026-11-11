@@ -19,11 +19,13 @@
  * not 0.72 / 0.74: the design blurs what is under it, which Qt 5.6 widgets
  * cannot (P6-8).
  *
- * Per theme since Phase 6 (WCAG 1.4.3 / 1.4.11): progress and switch fills,
- * the volume boost, the destructive text and the outline of fields, selects
- * and switches, which is their only boundary. Light fills take accTx (>= 4.4:1
- * on the light surfaces) and outlines ink 0.45 (>= 3:1); the dark theme keeps
- * the design's fills, and its outlines take the switch's ink 0.35 (>= 3:1).
+ * Per theme since Phase 6 (WCAG 1.4.3 / 1.4.11): the destructive text and the
+ * outline of fields, selects and switches, which is their only boundary.
+ * Outlines take ink 0.45 in light (>= 3:1) and the switch's ink 0.36 in dark.
+ * Fills (progress, seek, volume, sliders, switches, checked boxes and radios)
+ * and the volume boost are the design's bright accent in both themes, with
+ * OnAccent on them (8:1): the owner chose it over P6-2's darker light fill
+ * (accTx), so a light fill is 2.4:1 on white, below 1.4.11's 3:1 (I1-1).
  *****************************************************************************/
 
 #ifndef VLC_QT_THEME_TOKENS_HPP_
@@ -89,7 +91,7 @@ namespace RedesignTokens
         0xE0FAF9F7, /* rgba(250,249,247,0.88): the design's 0.74 is under a blur Qt 5.6 lacks */
         0xF7FFFFFF,
         0xFFE7E3DD, 0xFFDFDAD3,
-        0xFF9A4800, 0xFFFFFFFF, 0xFFD9400A, 0xFFB02515,
+        0xFFFF8A1F, 0xFF1C1206, 0xFFFF5A1F, 0xFFB02515, /* fills as dark (I1-1) */
         0x73000000  /* ink 0.45 */
     };
 
