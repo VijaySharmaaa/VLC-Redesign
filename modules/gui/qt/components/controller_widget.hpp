@@ -34,6 +34,7 @@
 
 #include <QWidget>
 #include <QToolButton>
+#include <QVariantAnimation>
 
 class QFrame;
 class QAbstractSlider;
@@ -50,13 +51,17 @@ class PlayButton : public QToolButton
 {
     Q_OBJECT
 public:
-    PlayButton() : b_round( false ), b_playing( false ) {}
+    PlayButton();
     /* the deck's accent circle (DESIGN_SPEC 3), for a big play button */
     void setRound( bool );
 public slots:
     void updateButtonIcons( bool );
+protected:
+    void paintEvent( QPaintEvent * ) Q_DECL_OVERRIDE;
 private:
+    void pressTo( qreal );
     bool b_round, b_playing;
+    QVariantAnimation press;   /* the round button's scale, 1 at rest */
 };
 
 class LoopButton : public QToolButton

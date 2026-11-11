@@ -170,6 +170,7 @@ namespace RedesignTokens
         static const int ViewChange = 240, Toast = 220, ToastHold = 2400;
         static const int PausedBadge = 180, MiniPlayer = 240, DropTarget = 150;
         static const int SeekTick = 250, VolumeFill = 120, EqBand = 150, Toggle = 150, PlayPress = 100;
+        static const int PlayPressScale = 92;   /* percent of its size while pressed */
         static const int ImmersiveIdle = 2500, ImmersiveFade = 300;
         /* the seek bar's loading bounce: one sweep, shown after the delay */
         static const int SeekLoading = 2000, SeekLoadingDelay = 500;

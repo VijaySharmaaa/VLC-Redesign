@@ -778,8 +778,6 @@ void AbstractController::applyAttributes( QToolButton *tmpButton, bool b_flat, b
             const int size = t->metric( Theme::PlayDeck ), glyph = t->px( Deck::PlayGlyph );
             tmpButton->setFixedSize( QSize( size, size ) );
             tmpButton->setIconSize( QSize( glyph, glyph ) );
-            /* shortcut: no press scale (.92 / 100 ms), a stylesheet cannot
-               transform; paint PlayButton itself if the design insists */
             PlayButton *play = qobject_cast<PlayButton *>( tmpButton );
             if( play )
                 play->setRound( true );

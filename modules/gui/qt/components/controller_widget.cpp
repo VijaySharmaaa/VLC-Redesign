@@ -30,6 +30,7 @@
 
 #include "input_manager.hpp"         /* Get notification of Volume Change */
 #include "util/input_slider.hpp"     /* SoundSlider */
+#include "components/overlay_host.hpp"   /* enterCurve */
 #include "util/theme.hpp"
 
 #include <vlc_input_item.h>
@@ -39,6 +40,8 @@
 #include <QHBoxLayout>
 #include <QMenu>
 #include <QStyle>
+#include <QStyleOptionToolButton>
+#include <QStylePainter>
 #include <QWidgetAction>
 
 SoundWidget::SoundWidget( QWidget *_parent, intf_thread_t * _p_intf,
@@ -201,6 +204,53 @@ void SoundWidget::setMuted( bool mute )
 /**
  * Play Button
  **/
+PlayButton::PlayButton() : b_round( false ), b_playing( false )
+{
+    /* DESIGN_SPEC 3: the circle shrinks while pressed */
+    press.setStartValue( 1. );
+    press.setEndValue( 1. );
+    connect( &press, &QVariantAnimation::valueChanged, this, [this]() { update(); } );
+    connect( this, &QAbstractButton::pressed, this, [this]() {
+        pressTo( RedesignTokens::Motion::PlayPressScale / 100. );
+    } );
+    connect( this, &QAbstractButton::released, this, [this]() { pressTo( 1. ); } );
+}
+
+void PlayButton::pressTo( qreal scale )
+{
+    /* animations off: no motion, the circle keeps its size */
+    const int ms = b_round ? Theme::instance()->duration( Theme::PlayPress ) : 0;
+    if( ms <= 0 )
+        return;
+    const QVariant from = press.currentValue();
+    press.stop();
+    press.setStartValue( from.isValid() ? from : QVariant( 1. ) );
+    press.setEndValue( scale );
+    press.setEasingCurve( OverlayWindow::enterCurve() );
+    press.setDuration( ms );
+    press.start();
+}
+
+void PlayButton::paintEvent( QPaintEvent *e )
+{
+    const QVariant v = press.currentValue();
+    const qreal scale = v.isValid() ? v.toReal() : 1.;
+    if( !b_round || scale <= 0. || qFuzzyCompare( scale, 1. ) )
+    {
+        QToolButton::paintEvent( e );
+        return;
+    }
+    /* QToolButton's own painting, about the centre */
+    QStylePainter p( this );
+    const QPointF centre = QRectF( rect() ).center();
+    p.translate( centre );
+    p.scale( scale, scale );
+    p.translate( -centre );
+    QStyleOptionToolButton opt;
+    initStyleOption( &opt );
+    p.drawComplexControl( QStyle::CC_ToolButton, opt );
+}
+
 void PlayButton::setRound( bool round )
 {
     b_round = round;
