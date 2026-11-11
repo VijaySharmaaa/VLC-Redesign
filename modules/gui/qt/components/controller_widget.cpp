@@ -155,12 +155,14 @@ void SoundWidget::userUpdateVolume( int i_sliderVolume )
 void SoundWidget::libUpdateVolume( float volume )
 {
     long i_volume = lroundf(volume * 100.f);
-    if( i_volume != volumeSlider->value()  )
-    {
-        b_ignore_valuechanged = true;
+    b_ignore_valuechanged = true;
+    /* the label as the OSD, also past a lowered qt-max-volume */
+    SoundSlider *soundSlider = qobject_cast<SoundSlider *>( volumeSlider );
+    if( soundSlider )
+        soundSlider->setLevel( i_volume );
+    else
         volumeSlider->setValue( i_volume );
-        b_ignore_valuechanged = false;
-    }
+    b_ignore_valuechanged = false;
     refreshLabels();
 }
 
@@ -297,13 +299,27 @@ void LoopButton::updateButtonIcons( int value )
 AspectRatioBadge::AspectRatioBadge( intf_thread_t *_p_intf )
     : p_intf( _p_intf ), p_vout( NULL )
 {
-    setProperty( "role", "speed" );     /* the deck's text buttons */
+    setProperty( "role", "deck" );
+    setIcon( deckIcon( RedesignIcons::IconAspectRatio ) );
+    setToolButtonStyle( Qt::ToolButtonIconOnly );
     setAccessibleName( qtr( "Aspect ratio" ) );
-    setToolTip( qtr( "Aspect ratio" ) );
-    setPopupMode( QToolButton::InstantPopup );
+    /* checked: the accent glyph while a ratio is forced */
+    setCheckable( true );
     menu = new QMenu( this );
-    setMenu( menu );
     connect( menu, &QMenu::triggered, this, &AspectRatioBadge::choose );
+    /* opened from clicked (no menu arrow; Space and Enter open it too),
+     * open while it shows */
+    connect( this, &QToolButton::clicked, this, [this]() {
+        setChecked( property( "on" ).toBool() );
+        setProperty( "open", true );
+        style()->unpolish( this );
+        style()->polish( this );
+        const QSize size = menu->sizeHint();
+        menu->exec( mapToGlobal( QPoint( 0, -size.height() ) ) );
+        setProperty( "open", false );
+        style()->unpolish( this );
+        style()->polish( this );
+    } );
     connect( THEMIM->getIM(), &InputManager::voutChanged, this, &AspectRatioBadge::setVout );
     setVout();
 }
@@ -403,10 +419,10 @@ void AspectRatioBadge::updateRatios()
     if( p_vout == NULL )
     {
         setText( qtr( "Default" ) );
+        setToolTip( qtr( "Aspect ratio" ) );
         setProperty( "on", false );
+        setChecked( false );
         setDisabled( true );
-        style()->unpolish( this );
-        style()->polish( this );
         return;
     }
 
@@ -438,10 +454,10 @@ void AspectRatioBadge::updateRatios()
     }
     var_FreeList( &val_list, &text_list );
     setProperty( "on", !EMPTY_STR( current ) );
+    setChecked( !EMPTY_STR( current ) );
     free( current );
+    setToolTip( qtr( "Aspect ratio: %1" ).arg( text() ) );
     setEnabled( true );
-    style()->unpolish( this );
-    style()->polish( this );
 }
 
 void AspectRatioBadge::choose( QAction *action )

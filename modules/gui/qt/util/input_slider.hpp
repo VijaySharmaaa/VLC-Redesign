@@ -128,7 +128,7 @@ signals:
 /* Sound Slider inherited directly from QAbstractSlider */
 class QPaintEvent;
 
-#define SOUNDMAX  125 // % (+6dB)
+#define SOUNDMAX  200 // %, as qt-max-volume
 
 class SoundSlider : public QAbstractSlider
 {
@@ -136,8 +136,12 @@ class SoundSlider : public QAbstractSlider
 public:
     SoundSlider(QWidget *_parent, float _i_step, char *psz_colors, int max = SOUNDMAX );
     void setMuted( bool ); /* Set Mute status */
+    /* the volume, also one past the maximum (a hotkey above a lowered
+     * qt-max-volume): the fill stops at the end, the label shows it all */
+    void setLevel( int );
 
 protected:
+    void sliderChange( SliderChange ) Q_DECL_OVERRIDE;
     void paintEvent( QPaintEvent *) Q_DECL_OVERRIDE;
     void wheelEvent( QWheelEvent *event ) Q_DECL_OVERRIDE;
     void mousePressEvent( QMouseEvent * ) Q_DECL_OVERRIDE;
@@ -152,6 +156,7 @@ private:
     int i_oldvalue; /* Store the old Value before changing */
     float f_step; /* How much do we increase each time we wheel */
     bool b_isMuted;
+    int i_level; /* the label's volume: value(), or the one setLevel() got */
 
     QStringList colorList; /* qt-slider-colours when customised, else empty */
 
