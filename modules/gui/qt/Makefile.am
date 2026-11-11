@@ -485,31 +485,41 @@ libqt_plugin_la_RES = \
 	gui/qt/pixmaps/valid.svg \
 	gui/qt/pixmaps/search_clear.svg \
 	gui/qt/pixmaps/lock.svg \
+	gui/qt/pixmaps/redesign/1x_mobiledata.svg \
 	gui/qt/pixmaps/redesign/add.svg \
 	gui/qt/pixmaps/redesign/album.svg \
 	gui/qt/pixmaps/redesign/arrow_back.svg \
 	gui/qt/pixmaps/redesign/aspect_ratio.svg \
 	gui/qt/pixmaps/redesign/av_timer.svg \
 	gui/qt/pixmaps/redesign/blur_linear.svg \
+	gui/qt/pixmaps/redesign/blur_on.svg \
+	gui/qt/pixmaps/redesign/bookmark.svg \
 	gui/qt/pixmaps/redesign/bookmarks.svg \
+	gui/qt/pixmaps/redesign/build.svg \
 	gui/qt/pixmaps/redesign/call_to_action.svg \
 	gui/qt/pixmaps/redesign/cast.svg \
 	gui/qt/pixmaps/redesign/check.svg \
 	gui/qt/pixmaps/redesign/check_box_outline_blank.svg \
+	gui/qt/pixmaps/redesign/chevron_left.svg \
 	gui/qt/pixmaps/redesign/chevron_right.svg \
 	gui/qt/pixmaps/redesign/close.svg \
 	gui/qt/pixmaps/redesign/code.svg \
+	gui/qt/pixmaps/redesign/compress.svg \
 	gui/qt/pixmaps/redesign/computer.svg \
 	gui/qt/pixmaps/redesign/cone.svg \
 	gui/qt/pixmaps/redesign/construction.svg \
 	gui/qt/pixmaps/redesign/content_copy.svg \
+	gui/qt/pixmaps/redesign/content_paste.svg \
 	gui/qt/pixmaps/redesign/create_new_folder.svg \
 	gui/qt/pixmaps/redesign/crop.svg \
 	gui/qt/pixmaps/redesign/crop_square.svg \
+	gui/qt/pixmaps/redesign/dashboard_customize.svg \
 	gui/qt/pixmaps/redesign/delete.svg \
 	gui/qt/pixmaps/redesign/dns.svg \
 	gui/qt/pixmaps/redesign/dock_to_bottom.svg \
+	gui/qt/pixmaps/redesign/dock_to_right.svg \
 	gui/qt/pixmaps/redesign/draft.svg \
+	gui/qt/pixmaps/redesign/edit.svg \
 	gui/qt/pixmaps/redesign/equalizer.svg \
 	gui/qt/pixmaps/redesign/error.svg \
 	gui/qt/pixmaps/redesign/event_note.svg \
@@ -520,6 +530,7 @@ libqt_plugin_la_RES = \
 	gui/qt/pixmaps/redesign/fiber_manual_record_fill.svg \
 	gui/qt/pixmaps/redesign/file_copy.svg \
 	gui/qt/pixmaps/redesign/file_open.svg \
+	gui/qt/pixmaps/redesign/first_page.svg \
 	gui/qt/pixmaps/redesign/fit_screen.svg \
 	gui/qt/pixmaps/redesign/folder.svg \
 	gui/qt/pixmaps/redesign/folder_open.svg \
@@ -533,21 +544,27 @@ libqt_plugin_la_RES = \
 	gui/qt/pixmaps/redesign/home_fill.svg \
 	gui/qt/pixmaps/redesign/info.svg \
 	gui/qt/pixmaps/redesign/input.svg \
+	gui/qt/pixmaps/redesign/keep.svg \
 	gui/qt/pixmaps/redesign/keyboard.svg \
 	gui/qt/pixmaps/redesign/keyboard_tab.svg \
 	gui/qt/pixmaps/redesign/lan_fill.svg \
 	gui/qt/pixmaps/redesign/language.svg \
 	gui/qt/pixmaps/redesign/laps.svg \
+	gui/qt/pixmaps/redesign/last_page.svg \
+	gui/qt/pixmaps/redesign/layers.svg \
 	gui/qt/pixmaps/redesign/library_music.svg \
 	gui/qt/pixmaps/redesign/library_music_fill.svg \
+	gui/qt/pixmaps/redesign/live_tv.svg \
 	gui/qt/pixmaps/redesign/logout.svg \
 	gui/qt/pixmaps/redesign/memory.svg \
 	gui/qt/pixmaps/redesign/menu.svg \
+	gui/qt/pixmaps/redesign/minimize.svg \
 	gui/qt/pixmaps/redesign/movie.svg \
 	gui/qt/pixmaps/redesign/movie_fill.svg \
 	gui/qt/pixmaps/redesign/music_note.svg \
 	gui/qt/pixmaps/redesign/note_add.svg \
 	gui/qt/pixmaps/redesign/open_in_full.svg \
+	gui/qt/pixmaps/redesign/palette.svg \
 	gui/qt/pixmaps/redesign/pause.svg \
 	gui/qt/pixmaps/redesign/pause_fill.svg \
 	gui/qt/pixmaps/redesign/photo_camera.svg \
@@ -576,6 +593,7 @@ libqt_plugin_la_RES = \
 	gui/qt/pixmaps/redesign/skip_previous_fill.svg \
 	gui/qt/pixmaps/redesign/slow_motion_video.svg \
 	gui/qt/pixmaps/redesign/sort.svg \
+	gui/qt/pixmaps/redesign/spatial_audio.svg \
 	gui/qt/pixmaps/redesign/speaker.svg \
 	gui/qt/pixmaps/redesign/speed.svg \
 	gui/qt/pixmaps/redesign/stop.svg \
@@ -585,11 +603,14 @@ libqt_plugin_la_RES = \
 	gui/qt/pixmaps/redesign/sync_alt.svg \
 	gui/qt/pixmaps/redesign/terminal.svg \
 	gui/qt/pixmaps/redesign/title.svg \
+	gui/qt/pixmaps/redesign/transform.svg \
 	gui/qt/pixmaps/redesign/tune.svg \
 	gui/qt/pixmaps/redesign/update.svg \
 	gui/qt/pixmaps/redesign/upload_file.svg \
 	gui/qt/pixmaps/redesign/video_library.svg \
 	gui/qt/pixmaps/redesign/videocam.svg \
+	gui/qt/pixmaps/redesign/view_list.svg \
+	gui/qt/pixmaps/redesign/visibility.svg \
 	gui/qt/pixmaps/redesign/volume_down.svg \
 	gui/qt/pixmaps/redesign/volume_down_fill.svg \
 	gui/qt/pixmaps/redesign/volume_off.svg \
@@ -598,6 +619,7 @@ libqt_plugin_la_RES = \
 	gui/qt/pixmaps/redesign/volume_up_fill.svg \
 	gui/qt/pixmaps/redesign/wallpaper.svg \
 	gui/qt/pixmaps/redesign/web.svg \
+	gui/qt/pixmaps/redesign/width.svg \
 	gui/qt/pixmaps/redesign/zoom_in.svg
 EXTRA_DIST += gui/qt/vlc.qrc $(libqt_plugin_la_RES) gui/qt/pixmaps/redesign/LICENSE
 

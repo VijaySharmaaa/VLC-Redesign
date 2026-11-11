@@ -395,10 +395,13 @@ QMenu *VLCMenuBar::FileMenu( intf_thread_t *p_intf, QWidget *parent, MainInterfa
         RedesignIcons::MenuOpenCapture, SLOT( openCaptureDialog() ), "Ctrl+C" );
 
     addDPStaticEntry( menu, qtr( "Open &Location from clipboard" ),
-                      NULL, SLOT( openUrlDialog() ), "Ctrl+V" );
+                      RedesignIcons::MenuOpenClipboard, SLOT( openUrlDialog() ), "Ctrl+V" );
 
     if( !recentsMenu && var_InheritBool( p_intf, "qt-recentplay" ) )
+    {
         recentsMenu = new QMenu( qtr( "Open &Recent Media" ) );
+        setMenuIcon( recentsMenu->menuAction(), RedesignIcons::MenuOpenRecent );
+    }
 
     if( recentsMenu )
     {
@@ -407,18 +410,20 @@ QMenu *VLCMenuBar::FileMenu( intf_thread_t *p_intf, QWidget *parent, MainInterfa
     }
     menu->addSeparator();
 
-    addDPStaticEntry( menu, qtr( I_PL_SAVE ), "", SLOT( savePlayingToPlaylist() ),
+    addDPStaticEntry( menu, qtr( I_PL_SAVE ), RedesignIcons::MenuSavePlaylist,
+        SLOT( savePlayingToPlaylist() ),
         "Ctrl+Y" );
 
 #ifdef ENABLE_SOUT
-    addDPStaticEntry( menu, qtr( "Conve&rt / Save..." ), "",
+    addDPStaticEntry( menu, qtr( "Conve&rt / Save..." ), RedesignIcons::MenuConvert,
         SLOT( openAndTranscodingDialogs() ), "Ctrl+R" );
     addDPStaticEntry( menu, qtr( "&Stream..." ),
         RedesignIcons::MenuStream, SLOT( openAndStreamingDialogs() ), "Ctrl+S" );
     menu->addSeparator();
 #endif
 
-    action = addMIMStaticEntry( p_intf, menu, qtr( "Quit at the end of playlist" ), "",
+    action = addMIMStaticEntry( p_intf, menu, qtr( "Quit at the end of playlist" ),
+                               RedesignIcons::MenuQuitAtEnd,
                                SLOT( activatePlayQuit( bool ) ) );
     action->setCheckable( true );
     action->setChecked( THEMIM->getPlayExitState() );
@@ -427,6 +432,7 @@ QMenu *VLCMenuBar::FileMenu( intf_thread_t *p_intf, QWidget *parent, MainInterfa
     {
         action = menu->addAction( qtr( "Close to systray"), mi,
                                  SLOT( toggleUpdateSystrayMenu() ) );
+        setMenuIcon( action, RedesignIcons::MenuCloseToSystray );
     }
 
     addDPStaticEntry( menu, qtr( "&Quit" ) ,
@@ -451,23 +457,23 @@ QMenu *VLCMenuBar::ToolsMenu( intf_thread_t *p_intf, QMenu *menu )
         RedesignIcons::MenuCodecInfo, SLOT( mediaCodecDialog() ), "Ctrl+J" );
 
 #ifdef ENABLE_VLM
-    addDPStaticEntry( menu, qtr( I_MENU_VLM ), "", SLOT( vlmDialog() ),
+    addDPStaticEntry( menu, qtr( I_MENU_VLM ), RedesignIcons::MenuVLM, SLOT( vlmDialog() ),
         "Ctrl+Shift+W" );
 #endif
 
-    addDPStaticEntry( menu, qtr( "Program Guide" ), "", SLOT( epgDialog() ),
+    addDPStaticEntry( menu, qtr( "Program Guide" ), RedesignIcons::MenuProgramGuide, SLOT( epgDialog() ),
         "" );
 
     addDPStaticEntry( menu, qtr( I_MENU_MSG ),
         RedesignIcons::MenuMessages, SLOT( messagesDialog() ), "Ctrl+M" );
 
     addDPStaticEntry( menu, qtr( "Plu&gins and extensions" ),
-        "", SLOT( pluginDialog() ) );
+        RedesignIcons::MenuExtensions, SLOT( pluginDialog() ) );
     menu->addSeparator();
 
     if( !p_intf->p_sys->b_isDialogProvider )
         addDPStaticEntry( menu, qtr( "Customi&ze Interface..." ),
-            RedesignIcons::MenuPreferences, SLOT( toolbarDialog() ) );
+            RedesignIcons::MenuCustomize, SLOT( toolbarDialog() ) );
 
     addDPStaticEntry( menu, qtr( "&Preferences" ),
         RedesignIcons::MenuPreferences, SLOT( prefsDialog() ), MENU_KEY_PREFERENCES, QAction::PreferencesRole );
@@ -516,16 +522,19 @@ QMenu *VLCMenuBar::ViewMenu( intf_thread_t *p_intf, QMenu *current, MainInterfac
 
     /* Docked Playlist */
     action = menu->addAction( qtr( "Docked Playlist" ) );
+    setMenuIcon( action, RedesignIcons::MenuDockedPlaylist );
     action->setCheckable( true );
     action->setChecked( mi->isPlDocked() );
     connect( action, &QAction::triggered, mi, &MainInterface::dockPlaylist );
 
     if( mi->getPlaylistView() )
-        menu->addMenu( StandardPLPanel::viewSelectionMenu( mi->getPlaylistView() ) );
+        setMenuIcon( menu->addMenu( StandardPLPanel::viewSelectionMenu( mi->getPlaylistView() ) ),
+                     RedesignIcons::MenuPlaylistView );
 
     menu->addSeparator();
 
     action = menu->addAction( qtr( "Always on &top" ) );
+    setMenuIcon( action, RedesignIcons::MenuAlwaysOnTop );
     action->setCheckable( true );
     action->setChecked( mi->isInterfaceAlwaysOnTop() );
     connect( action, &QAction::triggered, mi, &MainInterface::setInterfaceAlwaysOnTop );
@@ -544,6 +553,7 @@ QMenu *VLCMenuBar::ViewMenu( intf_thread_t *p_intf, QMenu *current, MainInterfac
     connect( mi, &MainInterface::minimalViewToggled, action, &QAction::setChecked );
 
     action = menu->addAction( qtr( "&Immersive Layout" ) );
+    setMenuIcon( action, RedesignIcons::MenuImmersive );
     action->setCheckable( true );
     action->setChecked( var_InheritBool( p_intf, "qt-immersive" ) );
     connect( action, &QAction::triggered, mi, &MainInterface::setImmersive );
@@ -608,7 +618,11 @@ QMenu *VLCMenuBar::InterfacesMenu( intf_thread_t *p_intf, QMenu *current )
     varnames.append( "intf-add" );
     objects.append( VLC_OBJECT(p_intf) );
 
-    return Populate( p_intf, current, varnames, objects );
+    Populate( p_intf, current, varnames, objects );
+    QAction *action = FindActionWithVar( current, "intf-add" );
+    if( action )
+        setMenuIcon( action, RedesignIcons::MenuInterfaces );
+    return current;
 }
 
 /**
@@ -699,9 +713,10 @@ QMenu *VLCMenuBar::SubtitleMenu( intf_thread_t *p_intf, QMenu *current, bool b_p
 
     if( current->isEmpty() || b_popup )
     {
-        addDPStaticEntry( current, qtr( "Add &Subtitle File..." ), "",
-                SLOT( loadSubtitlesFile() ) );
-        addActionWithSubmenu( current, "spu-es", qtr( "Sub &Track" ) );
+        addDPStaticEntry( current, qtr( "Add &Subtitle File..." ),
+                RedesignIcons::MenuAddSubtitle, SLOT( loadSubtitlesFile() ) );
+        addActionWithSubmenu( current, "spu-es", qtr( "Sub &Track" ),
+                RedesignIcons::MenuSubtitleTrack );
         current->addSeparator();
     }
 
@@ -740,7 +755,8 @@ QMenu *VLCMenuBar::VideoMenu( intf_thread_t *p_intf, QMenu *current )
         current->addSeparator();
         /* Rendering modifiers */
         addActionWithSubmenu( current, "deinterlace", qtr( "&Deinterlace" ), RedesignIcons::MenuDeinterlace );
-        addActionWithSubmenu( current, "deinterlace-mode", qtr( "&Deinterlace mode" ) );
+        addActionWithSubmenu( current, "deinterlace-mode", qtr( "&Deinterlace mode" ),
+                              RedesignIcons::MenuDeinterlaceMode );
 
         current->addSeparator();
         /* Other actions */
@@ -766,20 +782,24 @@ QMenu *VLCMenuBar::NavigMenu( intf_thread_t *p_intf, QMenu *menu )
     addActionWithSubmenu( menu, "title", qtr( "T&itle" ), RedesignIcons::MenuTitle );
     submenu = addActionWithSubmenu( menu, "chapter", qtr( "&Chapter" ), RedesignIcons::MenuChapter );
     submenu->setTearOffEnabled( true );
-    addActionWithSubmenu( menu, "program", qtr( "&Program" ) );
+    addActionWithSubmenu( menu, "program", qtr( "&Program" ), RedesignIcons::MenuProgram );
 
     submenu = new QMenu( qtr( I_MENU_BOOKMARK ), menu );
     submenu->setTearOffEnabled( true );
-    addDPStaticEntry( submenu, qtr( "&Manage" ), "",
+    addDPStaticEntry( submenu, qtr( "&Manage" ), RedesignIcons::MenuBookmarksManage,
                       SLOT( bookmarksDialog() ), "Ctrl+B" );
     submenu->addSeparator();
     action = menu->addMenu( submenu );
     action->setData( "bookmark" );
+    setMenuIcon( action, RedesignIcons::MenuBookmarks );
 
     menu->addSeparator();
 
     if ( !rendererMenu )
+    {
         rendererMenu = RendererMenu( p_intf );
+        setMenuIcon( rendererMenu->menuAction(), RedesignIcons::MenuRenderer );
+    }
 
     menu->addMenu( rendererMenu );
     menu->addSeparator();
@@ -813,6 +833,19 @@ QMenu *VLCMenuBar::RebuildNavigMenu( intf_thread_t *p_intf, QMenu *menu, bool b_
     EnableStaticEntries( menu, (p_object != NULL ) );
     Populate( p_intf, menu, varnames, objects );
 
+    static const struct { const char *var; const char *icon; } navIcons[] = {
+        { "prev-title",   RedesignIcons::MenuPrevTitle },
+        { "next-title",   RedesignIcons::MenuNextTitle },
+        { "prev-chapter", RedesignIcons::MenuPrevChapter },
+        { "next-chapter", RedesignIcons::MenuNextChapter },
+    };
+    for( size_t i = 0; i < sizeof( navIcons ) / sizeof( navIcons[0] ); i++ )
+    {
+        QAction *navAction = FindActionWithVar( menu, navIcons[i].var );
+        if( navAction )
+            setMenuIcon( navAction, navIcons[i].icon );
+    }
+
     /* Remove playback actions to recreate them */
     if( !b_keep )
     {
@@ -836,7 +869,7 @@ QMenu *VLCMenuBar::HelpMenu( QWidget *parent )
     addDPStaticEntry( menu, qtr( "&Help" ) ,
         RedesignIcons::MenuHelp, SLOT( helpDialog() ), "F1" );
 #ifdef UPDATE_CHECK
-    addDPStaticEntry( menu, qtr( "Check for &Updates..." ) , "",
+    addDPStaticEntry( menu, qtr( "Check for &Updates..." ) , RedesignIcons::MenuUpdates,
                       SLOT( updateDialog() ) );
 #endif
     menu->addSeparator();
@@ -935,6 +968,7 @@ void VLCMenuBar::PopupMenuControlEntries( QMenu *menu, intf_thread_t *p_intf,
 
     action = rateMenu->addAction( qtr( "N&ormal Speed" ), THEMIM->getIM(),
                               SLOT( normalRate() ) );
+    setMenuIcon( action, RedesignIcons::MenuNormalSpeed );
     action->setData( ACTION_STATIC );
 
     action = rateMenu->addAction( menuIcon( RedesignIcons::IconSlower ), qtr( "Slower (fine)" ), THEMIM->getIM(),
@@ -993,7 +1027,7 @@ void VLCMenuBar::PopupMenuStaticEntries( QMenu *menu )
         RedesignIcons::MenuOpenNetwork, SLOT( openNetDialog() ) );
     addDPStaticEntry( openmenu, qtr( "Open &Capture Device..." ),
         RedesignIcons::MenuOpenCapture, SLOT( openCaptureDialog() ) );
-    menu->addMenu( openmenu );
+    setMenuIcon( menu->addMenu( openmenu ), RedesignIcons::MenuOpenMedia );
 
     menu->addSeparator();
 #if 0
@@ -1085,6 +1119,8 @@ QMenu* VLCMenuBar::PopupMenu( intf_thread_t *p_intf, bool show )
                 CreateAndConnect( menu, "fullscreen",
                         qtr( "Leave Fullscreen" ),"" , ITEM_NORMAL,
                         VLC_OBJECT(THEPL), val, VLC_VAR_BOOL, b_isFullscreen );
+                /* CreateAndConnect() appends it, without the variable's name */
+                setMenuIcon( menu->actions().last(), RedesignIcons::MenuLeaveFullscreen );
             }
             vlc_object_release( p_vout );
 
@@ -1098,6 +1134,7 @@ QMenu* VLCMenuBar::PopupMenu( intf_thread_t *p_intf, bool show )
         submenu = new QMenu( menu );
         action = menu->addMenu( AudioMenu( p_intf, submenu ) );
         action->setText( qtr( "&Audio" ) );
+        setMenuIcon( action, RedesignIcons::MenuAudio );
         if( action->menu()->isEmpty() )
             action->setEnabled( false );
 
@@ -1105,6 +1142,7 @@ QMenu* VLCMenuBar::PopupMenu( intf_thread_t *p_intf, bool show )
         submenu = new QMenu( menu );
         action = menu->addMenu( VideoMenu( p_intf, submenu ) );
         action->setText( qtr( "&Video" ) );
+        setMenuIcon( action, RedesignIcons::MenuVideo );
         if( action->menu()->isEmpty() )
             action->setEnabled( false );
 
@@ -1112,12 +1150,14 @@ QMenu* VLCMenuBar::PopupMenu( intf_thread_t *p_intf, bool show )
         submenu = new QMenu( menu );
         action = menu->addMenu( SubtitleMenu( p_intf, submenu, true ) );
         action->setText( qtr( "Subti&tle") );
+        setMenuIcon( action, RedesignIcons::MenuSubtitle );
         UpdateItem( p_intf, submenu, "spu-es", VLC_OBJECT(p_input), true );
 
         /* Playback menu for chapters */
         submenu = new QMenu( menu );
         action = menu->addMenu( NavigMenu( p_intf, submenu ) );
         action->setText( qtr( "&Playback" ) );
+        setMenuIcon( action, RedesignIcons::MenuPlayback );
         if( action->menu()->isEmpty() )
             action->setEnabled( false );
     }
@@ -1135,6 +1175,7 @@ QMenu* VLCMenuBar::PopupMenu( intf_thread_t *p_intf, bool show )
         {
             QMenu *bar = menu; // Needed for next macro
             BAR_DADD( ViewMenu( p_intf, NULL, mi ), qtr( "V&iew" ), 4 );
+            setMenuIcon( menu->actions().last(), RedesignIcons::MenuView );
         }
 
         /* In skins interface, append some items */
@@ -1163,12 +1204,13 @@ QMenu* VLCMenuBar::PopupMenu( intf_thread_t *p_intf, bool show )
             ExtensionsMenu( p_intf, submenu );
         }
 
-        menu->addMenu( submenu );
+        setMenuIcon( menu->addMenu( submenu ), RedesignIcons::MenuTools );
     }
 
     /* */
     QMenuView *plMenu = new QMenuView( menu, 25 );
     plMenu->setTitle( qtr("Playlist") );
+    setMenuIcon( plMenu->menuAction(), RedesignIcons::MenuPlaylist );
     PLModel *model = PLModel::getPLModel( p_intf );
     plMenu->setModel( model );
     connect( plMenu, &QMenuView::activated,
@@ -1180,13 +1222,13 @@ QMenu* VLCMenuBar::PopupMenu( intf_thread_t *p_intf, bool show )
     {
         QMenu *openmenu = FileMenu( p_intf, menu );
         openmenu->setTitle( qtr( "Open Media" ) );
-        menu->addMenu( openmenu );
+        setMenuIcon( menu->addMenu( openmenu ), RedesignIcons::MenuOpenMedia );
 
         menu->addSeparator();
 
         QMenu *helpmenu = HelpMenu( menu );
         helpmenu->setTitle( qtr( "Help" ) );
-        menu->addMenu( helpmenu );
+        setMenuIcon( menu->addMenu( helpmenu ), RedesignIcons::MenuHelp );
 
         addDPStaticEntry( menu, qtr( "Quit" ), RedesignIcons::MenuQuit,
                           SLOT( quit() ), "Ctrl+Q", QAction::QuitRole );
@@ -1669,7 +1711,8 @@ void VLCMenuBar::updateRecents( intf_thread_t *p_intf )
             }
 
             recentsMenu->addSeparator();
-            recentsMenu->addAction( qtr("&Clear"), rmrl, SLOT( clear() ) );
+            setMenuIcon( recentsMenu->addAction( qtr("&Clear"), rmrl, SLOT( clear() ) ),
+                         RedesignIcons::MenuClearRecent );
             recentsMenu->setEnabled( true );
         }
     }
