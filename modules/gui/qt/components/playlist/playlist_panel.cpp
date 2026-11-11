@@ -95,7 +95,7 @@ void RowDelegate::paint( QPainter *p, const QStyleOptionViewItem &option,
                                                                       : InkAlpha::Hairline ) );
         p->drawRoundedRect( r, radius, radius );
     }
-    if( option.state & QStyle::State_HasFocus )
+    if( ( option.state & QStyle::State_HasFocus ) && Theme::showsFocus( option.widget ) )
     {
         /* the accent is 2.4:1 on light surfaces */
         const qreal inset = Size::FocusRing / 2.;

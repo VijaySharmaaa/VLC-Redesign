@@ -179,7 +179,7 @@ public:
         QStyledItemDelegate::paint( p, opt, index );
 
         const QAbstractItemView *view = qobject_cast<const QAbstractItemView *>( option.widget );
-        if( !view || !view->hasFocus() || view->currentIndex().row() != index.row() )
+        if( !view || !Theme::showsFocus( view ) || view->currentIndex().row() != index.row() )
             return;
         const int w = Size::FocusRing;
         const QRect r = option.rect;
@@ -360,9 +360,9 @@ void ResumeCard::paintEvent( QPaintEvent * )
 
     /* the outline: accent on hover, the focus ring from the keyboard; the
      * ring stays at full strength on a missing file */
-    if( hasFocus() )
+    if( Theme::showsFocus( this ) )
         p.setOpacity( 1 );
-    const QPen pen = hasFocus() ? QPen( focusRingColor(), Size::FocusRing )
+    const QPen pen = Theme::showsFocus( this ) ? QPen( focusRingColor(), Size::FocusRing )
                    : QPen( underMouse() ? t->color( Theme::Accent ) : t->ink( InkAlpha::Divider ),
                            Size::Hairline );
     const qreal inset = pen.widthF() / 2;

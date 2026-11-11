@@ -79,7 +79,7 @@ void NetworkTile::paintEvent( QPaintEvent * )
     p.setPen( QPen( t->ink( InkAlpha::Divider ), Size::Hairline ) );
     p.setBrush( t->color( underMouse() ? Theme::Raised : Theme::Surface ) );
     p.drawRoundedRect( r, radius, radius );
-    if( hasFocus() )
+    if( Theme::showsFocus( this ) )
     {
         const qreal inset = Size::FocusRing / 2.;
         p.setPen( QPen( t->color( t->isDark() ? Theme::Accent : Theme::AccentText ), Size::FocusRing ) );

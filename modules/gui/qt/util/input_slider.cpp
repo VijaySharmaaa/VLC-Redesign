@@ -764,7 +764,7 @@ void SoundSlider::paintEvent( QPaintEvent *e )
                                  RedesignTokens::Size::Hairline, tickH ),
                           theme->ink( RedesignTokens::InkAlpha::VolumeTick ) );
     }
-    if( hasFocus() )
+    if( Theme::showsFocus( this ) )
     {
         /* the accent is 2.4:1 on light surfaces: rings take the accent text there */
         const qreal inset = RedesignTokens::Size::FocusRing / 2.;

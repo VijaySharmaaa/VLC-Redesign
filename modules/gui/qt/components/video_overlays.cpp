@@ -101,7 +101,7 @@ namespace
             p.setPen( Qt::NoPen );
             p.setBrush( fill );
             p.drawEllipse( QRectF( rect() ) );
-            if( hasFocus() )
+            if( Theme::showsFocus( this ) )
             {
                 const qreal inset = RedesignTokens::Size::FocusRing / 2.;
                 p.setPen( QPen( t->color( Theme::Accent ), RedesignTokens::Size::FocusRing ) );

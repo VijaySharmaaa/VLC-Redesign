@@ -429,7 +429,7 @@ void CardDelegate::paintCard( QPainter *p, const QStyleOptionViewItem &option,
     p->setPen( QPen( hover ? t->color( Theme::Accent ) : t->ink( InkAlpha::Divider ), Size::Hairline ) );
     p->setBrush( Qt::NoBrush );
     p->drawRoundedRect( thumb, radius, radius );
-    if( option.state & QStyle::State_HasFocus )
+    if( ( option.state & QStyle::State_HasFocus ) && Theme::showsFocus( option.widget ) )
         paintFocusRing( p, thumb, radius );
 
     /* duration badge */
@@ -488,7 +488,7 @@ void CardDelegate::paintRow( QPainter *p, const QStyleOptionViewItem &option,
         p->setBrush( t->ink( InkAlpha::HoverFill ) );
         p->drawRoundedRect( r, radius, radius );
     }
-    if( option.state & QStyle::State_HasFocus )
+    if( ( option.state & QStyle::State_HasFocus ) && Theme::showsFocus( option.widget ) )
         paintFocusRing( p, r, radius );
 
     const int padX = t->px( Playlist::RowPadX ), gap = t->px( Playlist::RowGap );

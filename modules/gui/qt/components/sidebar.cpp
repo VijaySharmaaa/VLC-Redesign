@@ -124,7 +124,7 @@ void SidebarButton::paintEvent( QPaintEvent * )
 
     /* the accent button's ring goes outside its fill, a gap of the
      * sidebar between: a ring on the accent itself is too faint */
-    const qreal ringOut = primary && hasFocus() ? 2 * Size::FocusRing : 0;
+    const qreal ringOut = primary && Theme::showsFocus( this ) ? 2 * Size::FocusRing : 0;
     QColor fill( Qt::transparent );
     if( primary )
         fill = t->color( underMouse() ? Theme::AccentHover : Theme::Accent );
@@ -139,7 +139,7 @@ void SidebarButton::paintEvent( QPaintEvent * )
     p.drawRoundedRect( QRectF( rect() ).adjusted( ringOut, ringOut, -ringOut, -ringOut ),
                        radius - ringOut, radius - ringOut );
 
-    if( hasFocus() )
+    if( Theme::showsFocus( this ) )
     {
         /* the accent is 2.4:1 on light surfaces */
         const Theme::ColorRole ring = t->isDark() ? Theme::Accent : Theme::AccentText;

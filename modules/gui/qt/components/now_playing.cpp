@@ -303,7 +303,7 @@ void ThinSeekBar::paintEvent( QPaintEvent * )
         p.setBrush( t->color( Theme::AccentFill ) );
         p.drawRoundedRect( done, h / 2, h / 2 );
     }
-    if( hasFocus() )
+    if( Theme::showsFocus( this ) )
     {
         const qreal inset = Size::FocusRing / 2.;
         p.setPen( QPen( t->color( t->isDark() ? Theme::Accent : Theme::AccentText ),
@@ -601,7 +601,7 @@ public:
         else
             p->setBrush( Qt::NoBrush );
         p->drawRoundedRect( r, radius, radius );
-        if( opt.state & QStyle::State_HasFocus )
+        if( ( opt.state & QStyle::State_HasFocus ) && Theme::showsFocus( opt.widget ) )
         {
             const qreal inset = Size::FocusRing / 2.;
             p->setPen( QPen( t->color( t->isDark() ? Theme::Accent : Theme::AccentText ),

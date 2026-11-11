@@ -1309,7 +1309,7 @@ void EqBandSlider::paintEvent( QPaintEvent * )
     p.setBrush( t->color( Theme::AccentFill ) );
     p.drawRoundedRect( QRectF( groove.x(), qMin( y, zero ), track, qAbs( y - zero ) ),
                        track / 2, track / 2 );
-    if( hasFocus() )
+    if( Theme::showsFocus( this ) )
     {
         /* the accent is 2.4:1 on light surfaces */
         p.setPen( QPen( t->color( t->isDark() ? Theme::Accent : Theme::AccentText ),
