@@ -383,6 +383,13 @@ MainInterface::MainInterface( intf_thread_t *_p_intf, bool customFrame ) : QVLCM
     connect( stackCentralW, &QStackedWidget::currentChanged,
              this, &MainInterface::updateDeckPlacement );
     updateDeckPlacement();
+    /* Preferences own the content area: the docked playlist steps aside
+     * (playlistVisible keeps the choice) and is back on the way out */
+    connect( stackCentralW, &QStackedWidget::currentChanged, this, [this]() {
+        if( b_plDocked && !b_videoFullScreen )
+            showPlaylistPanel( playlistVisible
+                && stackCentralW->currentWidget() != sidebar->page( Sidebar::Preferences ) );
+    } );
 
     connect( this, &MainInterface::askToQuit, THEDP, &DialogsProvider::quit );
 
