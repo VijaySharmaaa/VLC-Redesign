@@ -40,6 +40,7 @@
 #include <QKeySequence>
 #include <QKeyEvent>
 #include <QAccessibleWidget>
+#include <QStylePainter>
 
 #include <cstddef>
 
@@ -104,6 +105,46 @@ public:
 
 private:
     QToolButton *button() const { return static_cast<QToolButton *>( widget() ); }
+};
+
+/* A tab tile: its icon over its label, the pair centred in the tile (a
+ * tool button keeps the icon at its top and centres the label in the rest,
+ * a wide gap in a tile taller than the pair). The style still draws the
+ * tile itself: background, border and focus ring. */
+class OpenTile : public QToolButton
+{
+protected:
+    void paintEvent( QPaintEvent * ) Q_DECL_OVERRIDE
+    {
+        QStylePainter p( this );
+        QStyleOptionToolButton opt;
+        initStyleOption( &opt );
+        const QStyle::State state = opt.state;
+        opt.text.clear();
+        opt.icon = QIcon();
+        p.drawComplexControl( QStyle::CC_ToolButton, opt );
+
+        const Theme *t = Theme::instance();
+        const QFontMetrics fm( font() );
+        const int gap = t->px( RedesignTokens::Dialogs::TabTileTextGap );
+        QRect glyph( QPoint(), iconSize() );
+        glyph.moveLeft( ( width() - glyph.width() ) / 2 );
+        glyph.moveTop( ( height() - glyph.height() - gap - fm.height() ) / 2 );
+        /* the icon's mode and state as QCommonStyle picks them */
+        QIcon::Mode mode = QIcon::Normal;
+        if( !( state & QStyle::State_Enabled ) )
+            mode = QIcon::Disabled;
+        else if( ( state & QStyle::State_MouseOver ) && ( state & QStyle::State_AutoRaise ) )
+            mode = QIcon::Active;
+        icon().paint( &p, glyph, Qt::AlignCenter, mode,
+                      ( state & QStyle::State_On ) ? QIcon::On : QIcon::Off );
+        /* the colours of the openTile QSS rules: checked, hover, normal */
+        p.setPen( t->color( ( state & QStyle::State_On ) ? Theme::AccentText
+                            : ( state & QStyle::State_MouseOver ) ? Theme::Text : Theme::Text2 ) );
+        const QRect label( 0, glyph.bottom() + 1 + gap, width(), fm.height() );
+        p.drawText( label, Qt::AlignHCenter | Qt::AlignTop,
+                    fm.elidedText( text(), Qt::ElideRight, width() ) );
+    }
 };
 
 QAccessibleInterface *openButtonAccessible( const QString &, QObject *object )
@@ -189,7 +230,7 @@ OpenDialog::OpenDialog( QWidget *parent,
     tiles = new QButtonGroup( this );
     for( int i = 0; i < OPEN_TAB_MAX; i++ )
     {
-        QToolButton *tile = new QToolButton;
+        QToolButton *tile = new OpenTile;
         tile->setProperty( "role", "openTile" );
         /* no underlined mnemonic on a tile (1.6.2); its Alt key stays.
          * shortcut: Disc and Capture &Device share Alt+D (Qt focuses each in
