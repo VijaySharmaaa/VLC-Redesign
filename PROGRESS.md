@@ -400,7 +400,12 @@ Branch `redesign/phase-6` from `redesign/phase-5` (c36cf50573). Six survey lanes
 - The mouse wheel sets the volume only over the player, the deck and the now-playing bar (not over library pages, the sidebar, Preferences or the docked Effects/playlist panels).
 - "Display preview" for snapshots (`snapshot-preview`) is shown but ignored: the toast replaces it (P6-9).
 - The fullscreen controller is now reachable with Tab (stock: not a Tab stop); the first Esc gives the keys back, the second leaves fullscreen.
-- 100 % and monitor-move results come from the two-monitor runs before the owner's second screen was disconnected; later fixes were checked at 125 %, 150 % (QT_SCALE_FACTOR) and with a scale-change test hook.
+- 100 % and monitor-move results come from the two-monitor runs before the owner's second screen was disconnected. The later per-monitor fixes (column widths, dialog minimums, rescale state on objects, `Theme::pt` fonts, following `windowHandle()->screen()`) were only exercised with a scale-change test hook, never on a real second monitor, and nothing after that was run on a true 100 % desktop (`QT_SCALE_FACTOR=0.8` breaks stock 3.0 too, so it can't stand in).
+- Narrator was never run: screen-reader results come from UI Automation (names, roles, values, Invoke) only.
+- Not run on Windows: animations off, high contrast at runtime, RTL, a monitor unplug.
+- The harness `baseline` state `04-effects` doesn't show the sheet at the default size (it opens as the XS drawer window, which the capture misses).
+- A Windows Firewall prompt ("allow VLC media player") appeared once during testing; it was cancelled, so no rule allows VLC. Tests only listen on 127.0.0.1.
+- **Waiting for the owner's sign-off:** the wheel no longer changes the volume over library pages, the sidebar or Preferences; after Tab moves the keys into the fullscreen controller, the first Esc gives them back instead of leaving fullscreen (a second Esc leaves; Esc after a mouse click still leaves at once).
 - RTL layout could not be run (needs a Windows setting); mirrored by code reading only.
 
 ### Deferred (pre-existing, stock)
@@ -433,7 +438,7 @@ Evidence: `D:\Projects\VLC\spike-results\p6-edge\` (runtime sessions), `p6-va\`,
 | Long strings, RTL, CJK | **deferred** | RTL needs a Windows setting; mirrored by code only. Effects tabs elide with tooltips. |
 | Keyboard only | **fixed** | Tab works after media opens (native-window fix); Open media tiles are a tab list; Shift+Tab wraps through the header back button without loops in every layout. |
 | Space on a focusable button = play/pause | **pass** | Including the header back button (earlier failures were a test tool dropping spaces). |
-| Narrator names and states | **fixed** | 0 unnamed controls on every surface; sliders, tiles, tracks button, seek bars ("x of y") and deck shortcuts exposed; duplicate caption buttons hidden (P6-3). UIA Select stays a Qt 5.6 stub. |
+| Narrator names and states | **fixed** (UI Automation; Narrator not run) | 0 unnamed controls on every surface; sliders, tiles, tracks button, seek bars ("x of y") and deck shortcuts exposed; duplicate caption buttons hidden (P6-3). UIA Select stays a Qt 5.6 stub. |
 | Toast must not cover the subtitle it announces | **fixed** | The toast follows the immersive lift. |
 | Subtitle position hotkeys while lifted; vout reuse | **pass** | Offset kept after the bar sleeps; no creep across items. |
 | Two video outputs (clone) | **deferred** | No embedded vout in that mode, so the lift does not apply. |
@@ -443,6 +448,6 @@ Evidence: `D:\Projects\VLC\spike-results\p6-edge\` (runtime sessions), `p6-va\`,
 | Recents length while playing | **fixed** | Updated in place, no page rebuild (focus kept). |
 | Prefs Save/Cancel/Reset; stop after Preferences | **pass** / **fixed** | Stopping a video after Preferences now goes Home; the docked playlist hides while Preferences shows. |
 | Open media: arrow keys, Capture | **fixed** / **deferred** | Arrow keys no longer reach Capture by accident; Capture itself still blocks in the DirectShow scan (stock). |
-| Closing during playback, 50× open/close | **pass** | No leaks in the survey (20–60 cycles). |
+| Closing during playback, 50× open/close | **pending re-run** | The survey (Phase 5 build, 20–60 cycles) found no leak; re-run on the final build below. |
 | Overlays over the video after the native-window change | **pass** | Docked and XS panels, fullscreen controller, minimal view, mini player, audio mode, resize, dark and light. |
 | Mouse wheel over panels | **fixed** | The wheel over the Effects sheet or playlist no longer changes the volume. |
