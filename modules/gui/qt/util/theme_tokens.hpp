@@ -404,6 +404,13 @@ namespace RedesignTokens
     {
         static const int Keycap = 26;   /* 0.10 */
     }
+
+    /* issues1 lane F */
+    namespace Dialogs
+    {
+        /* not in tokens.json: Open media, a tile's icon above its label */
+        static const int TabTileTextGap = 4;
+    }
 }
 
 /* issues1 lane E */

@@ -33,6 +33,7 @@
 class QCheckBox;
 class QPushButton;
 class QLabel;
+class QScrollArea;
 
 class ErrorsDialog : public QVLCDialog, public Singleton<ErrorsDialog>
 {
@@ -46,10 +47,14 @@ private:
     ErrorsDialog( intf_thread_t * );
     void add( bool, const QString&, const QString& );
     void setFailedItem( input_item_t * );
+    void showEmpty( bool );
 
+    QLabel *icon;
     QLabel *title;
     QLabel *body;
-    QPushButton *retryButton, *closeButton;
+    QLabel *empty;
+    QScrollArea *scroll;
+    QPushButton *retryButton, *closeButton, *clearButton;
     QCheckBox *stopShowing;
     QList<QPair<QString, QString> > entries; /* title, text */
     input_item_t *failedItem; /* held: the item whose open failed */

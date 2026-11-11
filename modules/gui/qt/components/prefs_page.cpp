@@ -82,6 +82,8 @@ static QFrame *cardRow( QLabel *name, const QString &desc,
     font.setWeight( QFont::Medium );
     name->setFont( font );
     name->setWordWrap( true );
+    /* a form's label may be right-aligned for its old grid column */
+    name->setAlignment( Qt::AlignLeading | Qt::AlignVCenter );
     text->addWidget( name );
     if( !desc.isEmpty() )
     {
@@ -445,8 +447,21 @@ static void toRows( QWidget *box, const QString &orphan, bool inCard, bool place
             if( QGroupBox *group = qobject_cast<QGroupBox *>( r.block ) )
                 toRows( group, group->title(), true, false, order );
             else if( QStackedWidget *pages = qobject_cast<QStackedWidget *>( r.block ) )
+            {
                 for( int p = 0; p < pages->count(); p++ )
                     toRows( pages->widget( p ), orphan, inCard, inCard && placed, order );
+                /* as tall as its current page: a stack takes its tallest
+                 * page's height, which left a short page (the skin file)
+                 * a large empty card */
+                const auto fit = [pages]( int current )
+                {
+                    for( int p = 0; p < pages->count(); p++ )
+                        pages->widget( p )->setSizePolicy( QSizePolicy::Preferred, p == current
+                                                           ? QSizePolicy::Preferred : QSizePolicy::Ignored );
+                };
+                fit( pages->currentIndex() );
+                QObject::connect( pages, &QStackedWidget::currentChanged, pages, fit );
+            }
             else if( isZone( r.block ) )
                 toRows( r.block, orphan, inCard, inCard && placed, order );
             else
@@ -519,13 +534,9 @@ PrefsPage::PrefsPage( intf_thread_t *_p_intf, QWidget *_tabAnchor )
                                     qtr( "Restore every setting to its default." ), resetButton, false ) );
     advLayout->addWidget( card );
     advLayout->addStretch( 1 );
-    /* the prototype's column: at most ContentMaxW wide, on the left; the
-     * sections' scroll areas keep the page's width (their bar on its edge) */
-    advanced->setMaximumWidth( t->px( Prefs::ContentMaxW ) );
     stack->addWidget( advanced );
 
     QWidget *buttonBar = new QWidget;
-    buttonBar->setMaximumWidth( t->px( Prefs::ContentMaxW ) );
     QHBoxLayout *buttons = new QHBoxLayout( buttonBar );
     buttons->setContentsMargins( 0, 0, 0, 0 );
     buttons->setSpacing( t->px( Prefs::ButtonGap ) );
@@ -603,7 +614,6 @@ void PrefsPage::showSection( int i )
         QList<QWidget *> order;
         toRows( scroller->widget(), QString(), false, false, order );
         sizeFields( scroller->widget() );
-        scroller->widget()->setMaximumWidth( Theme::instance()->px( Prefs::ContentMaxW ) );
         /* built after the page, its widgets end the window's focus chain:
          * move them after the sections and before Advanced's buttons,
          * Cancel and Save, in row order */
