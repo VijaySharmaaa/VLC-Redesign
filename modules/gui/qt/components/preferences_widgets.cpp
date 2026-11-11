@@ -1166,6 +1166,7 @@ KeySelectorControl::KeySelectorControl( vlc_object_t *_p_this,
     table->headerItem()->setText( GLOBAL_HOTKEY_COL, qtr( "Global" ) );
     table->headerItem()->setToolTip( GLOBAL_HOTKEY_COL, qtr( "Desktop level hotkey" ) );
     table->setAlternatingRowColors( true );
+    table->setProperty( "keycapsFrom", HOTKEY_COL );   /* the redesign's keycaps */
     table->setSelectionBehavior( QAbstractItemView::SelectItems );
 
     table->installEventFilter( this );

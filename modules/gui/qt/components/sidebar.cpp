@@ -443,6 +443,7 @@ void Sidebar::setBreakpoint( BreakpointWatcher::Size bp )
     for( SidebarButton *b : buttons )
         b->setRail( bp < BreakpointWatcher::M );
     heading->setVisible( bp >= BreakpointWatcher::M );
+    prefsPage->setNarrow( bp == BreakpointWatcher::XS );
 }
 
 void Sidebar::paintEvent( QPaintEvent * )

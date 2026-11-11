@@ -29,6 +29,7 @@
 #include <vlc_config_cat.h>
 
 #include <QAbstractItemView>
+#include <QApplication>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QFileInfo>
@@ -39,6 +40,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
+#include <QPainter>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QStackedWidget>
@@ -135,12 +137,58 @@ private:
     QLabel *name;
 };
 
-/* A list's rows at the redesign's list row height.
- * shortcut: plain text cells, draw the hotkeys as keycaps here if wanted */
+/* A list's rows at the redesign's list row height; the hotkey columns of
+ * a list that names them ("keycapsFrom") show each key as a keycap */
 class ListRowDelegate : public QStyledItemDelegate
 {
 public:
     explicit ListRowDelegate( QObject *parent ) : QStyledItemDelegate( parent ) {}
+
+    void paint( QPainter *p, const QStyleOptionViewItem &option,
+                const QModelIndex &index ) const Q_DECL_OVERRIDE
+    {
+        const QVariant from = option.widget ? option.widget->property( "keycapsFrom" ) : QVariant();
+        const QString key = index.data().toString();
+        if( !from.isValid() || index.column() < from.toInt() || key.isEmpty() )
+        {
+            QStyledItemDelegate::paint( p, option, index );
+            return;
+        }
+        /* the row's background and selection, without the text */
+        QStyleOptionViewItem opt = option;
+        initStyleOption( &opt, index );
+        opt.text.clear();
+        QStyle *style = opt.widget ? opt.widget->style() : QApplication::style();
+        style->drawControl( QStyle::CE_ItemViewItem, &opt, p, opt.widget );
+
+        const Theme *t = Theme::instance();
+        const QFont font = t->font( Theme::Mono );
+        const QFontMetrics fm( font );
+        const int padX = t->px( Prefs::KeycapPadX ), padY = t->px( Prefs::KeycapPadY );
+        const int bottom = t->px( Prefs::KeycapBottom ), radius = t->px( Prefs::KeycapRadius );
+        const int margin = style->pixelMetric( QStyle::PM_FocusFrameHMargin, 0, opt.widget ) + 1;
+        const QRect cell = opt.rect.adjusted( margin, 0, -margin, 0 );
+        const QString text = fm.elidedText( key, Qt::ElideRight, qMax( 0, cell.width() - 2 * padX ) );
+        /* the face's padding inside a 1 px outline, 2 px at the bottom */
+        QRect cap( 0, 0, qMin( cell.width(), fm.width( text ) + 2 * padX + 2 ),
+                   fm.height() + 2 * padY + 1 + bottom );
+        cap.moveTopLeft( QPoint( opt.direction == Qt::RightToLeft ? cell.right() + 1 - cap.width() : cell.left(),
+                                 cell.top() + ( cell.height() - cap.height() ) / 2 ) );
+
+        p->save();
+        p->setRenderHint( QPainter::Antialiasing );
+        p->setPen( Qt::NoPen );
+        /* the outline, its bottom thicker, under the face */
+        p->setBrush( t->ink( InkAlpha::Keycap ) );
+        p->drawRoundedRect( cap, radius, radius );
+        const QRect face = cap.adjusted( 1, 1, -1, -bottom );
+        p->setBrush( t->color( Theme::Raised ) );
+        p->drawRoundedRect( face, radius - 1, radius - 1 );
+        p->setFont( font );
+        p->setPen( t->color( Theme::Text ) );
+        p->drawText( face.translated( 0, -t->textNudge( font ) ), Qt::AlignCenter, text );
+        p->restore();
+    }
 
     QSize sizeHint( const QStyleOptionViewItem &option,
                     const QModelIndex &index ) const Q_DECL_OVERRIDE
@@ -263,12 +311,12 @@ static QFrame *buildRow( const Row &r, const QString &orphan, bool first, QList<
         QPushButton *button = qobject_cast<QPushButton *>( w );
         if( button && button->property( "role" ).isNull() )
             button->setProperty( "role", "outline" );
-        /* the form's grid gave them its column; a row gives them its end.
-         * shortcut: one width at every breakpoint, narrow it at XS if rows crowd */
+        /* the form's grid gave them its column; a row gives them its end,
+         * at the width PrefsPage::sizeFields() gives */
         if( qobject_cast<QComboBox *>( w ) || qobject_cast<QLineEdit *>( w ) )
         {
             if( fields == 1 )
-                w->setMinimumWidth( Theme::instance()->px( Prefs::ControlMinW ) );
+                w->setProperty( "prefsField", true );
             if( w->sizePolicy().horizontalPolicy() == QSizePolicy::Ignored )
                 w->setSizePolicy( QSizePolicy::Preferred, w->sizePolicy().verticalPolicy() );
         }
@@ -404,7 +452,8 @@ static void toRows( QWidget *box, const QString &orphan, bool inCard, bool place
 }
 
 PrefsPage::PrefsPage( intf_thread_t *_p_intf, QWidget *_tabAnchor )
-    : QWidget( NULL ), p_intf( _p_intf ), tabAnchor( _tabAnchor ), section( SPrefsDefaultCat )
+    : QWidget( NULL ), p_intf( _p_intf ), tabAnchor( _tabAnchor ), section( SPrefsDefaultCat ),
+      narrow( false )
 {
     static_assert( sizeof( sections ) / sizeof( sections[0] ) == SectionCount,
                    "one entry per section" );
@@ -531,6 +580,7 @@ void PrefsPage::showSection( int i )
         scroller->setFocusPolicy( Qt::NoFocus );
         QList<QWidget *> order;
         toRows( scroller->widget(), QString(), false, false, order );
+        sizeFields( scroller->widget() );
         scroller->widget()->setMaximumWidth( Theme::instance()->px( Prefs::ContentMaxW ) );
         /* built after the page, its widgets end the window's focus chain:
          * move them after the sections and before Advanced's buttons,
@@ -546,6 +596,21 @@ void PrefsPage::showSection( int i )
             }
     }
     stack->setCurrentWidget( panels[i] );
+}
+
+void PrefsPage::setNarrow( bool b )
+{
+    narrow = b;
+    sizeFields( this );
+}
+
+/* the prototype's select width: 240, 180 at XS */
+void PrefsPage::sizeFields( QWidget *root )
+{
+    const int w = Theme::instance()->px( narrow ? Prefs::ControlMinWXS : Prefs::ControlMinW );
+    foreach( QWidget *field, root->findChildren<QWidget *>() )
+        if( field->property( "prefsField" ).toBool() )
+            field->setMinimumWidth( w );
 }
 
 void PrefsPage::rebuild()

@@ -391,9 +391,16 @@ namespace RedesignTokens
         static const int RowGap = 20, DescGap = 3, ButtonGap = 8;
         /* selects and fields on the right of a row: the prototype's selW
          * (it narrows to 180 at XS) */
-        static const int ControlMinW = 240;
+        static const int ControlMinW = 240, ControlMinWXS = 180;
         /* not in tokens.json: the Hotkeys table shows at least this many rows */
         static const int HotkeysMinRows = 10;
+        /* a hotkey's keycap: the prototype's padding 4/10, radius 5, mono
+         * 12, an ink 0.10 outline, 2 px at the bottom */
+        static const int KeycapPadY = 4, KeycapPadX = 10, KeycapRadius = 5, KeycapBottom = 2;
+    }
+    namespace InkAlpha
+    {
+        static const int Keycap = 26;   /* 0.10 */
     }
 }
 
