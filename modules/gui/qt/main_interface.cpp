@@ -1036,22 +1036,27 @@ inline void MainInterface::showTab( QWidget *widget, bool video_closing )
     if ( widget == playlistWidget && !isPlDocked() )
         widget = bgWidget;
 
-    stackCentralOldWidget = stackCentralW->currentWidget();
+    QWidget *leaving = stackCentralW->currentWidget();
+    /* Preferences is a detour with its own way back (Sidebar::returnTo):
+     * never the page a stopping video returns to, nor what it replaces */
+    QWidget *prefs = sidebar->page( Sidebar::Preferences );
+    if( leaving != prefs && widget != prefs )
+        stackCentralOldWidget = leaving;
     if( !isFullScreen() )
-        stackWidgetsSizes[stackCentralOldWidget] = stackAreaSize();
+        stackWidgetsSizes[leaving] = stackAreaSize();
 
     /* If we are playing video, embedded */
     if( !video_closing && videoWidget && THEMIM->getIM()->hasVideo() )
     {
         /* Video -> Playlist */
-        if( videoWidget == stackCentralOldWidget && widget == playlistWidget )
+        if( videoWidget == leaving && widget == playlistWidget )
         {
             stackCentralW->removeWidget( videoWidget );
             videoWidget->show(); videoWidget->raise();
         }
 
         /* Playlist -> Video */
-        if( playlistWidget == stackCentralOldWidget && widget == videoWidget )
+        if( playlistWidget == leaving && widget == videoWidget )
         {
             playlistWidget->artContainer->removeWidget( videoWidget );
             videoWidget->show(); videoWidget->raise();
@@ -1059,7 +1064,7 @@ inline void MainInterface::showTab( QWidget *widget, bool video_closing )
         }
 
         /* Background or library page -> Video */
-        if( playlistWidget != stackCentralOldWidget && widget == videoWidget )
+        if( playlistWidget != leaving && widget == videoWidget )
         {
             /* In rare case when video is started before the interface */
             if( playlistWidget != NULL )
@@ -1077,7 +1082,7 @@ inline void MainInterface::showTab( QWidget *widget, bool video_closing )
     const auto stockView = [this]( QWidget *w ) {
         return w == bgWidget || w == videoWidget || w == playlistWidget;
     };
-    if( b_autoresize && stockView( stackCentralOldWidget ) && stockView( widget )
+    if( b_autoresize && stockView( leaving ) && stockView( widget )
      && stackWidgetsSizes.contains( widget ) )
         resizeStack( stackWidgetsSizes[widget].width(), stackWidgetsSizes[widget].height() );
 
@@ -1085,14 +1090,15 @@ inline void MainInterface::showTab( QWidget *widget, bool video_closing )
     msg_Dbg( p_intf, "Stack state changed to %s, index %i",
               stackCentralW->currentWidget()->metaObject()->className(),
               stackCentralW->currentIndex() );
-    msg_Dbg( p_intf, "New stackCentralOldWidget %s at index %i",
-              stackCentralOldWidget->metaObject()->className(),
-              stackCentralW->indexOf( stackCentralOldWidget ) );
+    if( stackCentralOldWidget )
+        msg_Dbg( p_intf, "New stackCentralOldWidget %s at index %i",
+                 stackCentralOldWidget->metaObject()->className(),
+                 stackCentralW->indexOf( stackCentralOldWidget ) );
 #endif
 
     /* This part is done later, to account for the new pl size */
     if( !video_closing && videoWidget && THEMIM->getIM()->hasVideo() &&
-        videoWidget == stackCentralOldWidget && widget == playlistWidget )
+        videoWidget == leaving && widget == playlistWidget )
     {
         playlistWidget->artContainer->addWidget( videoWidget );
         playlistWidget->artContainer->setCurrentWidget( videoWidget );
