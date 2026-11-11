@@ -522,9 +522,8 @@ void MainInterface::computeMinimumSize( bool b_minimal )
  * then the decks rebuilt at them */
 void MainInterface::followScreen()
 {
-    const QList<QScreen *> screens = QGuiApplication::screens();
-    const int n = QApplication::desktop()->screenNumber( this );
-    if( n < 0 || n >= screens.size() || !Theme::instance()->setScreen( screens.at( n ) ) )
+    /* the screen Qt gave the window, the one screenChanged() reports */
+    if( !windowHandle() || !Theme::instance()->setScreen( windowHandle()->screen() ) )
         return;
     computeMinimumSize( b_minimalView );
     toolBarConfUpdated();
