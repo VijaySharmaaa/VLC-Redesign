@@ -41,7 +41,9 @@
 #include <vlc_url.h>
 
 #include <QAction>
+#include <QApplication>
 #include <QHBoxLayout>
+#include <QIconEngine>
 #include <QImageReader>
 #include <QKeyEvent>
 #include <QKeySequence>
@@ -56,6 +58,7 @@
 #include <QScrollBar>
 #include <QStyle>
 #include <QToolButton>
+#include <QVariantAnimation>
 #include <QVBoxLayout>
 
 using namespace RedesignTokens;
@@ -534,8 +537,7 @@ QString CardDelegate::artPath( input_item_t *input, const QModelIndex &source ) 
         return path;
     if( !LibraryData::isFolder( model, source ) )
         return thumbs->frame( local, input_item_GetDuration( input ) / 1000 );
-    const QStringList *videos = thumbs->videos( local );
-    return videos && !videos->isEmpty() ? thumbs->frame( videos->first(), 0 ) : path;
+    return thumbs->folderFrame( local );
 }
 
 qreal CardDelegate::progress( input_item_t *input, const QModelIndex &source ) const
@@ -762,21 +764,11 @@ LibraryHeader::LibraryHeader( const QString &_title, QWidget *parent )
     title->setAccessibleName( pageTitle );
     layout->addWidget( title, 1 );
 
-    status = new QLabel( this );
-    status->setProperty( "role", "hint" );
-    layout->addWidget( status );
-
     searchEdit = new QLineEdit( this );
     searchEdit->setProperty( "role", "librarySearch" );
     searchEdit->setPlaceholderText( qtr( "Search media library" ) );
     searchEdit->setAccessibleName( qtr( "Search media library" ) );
-    searchEdit->setClearButtonEnabled( true );
-    searchEdit->addAction( Theme::themedIcon( RedesignIcons::IconSearch, Theme::Dim ),
-                           QLineEdit::LeadingPosition )->setText( qtr( "Search" ) );
-    /* names the field's icon buttons for screen readers */
-    QAction *clear = searchEdit->findChild<QAction *>( QLatin1String( "_q_qlineeditclearaction" ) );
-    if( clear )
-        clear->setText( qtr( "Clear search" ) );
+    setupSearchField( searchEdit, qtr( "Search" ), qtr( "Clear search" ) );
     searchEdit->setFixedHeight( t->metric( Theme::InputH ) );
     layout->addWidget( searchEdit );
 }
@@ -786,11 +778,6 @@ void LibraryHeader::setFolder( const QString &name )
     title->setText( name.isEmpty() ? pageTitle : name );
     title->setAccessibleName( title->text() );
     back->setVisible( !name.isEmpty() );
-}
-
-void LibraryHeader::setStatus( const QString &text )
-{
-    status->setText( text );
 }
 
 void LibraryHeader::resizeEvent( QResizeEvent *e )
@@ -831,8 +818,12 @@ LibraryEmptyState::LibraryEmptyState( const QString &text, const QString &note, 
 
     QLabel *cone = new QLabel( this );
     const int conePx = t->px( Library::EmptyCone );
-    cone->setPixmap( t->icon( QLatin1String( RedesignIcons::IconCone ), Theme::Accent,
-                              QSize( conePx, conePx ) ).pixmap( conePx, conePx ) );
+    /* the original cone, as drawn, at the size nearest the screen's */
+    QIcon logo;
+    logo.addFile( ":/logo/vlc48.png" );
+    logo.addFile( ":/logo/vlc128.png" );
+    logo.addFile( ":/logo/vlc256.png" );
+    cone->setPixmap( logo.pixmap( conePx, conePx ) );
     layout->addWidget( cone, 0, Qt::AlignHCenter );
 
     QLabel *title = new QLabel( qtr( "Your library is empty" ), this );
@@ -913,4 +904,234 @@ void LibraryEmptyState::paintEvent( QPaintEvent * )
     p.setBrush( Qt::NoBrush );
     const qreal radius = t->metric( Theme::RadiusTile );
     p.drawRoundedRect( QRectF( contentsRect() ).adjusted( w / 2, w / 2, -w / 2, -w / 2 ), radius, radius );
+}
+
+/**********************************************************************
+ * LoadingRing
+ **********************************************************************/
+LoadingRing::LoadingRing( QWidget *parent ) : QWidget( parent )
+{
+    setAccessibleName( qtr( "Loading" ) );
+    spin = new QVariantAnimation( this );
+    spin->setStartValue( 0. );
+    spin->setEndValue( 360. );
+    spin->setLoopCount( -1 );
+    connect( spin, &QVariantAnimation::valueChanged, this,
+             static_cast<void (QWidget::*)()>( &QWidget::update ) );
+}
+
+QSize LoadingRing::sizeHint() const
+{
+    const int px = Theme::instance()->px( Library::NoticeRing );
+    return QSize( px, px );
+}
+
+void LoadingRing::showEvent( QShowEvent *e )
+{
+    /* 0: Windows animations are off, a still ring */
+    const int ms = Theme::instance()->duration( Theme::Spinner );
+    if( ms )
+    {
+        spin->setDuration( ms );
+        spin->start();
+    }
+    QWidget::showEvent( e );
+}
+
+void LoadingRing::hideEvent( QHideEvent *e )
+{
+    spin->stop();
+    QWidget::hideEvent( e );
+}
+
+void LoadingRing::paintEvent( QPaintEvent * )
+{
+    const Theme *t = Theme::instance();
+    QPainter p( this );
+    p.setRenderHint( QPainter::Antialiasing );
+    const qreal w = t->px( Library::NoticeRingWidth );
+    const int side = qMin( width(), height() );
+    const QRectF r = QRectF( ( width() - side ) / 2., ( height() - side ) / 2., side, side )
+                         .adjusted( w / 2, w / 2, -w / 2, -w / 2 );
+    p.setPen( QPen( t->ink( InkAlpha::Track ), w ) );
+    p.drawEllipse( r );
+    /* the accent top quarter, turning clockwise (Qt's angles turn the other way) */
+    const qreal turn = spin->state() == QAbstractAnimation::Running ? spin->currentValue().toReal() : 0.;
+    p.setPen( QPen( t->color( Theme::Accent ), w, Qt::SolidLine, Qt::FlatCap ) );
+    p.drawArc( r, qRound( ( 45. - turn ) * 16 ), 90 * 16 );
+}
+
+/**********************************************************************
+ * LibraryNotice
+ **********************************************************************/
+LibraryNotice::LibraryNotice( QWidget *parent ) : QWidget( parent )
+{
+    Theme *t = Theme::instance();
+    QVBoxLayout *layout = new QVBoxLayout( this );
+    const int pad = t->px( Library::EmptyPad );
+    layout->setContentsMargins( pad, 0, pad, 0 );
+    layout->setSpacing( t->px( Library::EmptyGap ) );
+    layout->addStretch( 1 );
+
+    ring = new LoadingRing( this );
+    layout->addWidget( ring, 0, Qt::AlignHCenter );
+    glyph = new QLabel( this );
+    layout->addWidget( glyph, 0, Qt::AlignHCenter );
+    title = new QLabel( this );
+    title->setFont( fontAt( Theme::PanelTitle, Library::EmptyTitle, true ) );
+    layout->addWidget( title, 0, Qt::AlignHCenter );
+    text = new FixedTextLabel( QString(), this );
+    text->setProperty( "role", "hint" );
+    text->setWordWrap( true );
+    text->setAlignment( Qt::AlignCenter );
+    text->setFixedWidth( t->px( Library::EmptyTextW ) );
+    layout->addWidget( text, 0, Qt::AlignHCenter );
+
+    QHBoxLayout *buttons = new QHBoxLayout;
+    buttons->setSpacing( t->px( Library::EmptyButtonGap ) );
+    primary = new QPushButton( this );
+    primary->setProperty( "role", "primary" );
+    connect( primary, &QPushButton::clicked, this, &LibraryNotice::primaryClicked );
+    secondary = new QPushButton( this );
+    secondary->setProperty( "role", "outline" );
+    connect( secondary, &QPushButton::clicked, this, &LibraryNotice::secondaryClicked );
+    foreach( QPushButton *b, QList<QPushButton *>() << primary << secondary )
+    {
+        b->setFixedHeight( t->px( Library::EmptyButtonH ) );
+        b->setFocusPolicy( Qt::TabFocus );
+        b->setCursor( Qt::PointingHandCursor );
+        buttons->addWidget( b );
+    }
+    layout->addSpacing( t->px( Library::EmptyButtonsTop ) );
+    layout->addLayout( buttons );
+    layout->setAlignment( buttons, Qt::AlignHCenter );
+    layout->addStretch( 1 );
+    /* a page moving the focus here from its grid lands on the action */
+    setFocusProxy( primary );
+}
+
+void LibraryNotice::setText( QLabel *label, const QString &s )
+{
+    /* called for each row of a scan */
+    if( label->text() == s && label->isVisibleTo( this ) == !s.isEmpty() )
+        return;
+    label->setText( s );
+    label->setVisible( !s.isEmpty() );
+    if( label == text )   /* its wrapped size, as LibraryEmptyState's */
+        label->setFixedHeight( label->heightForWidth( label->width() ) );
+}
+
+void LibraryNotice::showLoading( const QString &caption )
+{
+    glyph->hide();
+    title->hide();
+    setText( text, caption );
+    primary->hide();
+    secondary->hide();
+    ring->show();
+    setAccessibleName( caption );
+}
+
+void LibraryNotice::showMessage( const char *icon, Theme::ColorRole role, const QString &_title,
+                                 const QString &_text, const QString &primaryText,
+                                 const QString &secondaryText )
+{
+    Theme *t = Theme::instance();
+    ring->hide();
+    const int px = t->px( Library::NoticeGlyph );
+    glyph->setPixmap( t->icon( QLatin1String( icon ), role, QSize( px, px ) ).pixmap( px, px ) );
+    glyph->show();
+    setText( title, _title );
+    setText( text, _text );
+    primary->setText( primaryText );
+    primary->setVisible( !primaryText.isEmpty() );
+    secondary->setText( secondaryText );
+    secondary->setVisible( !secondaryText.isEmpty() );
+    setAccessibleName( _title );
+}
+
+/**********************************************************************
+ * Search fields
+ **********************************************************************/
+namespace {
+/* A themed glyph at the token size, centred in the box QLineEdit gives
+ * its action icons: Qt 5.6 makes that 32 px in a field 34 px or taller,
+ * 16 px below, so the plain icon was twice as big in the library's field */
+class FieldIconEngine : public QIconEngine
+{
+public:
+    FieldIconEngine( const char *_name, Theme::ColorRole _role ) : name( _name ), role( _role ) {}
+
+    QPixmap pixmap( const QSize &size, QIcon::Mode mode, QIcon::State state ) Q_DECL_OVERRIDE
+    {
+        /* size is in device pixels: QIcon asked for the window's ratio */
+        QPixmap canvas( size );
+        canvas.fill( Qt::transparent );
+        QPainter p( &canvas );
+        const int px = qMin( qRound( Theme::instance()->px( Library::FieldGlyph )
+                                     * qApp->devicePixelRatio() ),
+                             qMin( size.width(), size.height() ) );
+        QRect glyph( 0, 0, px, px );
+        glyph.moveCenter( canvas.rect().center() );
+        Theme::themedIcon( name, role ).paint( &p, glyph, Qt::AlignCenter, mode, state );
+        return canvas;
+    }
+    void paint( QPainter *p, const QRect &rect, QIcon::Mode mode, QIcon::State state ) Q_DECL_OVERRIDE
+    {
+        const int px = qMin( Theme::instance()->px( Library::FieldGlyph ),
+                             qMin( rect.width(), rect.height() ) );
+        QRect glyph( 0, 0, px, px );
+        glyph.moveCenter( rect.center() );
+        Theme::themedIcon( name, role ).paint( p, glyph, Qt::AlignCenter, mode, state );
+    }
+    QIconEngine *clone() const Q_DECL_OVERRIDE { return new FieldIconEngine( *this ); }
+
+private:
+    const char *name;
+    Theme::ColorRole role;
+};
+
+/* Esc empties the field when it has text, else goes on (a page's back,
+ * a panel's close) */
+class EscClears : public QObject
+{
+public:
+    explicit EscClears( QLineEdit *edit ) : QObject( edit ) { edit->installEventFilter( this ); }
+
+protected:
+    bool eventFilter( QObject *o, QEvent *e ) Q_DECL_OVERRIDE
+    {
+        QLineEdit *edit = static_cast<QLineEdit *>( o );
+        if( ( e->type() != QEvent::KeyPress && e->type() != QEvent::ShortcutOverride )
+         || static_cast<QKeyEvent *>( e )->key() != Qt::Key_Escape
+         || static_cast<QKeyEvent *>( e )->modifiers() != Qt::NoModifier || edit->text().isEmpty() )
+            return false;
+        /* before an Esc shortcut of the window can take it */
+        if( e->type() == QEvent::KeyPress )
+            edit->clear();
+        e->accept();
+        return true;
+    }
+};
+}
+
+void setupSearchField( QLineEdit *edit, const QString &searchName, const QString &clearName )
+{
+    edit->setClearButtonEnabled( false );   /* Qt's own X is not themed */
+    edit->addAction( QIcon( new FieldIconEngine( RedesignIcons::IconSearch, Theme::Dim ) ),
+                     QLineEdit::LeadingPosition )->setText( searchName );
+    QAction *clear = new QAction( QIcon( new FieldIconEngine( RedesignIcons::IconClose, Theme::Text2 ) ),
+                                  clearName, edit );
+    clear->setToolTip( QString( "%1 (%2)" ).arg( clearName,
+        QKeySequence( Qt::Key_Escape ).toString( QKeySequence::NativeText ) ) );
+    QObject::connect( clear, &QAction::triggered, edit, &QLineEdit::clear );
+    /* shown only with text: added and taken away, as Qt 5.6 keeps the
+     * button of a hidden action */
+    QObject::connect( edit, &QLineEdit::textChanged, clear, [edit, clear]( const QString &text ) {
+        if( text.isEmpty() )
+            edit->removeAction( clear );
+        else if( !edit->actions().contains( clear ) )
+            edit->addAction( clear, QLineEdit::TrailingPosition );
+    } );
+    new EscClears( edit );
 }

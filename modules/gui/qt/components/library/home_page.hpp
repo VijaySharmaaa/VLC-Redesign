@@ -29,6 +29,7 @@
 
 class ArtLoader;
 class LibraryEmptyState;
+class LibraryNotice;
 class LibraryHeader;
 class QHBoxLayout;
 class QTreeWidget;
@@ -74,6 +75,7 @@ private:
     QList<ResumeCard *> cards;
     QTreeWidget *table;
     LibraryEmptyState *empty;
+    LibraryNotice *noResults;
     QSet<QString> missing;  /* mrls of local files that are not there */
     /* one check at a time: a blocked one must not pile up others */
     bool checking, recheck;

@@ -30,6 +30,7 @@ class CardView;
 class LibraryEmptyState;
 class LibraryFilter;
 class LibraryHeader;
+class LibraryNotice;
 class PLModel;
 class QStackedWidget;
 class QTimer;
@@ -57,6 +58,7 @@ private:
     void browse( const QModelIndex &source );
     void goBack();
     void updateState();
+    void noticeAction( bool primary );
     void setAttached( bool );
     QModelIndex rootIndex() const;
 
@@ -68,11 +70,14 @@ private:
     QStackedWidget *body;
     CardView *view;
     LibraryEmptyState *empty;
+    LibraryNotice *notice;   /* loading, empty folder, no results, failed */
     Thumbnailer *thumbs;    /* Videos only */
     QTimer *settle;
     int expandingId;   /* a folder being expanded, to browse into */
+    QPersistentModelIndex expanding;
+    QTimer *expandTimer;     /* then the folder is reported as not opened */
     QSet<int> expandRequested;
-    bool loaded;
+    bool loaded, loadFailed, expandFailed;
     /* a burst of inserted rows detaches the grid until the scan settles */
     QElapsedTimer burstClock;
     int burstRows;

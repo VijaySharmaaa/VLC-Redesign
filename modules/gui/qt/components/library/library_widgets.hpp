@@ -21,6 +21,7 @@
 
 #include "qt.hpp"
 #include "util/breakpoints.hpp"
+#include "util/theme.hpp"                       /* Theme::ColorRole */
 
 #include <QListView>
 #include <QPersistentModelIndex>
@@ -33,7 +34,9 @@
 class PLModel;
 class QLabel;
 class QLineEdit;
+class QPushButton;
 class QTimer;
+class QVariantAnimation;
 class QThreadPool;
 class QToolButton;
 class Thumbnailer;
@@ -193,14 +196,13 @@ private:
     bool backEnabled;
 };
 
-/* Title row of a library page: back, title, status, search field */
+/* Title row of a library page: back, title, search field */
 class LibraryHeader : public QWidget
 {
     Q_OBJECT
 public:
     LibraryHeader( const QString &title, QWidget *parent );
     void setFolder( const QString &name ); /* empty: the page's own title */
-    void setStatus( const QString & );
     QLineEdit *search() const { return searchEdit; }
 
 signals:
@@ -212,7 +214,7 @@ protected:
 private:
     QString pageTitle;
     QToolButton *back;
-    QLabel *title, *status;
+    QLabel *title;
     QLineEdit *searchEdit;
 };
 
@@ -233,12 +235,59 @@ private:
     QLabel *noteLabel;
 };
 
+/* The library's loading indicator: the buffering ring's accent arc turning
+ * on an ink track, only while shown; still when Windows animations are off */
+class LoadingRing : public QWidget
+{
+    Q_OBJECT
+public:
+    explicit LoadingRing( QWidget *parent );
+    QSize sizeHint() const Q_DECL_OVERRIDE;
+
+protected:
+    void paintEvent( QPaintEvent * ) Q_DECL_OVERRIDE;
+    void showEvent( QShowEvent * ) Q_DECL_OVERRIDE;
+    void hideEvent( QHideEvent * ) Q_DECL_OVERRIDE;
+
+private:
+    QVariantAnimation *spin;
+};
+
+/* A page's or folder's state in the middle of its content area: loading
+ * (the ring and a caption), or a glyph, a title, a text and up to two
+ * buttons (empty folder, no results, could not be opened) */
+class LibraryNotice : public QWidget
+{
+    Q_OBJECT
+public:
+    explicit LibraryNotice( QWidget *parent );
+    void showLoading( const QString &caption );
+    /* an empty button text hides that button */
+    void showMessage( const char *icon, Theme::ColorRole, const QString &title, const QString &text,
+                      const QString &primary, const QString &secondary );
+
+signals:
+    void primaryClicked();
+    void secondaryClicked();
+
+private:
+    void setText( QLabel *, const QString & );
+
+    LoadingRing *ring;
+    QLabel *glyph, *title, *text;
+    QPushButton *primary, *secondary;
+};
+
 /* "2010 · 1080p · H.264 · 5.1": what preparsing found so far of an item's
  * year, picture height, video codec and surround channels; empty if none */
 QString mediaMetaLine( input_item_t * );
 
 /* The item's local file or folder, empty when it is not one */
 QString localPath( input_item_t * );
+
+/* The library's and the playlist's search field: a small search glyph
+ * ahead, a themed X that clears it while it has text, Esc clears too */
+void setupSearchField( QLineEdit *, const QString &searchName, const QString &clearName );
 
 /* A card's progress (0..1) along the bottom of its picture */
 void paintProgress( QPainter *, const QRectF &thumb, qreal fraction, Qt::LayoutDirection );
