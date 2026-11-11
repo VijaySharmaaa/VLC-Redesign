@@ -238,6 +238,9 @@ OpenDialog::OpenDialog( QWidget *parent,
 
     /* Cancel Button */
     cancelButton = new QPushButton( qtr( "&Cancel" ) );
+    /* the split button's room for its focus ring made it taller than the
+     * push buttons beside it, its label a pixel lower: one height */
+    playButton->setFixedHeight( cancelButton->sizeHint().height() );
 
     /* Select Button */
     selectButton = new QPushButton( qtr( "&Select" ) );

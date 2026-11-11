@@ -438,6 +438,11 @@ namespace
         {
             QProxyStyle::polish(w);
             QLineEdit *edit = qobject_cast<QLineEdit *>(w);
+            /* not an item view's editor: it is as tall as its row, the
+             * nudge cut the descenders and put the capitals on the frame */
+            if (edit && edit->parentWidget()
+                && qobject_cast<QAbstractItemView *>(edit->parentWidget()->parentWidget()))
+                edit = NULL;
             if (edit && Theme::instance())
             {
                 /* the text up by the nudge, the field's height unchanged;
@@ -639,10 +644,14 @@ void Theme::reload()
     emit changed();
 }
 
-int Theme::textNudge(const QFont &f) const
+int Theme::textNudge(const QFont &font) const
 {
-    /* at the font's own dpi: a widget's or a painter's font carries its screen's */
-    const QString key = f.key() + QLatin1Char('|') + QString::number(QFontInfo(f).pixelSize());
+    /* by family and size only: the offset is about half a pixel at 13 px,
+     * and a weight's own rounding put a semibold label (Play) a pixel
+     * below a regular one (Cancel) */
+    QFont f(font.family());
+    f.setPixelSize(QFontInfo(font).pixelSize());
+    const QString key = f.family() + QLatin1Char('|') + QString::number(f.pixelSize());
     QHash<QString, int>::const_iterator it = nudges.constFind(key);
     if (it != nudges.constEnd())
         return it.value();
