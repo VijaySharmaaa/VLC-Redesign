@@ -845,7 +845,9 @@ void DialogsProvider::loadSubtitlesFile()
 
     foreach( const QString &qsUrl, qsl )
     {
-        if( input_AddSlave( p_input, SLAVE_TYPE_SPU, qtu( qsUrl ), true, true, false ) )
+        /* the main window's toast says it: no on-video OSD as well */
+        if( input_AddSlave( p_input, SLAVE_TYPE_SPU, qtu( qsUrl ), true,
+                            p_intf->p_sys->p_mi == NULL, false ) )
             msg_Warn( p_intf, "unable to load subtitles from '%s'",
                       qtu( qsUrl ) );
         else if( p_intf->p_sys->p_mi )

@@ -2240,7 +2240,7 @@ void MainInterface::dropEventPlay( QDropEvent *event, bool b_play, bool b_playli
     if( mimeData->urls().count() == 1 && THEMIM->getIM()->hasInput() )
     {
         if( !input_AddSlave( THEMIM->getInput(), SLAVE_TYPE_SPU,
-                 qtu( mimeData->urls()[0].toString() ), true, true, true ) )
+                 qtu( mimeData->urls()[0].toString() ), true, false, true ) )
         {
             showToast( qtr( "Loaded subtitle: %1" )
                        .arg( QFileInfo( mimeData->urls()[0].path() ).fileName() ) );
