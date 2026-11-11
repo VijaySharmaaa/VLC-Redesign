@@ -448,6 +448,6 @@ Evidence: `D:\Projects\VLC\spike-results\p6-edge\` (runtime sessions), `p6-va\`,
 | Recents length while playing | **fixed** | Updated in place, no page rebuild (focus kept). |
 | Prefs Save/Cancel/Reset; stop after Preferences | **pass** / **fixed** | Stopping a video after Preferences now goes Home; the docked playlist hides while Preferences shows. |
 | Open media: arrow keys, Capture | **fixed** / **deferred** | Arrow keys no longer reach Capture by accident; Capture itself still blocks in the DirectShow scan (stock). |
-| Closing during playback, 50× open/close | **pending re-run** | The survey (Phase 5 build, 20–60 cycles) found no leak; re-run on the final build below. |
+| Closing during playback, 50× open/close | **pass** | Final build, 50 cycles each (Preferences, Effects docked and XS, Open media, playlist, Media info, Go to time, About): handles, GDI and USER flat. The docked Effects sheet's private bytes rise 1.5 MB by cycle 25 then level off over 150 cycles (heap churn from resizing the video area; stock's separate Effects window doesn't resize the video). Exit code 0 in 0.2–0.6 s with each surface open; with a modal dialog (Open media, About) the main window ignores close, as in stock. |
 | Overlays over the video after the native-window change | **pass** | Docked and XS panels, fullscreen controller, minimal view, mini player, audio mode, resize, dark and light. |
 | Mouse wheel over panels | **fixed** | The wheel over the Effects sheet or playlist no longer changes the volume. |
