@@ -377,6 +377,46 @@ static QFrame *buildRow( const Row &r, const QString &orphan, bool first, QList<
  * boxes become cards; rows outside them are gathered in cards of their own.
  * `placed`: something is above in the same card (the first row draws a
  * hairline then). The rows' Tab order is appended to `order`. */
+/* A stack as tall as its current page: Qt 5.6's QStackedWidget takes its
+ * tallest page's size hint whatever the pages' size policies, which left a
+ * short page (the skin file) a large empty card. The other pages' Ignored
+ * policy keeps the minimum down, the maximum caps the hint. */
+class StackFit : public QObject
+{
+public:
+    explicit StackFit( QStackedWidget *s ) : QObject( s ), pages( s )
+    {
+        s->installEventFilter( this );
+        connect( s, &QStackedWidget::currentChanged, this, &StackFit::fit );
+        fit();
+    }
+
+    bool eventFilter( QObject *, QEvent *e ) override
+    {
+        /* a new width wraps the rows' text; a page's hint changed */
+        if( e->type() == QEvent::Resize || e->type() == QEvent::LayoutRequest )
+            fit();
+        return false;
+    }
+
+private:
+    void fit()
+    {
+        QWidget *cur = pages->currentWidget();
+        for( int p = 0; p < pages->count(); p++ )
+            pages->widget( p )->setSizePolicy( QSizePolicy::Preferred, pages->widget( p ) == cur
+                                               ? QSizePolicy::Preferred : QSizePolicy::Ignored );
+        if( !cur )
+            return;
+        const int w = pages->contentsRect().width();
+        const int h = cur->hasHeightForWidth() && w > 0 ? cur->heightForWidth( w )
+                                                        : cur->sizeHint().height();
+        pages->setMaximumHeight( qMax( h, cur->minimumSizeHint().height() ) + 2 * pages->frameWidth() );
+    }
+
+    QStackedWidget *pages;
+};
+
 static void toRows( QWidget *box, const QString &orphan, bool inCard, bool placed,
                     QList<QWidget *> &order )
 {
@@ -450,17 +490,7 @@ static void toRows( QWidget *box, const QString &orphan, bool inCard, bool place
             {
                 for( int p = 0; p < pages->count(); p++ )
                     toRows( pages->widget( p ), orphan, inCard, inCard && placed, order );
-                /* as tall as its current page: a stack takes its tallest
-                 * page's height, which left a short page (the skin file)
-                 * a large empty card */
-                const auto fit = [pages]( int current )
-                {
-                    for( int p = 0; p < pages->count(); p++ )
-                        pages->widget( p )->setSizePolicy( QSizePolicy::Preferred, p == current
-                                                           ? QSizePolicy::Preferred : QSizePolicy::Ignored );
-                };
-                fit( pages->currentIndex() );
-                QObject::connect( pages, &QStackedWidget::currentChanged, pages, fit );
+                new StackFit( pages );
             }
             else if( isZone( r.block ) )
                 toRows( r.block, orphan, inCard, inCard && placed, order );
