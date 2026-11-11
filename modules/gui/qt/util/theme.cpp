@@ -1188,7 +1188,9 @@ QToolButton[role="split"][popupMode="1"] { padding-right: @splitPadR@px; }
 QToolButton[role="split"]:hover { background: @accentHover@; }
 QToolButton[role="split"]:focus { border-color: @onAccent@; }
 QToolButton[role="split"]::menu-arrow { image: url("@arrowDownOnAccent@"); }
-QToolButton[role="split"]:disabled { background: @panel@; color: @dim@; }
+/* as QPushButton:disabled: on the dialog's own panel colour the outline is
+   what is left of the button */
+QToolButton[role="split"]:disabled { background: @panel@; color: @dim@; border-color: @divider@; }
 QToolButton[role="split"]::menu-arrow:disabled { image: url("@arrowDownDim@"); }
 QLabel[role="errorIcon"] { background: @errorTint@; border-radius: @errorIconR@px; }
 QPushButton[role="link"] { background: transparent; color: @accTx@; border: @ring@px solid transparent; }
