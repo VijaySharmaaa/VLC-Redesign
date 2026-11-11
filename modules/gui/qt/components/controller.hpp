@@ -38,12 +38,15 @@
 
 /* The redesign's deck (DESIGN_SPEC 3); read only when the key is unset, so
  * saved layouts stay as they are. The DVD menu buttons (37) left the deck:
- * they are in the Playback menu and the toolbar editor. */
+ * they are in the Playback menu and the toolbar editor. The expert controls
+ * (A-B, frame, snapshot, record, aspect ratio) are in the deck itself, not
+ * in the Advanced Controls row (39): every button shows while it fits, the
+ * rest go to the deck's More menu (AbstractController::fitDeck). */
 #define MAIN_TB1_DEFAULT "38;65"
-#define MAIN_TB2_DEFAULT "0-2;3;1;4;32;20;19;39;65;26;42;9;10;27;7;32;35-4"
+#define MAIN_TB2_DEFAULT "0-2;3;1;4;32;20;19;13;14;11;12;41;65;26;42;9;10;27;7;32;35-4"
 #define ADV_TB_DEFAULT "32;13;14;11;12;41"
 #define INPT_TB_DEFAULT "43;33-4;44"
-#define FSC_TB_DEFAULT "0-2;3;1;4;32;20;19;65;26;42;9;10;8;25;32;35-4"
+#define FSC_TB_DEFAULT "0-2;3;1;4;32;20;19;13;14;11;12;41;65;26;42;9;10;8;25;32;35-4"
 
 #define I_PLAY_TOOLTIP N_("Play\nIf the playlist is empty, open a medium")
 
@@ -52,6 +55,7 @@ class QHBoxLayout;
 
 class QAbstractButton;
 class QToolButton;
+class QMenu;
 
 class WidgetListing;
 
@@ -194,6 +198,14 @@ protected:
                                      buttonType_e i_type, int i_option );
 
     QWidget *createWidget( buttonType_e, int options = WIDGET_NORMAL );
+
+    /* The owner's I2 rule: every item shows while the deck fits in room;
+     * the optional ones that do not go, lowest rank first, into the More
+     * (⋯) menu at the end of the deck, which shows only then */
+    void addMoreButton( QBoxLayout * );
+    void fitDeck( int room );
+    QList<QWidget *> rankedItems() const;   /* lowest rank first */
+    QToolButton *moreButton;                /* NULL without addMoreButton */
     /* deck buttons: the tooltip gets the button's shortcut (hotkey
      * property); Space and Enter are MainInterface's ButtonKeys */
     bool eventFilter( QObject *, QEvent * ) Q_DECL_OVERRIDE;
@@ -204,6 +216,7 @@ private:
     void applyAttributes( QToolButton *, bool b_flat, bool b_big );
 
     QHBoxLayout         *buttonGroupLayout;
+    void buildMoreMenu( QMenu * );
 protected slots:
     virtual void setStatus( int );
 
@@ -238,8 +251,10 @@ public:
     /* p_intf, advanced control visible or not, blingbling or not */
     ControlsWidget( intf_thread_t *_p_i, bool b_advControls,
                     QWidget *_parent = 0 );
-    /* the width with the optional items dropped: the window's minimum */
+    /* the width with the optional items in the More menu: the window's minimum */
     int compactWidth() const;
+    /* as narrow as compactWidth: fitDeck moves the rest to More */
+    QSize minimumSizeHint() const Q_DECL_OVERRIDE;
 
 protected:
     friend class MainInterface;
@@ -248,10 +263,6 @@ protected:
 
     bool advancedAvailable();
     bool b_advancedVisible;
-
-private:
-    QList<QWidget *> optionalItems() const;
-    void fitWidth();
 
 protected slots:
     void toggleAdvanced();

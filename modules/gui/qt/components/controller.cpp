@@ -45,12 +45,12 @@
 #include "util/input_slider.hpp"                         /* SeekSlider */
 #include "util/customwidgets.hpp"                       /* qEventToKey */
 #include "util/theme.hpp"
-#include "util/breakpoints.hpp"                         /* BreakpointWatcher */
 
 #include "adapters/seekpoints.hpp"
 
 
 #include <QToolButton>
+#include <QMenu>
 #include <QStyle>
 #include <QToolTip>
 #include <QHelpEvent>
@@ -65,6 +65,8 @@
 #if QT_VERSION < QT_VERSION_CHECK(5, 10, 0)
 #include <QDesktopWidget>
 #endif
+
+#include <algorithm>                                    /* std::stable_sort */
 
 //#define DEBUG_LAYOUT 1
 
@@ -188,6 +190,7 @@ AbstractController::AbstractController( intf_thread_t * _p_i, QWidget *_parent )
     p_intf = _p_i;
     advControls = NULL;
     buttonGroupLayout = NULL;
+    moreButton = NULL;
 
     /* Main action provider */
     toolbarActionsMapper = new QSignalMapper( this );
@@ -346,18 +349,17 @@ void AbstractController::createAndAddWidget( QBoxLayout *controlLayout_,
         QWidget *widg = createWidget( i_type, i_option );
         if( !widg ) return;
 
-        /* DESIGN_SPEC 3's "*" items, in the menus too: a narrow deck drops
-         * them (ControlsWidget::fitWidth). Stop stays at every width (the
+        /* The items a narrow deck moves to its More menu (fitDeck), the
+         * lowest rank first: the expert row, the expert controls, then
+         * DESIGN_SPEC 3's "*" items. Stop stays at every width (the
          * owner's I1 decision) */
-        switch( i_type )
-        {
-        case LOOP_BUTTON: case RANDOM_BUTTON: case SPEED_LABEL:
-        case MINIPLAYER_BUTTON: case FULLSCREEN_BUTTON:
-            widg->setProperty( "deckOptional", true );
-            break;
-        default:
-            break;
-        }
+        static const buttonType_e dropOrder[] = {
+            ADVANCED_CONTROLLER, FRAME_BUTTON, ATOB_BUTTON, SNAPSHOT_BUTTON,
+            ASPECT_RATIO_COMBOBOX, RECORD_BUTTON, SPEED_LABEL, MINIPLAYER_BUTTON,
+            RANDOM_BUTTON, LOOP_BUTTON, FULLSCREEN_BUTTON };
+        for( size_t i = 0; i < sizeof( dropOrder ) / sizeof( *dropOrder ); i++ )
+            if( dropOrder[i] == i_type )
+                widg->setProperty( "deckRank", (int)i + 1 );
 
         /* Buttons */
         if( i_type < BUTTON_MAX )
@@ -525,10 +527,7 @@ QWidget *AbstractController::createWidget( buttonType_e button, int options )
          * deck hidden; hotkeyL keeps it in the tooltip */
         ABButton->setCheckable( true );
         BUTTON_SET_BAR( ABButton );
-        /* the design's text, accent while a point is set (checked) */
-        ABButton->setToolButtonStyle( Qt::ToolButtonTextOnly );
-        ABButton->setText( qtr( "A–B" ) );
-        ABButton->setFont( Theme::instance()->font( Theme::Meta ) );
+        /* an icon as the other deck buttons, accent while a point is set */
         ENABLE_ON_INPUT( ABButton );
         connect( ABButton, &AtoB_Button::clicked, toolbarActionsMapper, QOverload<>::of(&QSignalMapper::map) );
         toolbarActionsMapper->setMapping( ABButton, ATOB_ACTION );
@@ -671,10 +670,11 @@ QWidget *AbstractController::createWidget( buttonType_e button, int options )
         }
         break;
     case ASPECT_RATIO_COMBOBOX:
-        widget = new AspectRatioBadge( p_intf );
-        widget->setFixedHeight( Theme::instance()->metric( Theme::IconButton ) );
-        widget->setFocusPolicy( Qt::TabFocus );
-        widget->installEventFilter( this );
+        {
+            AspectRatioBadge *aspect = new AspectRatioBadge( p_intf );
+            setupButton( aspect );
+            widget = aspect;
+        }
         break;
     case SPEED_LABEL:
         {
@@ -942,6 +942,134 @@ QFrame *AbstractController::telexFrame()
 #undef ENABLE_ON_VIDEO
 #undef ENABLE_ON_INPUT
 
+/* the deck's widgets in the order on screen */
+static void deckWidgets( QLayout *layout, QList<QWidget *> &out )
+{
+    for( int i = 0; i < layout->count(); i++ )
+    {
+        QLayoutItem *item = layout->itemAt( i );
+        if( item->layout() )
+            deckWidgets( item->layout(), out );
+        else if( item->widget() )
+            out << item->widget();
+    }
+}
+
+QList<QWidget *> AbstractController::rankedItems() const
+{
+    QList<QWidget *> all, items;
+    deckWidgets( layout(), all );
+    /* not one its owner hid (the Advanced Controls toggle) */
+    foreach( QWidget *w, all )
+        if( w->property( "deckRank" ).toInt() > 0
+            && ( !w->isHidden() || w->property( "deckDropped" ).toBool() ) )
+            items << w;
+    std::stable_sort( items.begin(), items.end(), []( QWidget *a, QWidget *b ) {
+        return a->property( "deckRank" ).toInt() < b->property( "deckRank" ).toInt();
+    } );
+    return items;
+}
+
+void AbstractController::addMoreButton( QBoxLayout *row )
+{
+    moreButton = new QToolButton;
+    setupButton( moreButton );
+    moreButton->setIcon( deckIcon( RedesignIcons::IconMore ) );
+    moreButton->setAccessibleName( qtr( "More" ) );
+    moreButton->setToolTip( qtr( "More controls" ) );
+    /* opened from clicked, so Space and Enter (ButtonKeys) open it too */
+    QMenu *menu = new QMenu( moreButton );
+    connect( moreButton, &QToolButton::clicked, this, [this, menu]() {
+        buildMoreMenu( menu );
+        const QSize size = menu->sizeHint();
+        menu->exec( moreButton->mapToGlobal( QPoint( moreButton->width() - size.width(),
+                                                     -size.height() ) ) );
+    } );
+    moreButton->hide();
+    row->addWidget( moreButton );
+}
+
+void AbstractController::fitDeck( int room )
+{
+    if( !moreButton )
+        return;
+    /* a hide refreshes the top layout's hint only, not its rows' (the
+     * button groups): activate, or the widths read here are stale */
+    layout()->activate();
+    const int gap = Theme::instance()->px( Deck::Gap );
+    const int moreWidth = moreButton->width() + gap;
+    const QList<QWidget *> items = rankedItems();
+    /* the width with every item shown and no More button */
+    int full = layout()->sizeHint().width() - ( moreButton->isHidden() ? 0 : moreWidth );
+    foreach( QWidget *w, items )
+        if( w->isHidden() )
+            full += w->sizeHint().width() + gap;
+    /* drop the lowest ranks until the rest and More fit */
+    int need = full > room ? full + moreWidth : full;
+    int dropped = 0;
+    while( need > room && dropped < items.count() )
+        need -= items.at( dropped++ )->sizeHint().width() + gap;
+    for( int i = 0; i < items.count(); i++ )
+    {
+        QWidget *w = items.at( i );
+        w->setProperty( "deckDropped", i < dropped );
+        if( w->isHidden() != ( i < dropped ) )
+            w->setVisible( i >= dropped );
+    }
+    if( moreButton->isHidden() != ( dropped == 0 ) )
+        moreButton->setVisible( dropped > 0 );
+    layout()->activate();   /* fresh hints for compactWidth */
+}
+
+/* One entry for a deck button: its name, shortcut or value, state and
+ * click; the aspect ratio badge brings its own choices */
+static void addMoreEntry( intf_thread_t *p_intf, QMenu *menu, QWidget *item,
+                          QToolButton *more )
+{
+    QAbstractButton *button = qobject_cast<QAbstractButton *>( item );
+    if( !button || ( button->isHidden() && !button->property( "deckDropped" ).toBool() ) )
+        return;     /* separators; reverse while it cannot play backwards */
+    QString key = hotkeyText( p_intf, button->property( "hotkey" ).toByteArray().constData() );
+    AspectRatioBadge *aspect = qobject_cast<AspectRatioBadge *>( button );
+    if( key.isEmpty() && ( aspect || qobject_cast<SpeedLabel *>( button ) ) )
+        key = button->text();   /* the aspect ratio, the rate */
+    QAction *action = menu->addAction( button->icon(), key.isEmpty() ? button->accessibleName()
+                                       : button->accessibleName() + '\t' + key );
+    action->setEnabled( button->isEnabled() );
+    if( aspect )
+        action->setMenu( aspect->ratios() );
+    else if( qobject_cast<SpeedLabel *>( button ) )
+        /* its popover points at the button on screen: More */
+        QObject::connect( action, &QAction::triggered, more,
+                          [p_intf, more]() { showSpeedPopover( p_intf, more ); } );
+    else
+    {
+        action->setCheckable( button->isCheckable() );
+        action->setChecked( button->isChecked() );
+        QObject::connect( action, &QAction::triggered, button, &QAbstractButton::click );
+    }
+}
+
+/* the dropped items in the order on screen; the expert row's one by one */
+void AbstractController::buildMoreMenu( QMenu *menu )
+{
+    menu->clear();
+    QList<QWidget *> all;
+    deckWidgets( layout(), all );
+    foreach( QWidget *w, all )
+    {
+        if( !w->property( "deckDropped" ).toBool() )
+            continue;
+        QList<QWidget *> row;
+        if( w == advControls )
+            deckWidgets( advControls->layout(), row );
+        else
+            row << w;
+        foreach( QWidget *item, row )
+            addMoreEntry( p_intf, menu, item, moreButton );
+    }
+}
+
 #include <QHBoxLayout>
 /*****************************
  * DA Control Widget !
@@ -952,6 +1080,8 @@ ControlsWidget::ControlsWidget( intf_thread_t *_p_i,
                                 AbstractController( _p_i, _parent )
 {
     RTL_UNAFFECTED_WIDGET
+    /* shrinks to minimumSizeHint, not to its full width */
+    setSizePolicy( QSizePolicy::Expanding, QSizePolicy::Fixed );
     /* advanced Controls handling */
     b_advancedVisible = b_advControls;
 #ifdef DEBUG_LAYOUT
@@ -975,6 +1105,7 @@ ControlsWidget::ControlsWidget( intf_thread_t *_p_i,
     QString line2 = getSettings()->value( "MainWindow/MainToolbar2", MAIN_TB2_DEFAULT )
                                         .toString();
     parseAndCreate( line2, controlLayout2 );
+    addMoreButton( controlLayout2 );
 
     if( !b_advancedVisible && advControls ) advControls->hide();
 
@@ -984,72 +1115,36 @@ ControlsWidget::ControlsWidget( intf_thread_t *_p_i,
     tabInLayoutOrder( controlLayout, previous );
 }
 
-QList<QWidget *> ControlsWidget::optionalItems() const
-{
-    QList<QWidget *> items;
-    foreach( QWidget *w, findChildren<QWidget *>( QString(), Qt::FindDirectChildrenOnly ) )
-        if( w->property( "deckOptional" ).toBool() )
-            items << w;
-    return items;
-}
-
 int ControlsWidget::compactWidth() const
 {
     /* the hint, not the minimum: below it the volume squeezes its label */
     const int gap = Theme::instance()->px( Deck::Gap );
     int width = layout()->sizeHint().width();
-    foreach( QWidget *w, optionalItems() )
+    const QList<QWidget *> items = rankedItems();
+    foreach( QWidget *w, items )
         if( !w->isHidden() )
             width -= w->sizeHint().width() + gap;
-    if( advControls && !advControls->isHidden() )
-        width -= advControls->sizeHint().width() + gap;
+    if( !items.isEmpty() && moreButton->isHidden() )
+        width += moreButton->width() + gap;
     return width;
 }
 
-/* The optional items go at the XS breakpoint (of the main window, also for
- * the immersive bar's deck) and whenever the deck would not fit with them;
- * then the expert row, if it still doesn't fit: all of them are in the
- * menus, and nothing clips. */
-void ControlsWidget::fitWidth()
+QSize ControlsWidget::minimumSizeHint() const
 {
-    const int gap = Theme::instance()->px( Deck::Gap );
-    const QList<QWidget *> items = optionalItems();
-    QWidget *expert = b_advancedVisible ? advControls : NULL;
-    /* the width with everything shown, and what each step gives back */
-    int full = layout()->sizeHint().width();
-    int itemsWidth = 0;
-    foreach( QWidget *w, items )
-    {
-        itemsWidth += w->sizeHint().width() + gap;
-        if( w->isHidden() )
-            full += w->sizeHint().width() + gap;
-    }
-    const int expertWidth = expert ? expert->sizeHint().width() + gap : 0;
-    if( expert && expert->isHidden() )
-        full += expertWidth;
-
-    QWidget *main = p_intf->p_sys->p_mi ? static_cast<QWidget *>( p_intf->p_sys->p_mi ) : window();
-    const bool fits = BreakpointWatcher::fromWidth( main->width() ) != BreakpointWatcher::XS
-                   && full <= width();
-    foreach( QWidget *w, items )
-        if( w->isHidden() == fits )
-            w->setVisible( fits );
-    const bool expertFits = full - ( fits ? 0 : itemsWidth ) <= width();
-    if( expert && expert->isHidden() == expertFits )
-        expert->setVisible( expertFits );
+    return QSize( compactWidth(), AbstractController::minimumSizeHint().height() );
 }
 
 void ControlsWidget::resizeEvent( QResizeEvent *e )
 {
     AbstractController::resizeEvent( e );
-    fitWidth();
+    fitDeck( width() );
 }
 
 /* and when its content changes width (the expert row, the aspect badge) */
 bool ControlsWidget::event( QEvent *e )
 {
     if( e->type() == QEvent::LayoutRequest )
-        fitWidth();
+        fitDeck( width() );
     return AbstractController::event( e );
 }
 
@@ -1063,6 +1158,8 @@ void ControlsWidget::toggleAdvanced()
     if( !advControls ) return;
 
     advControls->setVisible( !b_advancedVisible );
+    /* its own state now: fitDeck takes it again only while it shows */
+    advControls->setProperty( "deckDropped", false );
     b_advancedVisible = !b_advancedVisible;
     emit advancedControlsToggled( b_advancedVisible );
 }
@@ -1155,6 +1252,7 @@ FullscreenControllerWidget::FullscreenControllerWidget( intf_thread_t *_p_i, QWi
     controlLayout->setSpacing( t->px( Deck::Gap ) );
     QString line = getSettings()->value( "MainWindow/FSCtoolbar", FSC_TB_DEFAULT ).toString();
     parseAndCreate( line, controlLayout );
+    addMoreButton( controlLayout );
     controlLayout2->addLayout( controlLayout );
     /* Tab reaches it (takeFocus): in the order on screen, as the deck */
     QWidget *previous = NULL;
@@ -1206,6 +1304,12 @@ FullscreenControllerWidget::~FullscreenControllerWidget()
 
 void FullscreenControllerWidget::restoreFSC()
 {
+    /* the deck within its screen (less the margins centerFSC leaves), the
+     * rest in its More menu */
+    if( targetScreen() >= 0 )
+        fitDeck( QGuiApplication::screens()[ targetScreen() ]->geometry().width()
+                 - ( isWideFSC ? 0 : 2 * Theme::instance()->px( VideoOverlay::ImmersiveMargin ) ) );
+
     if( !isWideFSC )
     {
         /* Restore half-bar and re-centre if needed */

@@ -230,6 +230,7 @@
         <file alias="memory.svg">pixmaps/redesign/memory.svg</file>
         <file alias="menu.svg">pixmaps/redesign/menu.svg</file>
         <file alias="minimize.svg">pixmaps/redesign/minimize.svg</file>
+        <file alias="more_horiz.svg">pixmaps/redesign/more_horiz.svg</file>
         <file alias="movie.svg">pixmaps/redesign/movie.svg</file>
         <file alias="movie_fill.svg">pixmaps/redesign/movie_fill.svg</file>
         <file alias="music_note.svg">pixmaps/redesign/music_note.svg</file>

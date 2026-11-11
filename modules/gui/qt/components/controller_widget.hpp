@@ -78,14 +78,16 @@ public slots:
     void updateButtonIcons( bool, bool );
 };
 
-/* DESIGN_SPEC 3: the aspect ratio as a deck text badge ("16:9", "Default",
- * accent when not the default); its menu has the vout's aspect-ratio choices */
+/* The aspect ratio as a deck icon button (on = accent when not the
+ * default); its menu has the vout's aspect-ratio choices, the current one
+ * checked, and text() is the current value ("16:9", "Default") */
 class AspectRatioBadge : public QToolButton
 {
     Q_OBJECT
 public:
     AspectRatioBadge( intf_thread_t * );
     virtual ~AspectRatioBadge();
+    QMenu *ratios() const { return menu; }
 
 private slots:
     void setVout();

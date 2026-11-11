@@ -44,7 +44,7 @@
  *   PLAYLIST_BUTTON      IconPlaylist
  *   SNAPSHOT_BUTTON      IconSnapshot
  *   RECORD_BUTTON        IconRecord
- *   ATOB_BUTTON          IconAtoB        (the design draws the text "A–B")
+ *   ATOB_BUTTON          IconAtoB
  *   FRAME_BUTTON         IconFrame
  *   REVERSE_BUTTON       IconReverse     (not in the design)
  *   SKIP_BACK_BUTTON     IconJumpBackward
@@ -155,6 +155,7 @@ static const char * const IconRemove         = "remove";
 static const char * const IconCheck          = "check";
 static const char * const IconUnchecked      = "check_box_outline_blank";
 static const char * const IconExpandMore     = "expand_more";
+static const char * const IconMore           = "more_horiz";
 static const char * const IconSubmenu        = "chevron_right";
 static const char * const IconInfo           = "info";
 static const char * const IconError          = "error";

@@ -561,6 +561,7 @@ libqt_plugin_la_RES = \
 	gui/qt/pixmaps/redesign/memory.svg \
 	gui/qt/pixmaps/redesign/menu.svg \
 	gui/qt/pixmaps/redesign/minimize.svg \
+	gui/qt/pixmaps/redesign/more_horiz.svg \
 	gui/qt/pixmaps/redesign/movie.svg \
 	gui/qt/pixmaps/redesign/movie_fill.svg \
 	gui/qt/pixmaps/redesign/music_note.svg \
