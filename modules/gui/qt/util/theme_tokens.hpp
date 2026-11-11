@@ -404,4 +404,21 @@ namespace RedesignTokens
     }
 }
 
+/* issues1 lane E */
+namespace RedesignTokens
+{
+    namespace Library
+    {
+        /* not in tokens.json: video frames (Thumbnailer, I1-3), made one
+         * at a time by a headless vlc.exe */
+        static const int ThumbWidth = 480;          /* the PNG's width, px */
+        static const int ThumbAtPercent = 10;       /* where the frame is taken */
+        static const int ThumbUnknownAtS = 10;      /* the same, length unknown */
+        static const int ThumbSpanS = 1;            /* played from there */
+        static const int ThumbTimeoutMs = 15000;    /* then the process is killed */
+        static const int ThumbKillWaitMs = 1000;
+        static const int ThumbQueueMax = 24;        /* about the cards on screen */
+    }
+}
+
 #endif

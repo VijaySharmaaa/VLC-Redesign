@@ -695,6 +695,8 @@ modules/gui/qt/components/library/media_page.cpp
 modules/gui/qt/components/library/media_page.hpp
 modules/gui/qt/components/library/network_page.cpp
 modules/gui/qt/components/library/network_page.hpp
+modules/gui/qt/components/library/thumbnailer.cpp
+modules/gui/qt/components/library/thumbnailer.hpp
 modules/gui/qt/components/now_playing.cpp
 modules/gui/qt/components/now_playing.hpp
 modules/gui/qt/components/open_panels.cpp

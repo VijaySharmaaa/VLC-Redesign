@@ -26,6 +26,7 @@
 #include "qt.hpp"
 #include "components/library/home_page.hpp"
 #include "components/library/library_widgets.hpp"
+#include "components/library/thumbnailer.hpp"
 #include "components/now_playing.hpp"   /* paintStripes, fontAt */
 #include "input_manager.hpp"
 #include "recents.hpp"
@@ -217,15 +218,18 @@ QLabel *sectionLabel( const QString &text, QWidget *parent )
 
 } // namespace
 
-/* A "Continue watching" card: 16:9 placeholder with the type glyph, the
- * time left and the progress, then the title and where it resumes */
+/* A "Continue watching" card: a frame of the video (a placeholder with the
+ * type glyph until there is one), the time left and the progress, then the
+ * title and where it resumes */
 class ResumeCard : public QAbstractButton
 {
 public:
     ResumeCard( const QString &_mrl, const QString &title, const QString &_path,
-                const char *_icon, int64_t _timeMs, int64_t lengthMs, QWidget *parent )
-        : QAbstractButton( parent ), mrl( _mrl ), path( _path ), icon( _icon ),
-          timeMs( _timeMs ), progress( -1 ), missing( false )
+                const QString &_localVideo, const char *_icon, int64_t _timeMs,
+                int64_t _lengthMs, ArtLoader *_art, Thumbnailer *_thumbs, QWidget *parent )
+        : QAbstractButton( parent ), mrl( _mrl ), path( _path ), localVideo( _localVideo ),
+          icon( _icon ), timeMs( _timeMs ), lengthMs( _lengthMs ), progress( -1 ),
+          missing( false ), art( _art ), thumbs( _thumbs )
     {
         setText( title );
         meta = qtr( "Resume from %1" ).arg( timeString( timeMs / 1000 ) );
@@ -238,8 +242,9 @@ public:
         setLength( lengthMs );
     }
 
-    void setLength( int64_t lengthMs )
+    void setLength( int64_t _lengthMs )
     {
+        lengthMs = _lengthMs;
         badge.clear();
         progress = -1;
         if( lengthMs > timeMs )
@@ -286,11 +291,14 @@ protected:
     }
 
 private:
-    QString path, meta, badge;
+    QString path, localVideo, meta, badge;
     const char *icon;
     const int64_t timeMs;
+    int64_t lengthMs;
     qreal progress;     /* 0..1, -1 when the length is unknown */
     bool missing;
+    ArtLoader *art;     /* the page's */
+    Thumbnailer *thumbs;
 };
 
 void ResumeCard::paintEvent( QPaintEvent * )
@@ -308,22 +316,29 @@ void ResumeCard::paintEvent( QPaintEvent * )
     clip.addRoundedRect( thumb, radius, radius );
     p.save();
     p.setClipPath( clip );
-    paintStripes( p, thumb, t->px( Home::CardStripe ) );
-
-    /* the type glyph stands in for a thumbnail: VLC 3 has no thumbnailer */
-    const int glyph = t->px( Home::CardGlyph );
-    const int devicePx = qRound( glyph * devicePixelRatioF() );
-    t->icon( QLatin1String( icon ), Theme::Dim, QSize( devicePx, devicePx ) )
-        .paint( &p, QRect( ( width() - glyph ) / 2, ( thumbH - glyph ) / 2, glyph, glyph ) );
+    const qreal dpr = devicePixelRatioF();
+    QPixmap frame;
+    if( !localVideo.isEmpty() && !missing )
+        frame = art->get( thumbs->frame( localVideo, lengthMs ), ( thumb.size() * dpr ).toSize() );
+    if( frame.isNull() )
+    {
+        paintStripes( p, thumb, t->px( Home::CardStripe ) );
+        const int glyph = t->px( Home::CardGlyph );
+        const int devicePx = qRound( glyph * dpr );
+        t->icon( QLatin1String( icon ), Theme::Dim, QSize( devicePx, devicePx ) )
+            .paint( &p, QRect( ( width() - glyph ) / 2, ( thumbH - glyph ) / 2, glyph, glyph ) );
+    }
+    else
+    {
+        /* cropped to fill, as the library cards */
+        frame.setDevicePixelRatio( dpr );
+        const QSizeF s = QSizeF( frame.size() ) / dpr;
+        p.drawPixmap( QPointF( thumb.center().x() - s.width() / 2,
+                               thumb.center().y() - s.height() / 2 ), frame );
+    }
 
     if( progress >= 0 )
-    {
-        const int h = t->px( Home::Progress );
-        const QRectF track( 0, thumbH - h, width(), h );
-        p.fillRect( track, t->ink( InkAlpha::ProgressTrack ) );
-        const QRect done( 0, thumbH - h, qRound( width() * progress ), h );
-        p.fillRect( QStyle::visualRect( layoutDirection(), rect(), done ), t->color( Theme::Accent ) );
-    }
+        paintProgress( &p, thumb, progress, layoutDirection() );
     if( !badge.isEmpty() )
     {
         const QFont f = fontAt( Theme::Overline, Type::Overline, false );
@@ -389,9 +404,12 @@ void ExistsCheck::run()
  * HomePage
  **********************************************************************/
 HomePage::HomePage( intf_thread_t *_p_intf, QWidget *parent )
-    : QScrollArea( parent ), p_intf( _p_intf ), checking( false ), recheck( false )
+    : QScrollArea( parent ), p_intf( _p_intf ), art( new ArtLoader( this ) ),
+      thumbs( new Thumbnailer( _p_intf, this ) ), checking( false ), recheck( false )
 {
     Theme *t = Theme::instance();
+    connect( art, &ArtLoader::ready, this, &HomePage::updateCards );
+    connect( thumbs, &Thumbnailer::changed, this, &HomePage::updateCards );
     setAccessibleName( qtr( "Home" ) );
     /* the cards and the table are the Tab stops; QScrollArea scrolls to them */
     setFocusPolicy( Qt::NoFocus );
@@ -559,8 +577,10 @@ void HomePage::rebuild()
         const int64_t lengthMs = recents->length( mrl );
         if( timeMs > 0 )
         {
-            ResumeCard *card = new ResumeCard( mrl, e.title, e.path, e.icon, timeMs, lengthMs,
-                                               cardsArea->widget() );
+            /* frames of videos only: not of a disc, a folder or a stream */
+            const QString video = e.icon == RedesignIcons::IconVideo ? e.localPath : QString();
+            ResumeCard *card = new ResumeCard( mrl, e.title, e.path, video, e.icon, timeMs, lengthMs,
+                                               art, thumbs, cardsArea->widget() );
             connect( card, &QAbstractButton::clicked, this, [this, mrl]() { play( mrl, true ); } );
             connect( card, &QWidget::customContextMenuRequested, this,
                      [this, card]( const QPoint &pos ) { popup( card->mrl, card->mapToGlobal( pos ) ); } );
@@ -768,6 +788,18 @@ void HomePage::popup( const QString mrl, const QPoint &globalPos )
         QApplication::clipboard()->setText( e.path );
     else if( chosen == removeAction )
         RecentsMRL::getInstance( p_intf )->removeRecent( mrl );
+}
+
+void HomePage::updateCards()
+{
+    foreach( ResumeCard *card, cards )
+        card->update();
+}
+
+void HomePage::hideEvent( QHideEvent *e )
+{
+    thumbs->cancel();
+    QScrollArea::hideEvent( e );
 }
 
 void HomePage::showEvent( QShowEvent *e )

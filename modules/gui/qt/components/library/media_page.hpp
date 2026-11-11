@@ -33,6 +33,7 @@ class LibraryHeader;
 class PLModel;
 class QStackedWidget;
 class QTimer;
+class Thumbnailer;
 
 /* DESIGN_SPEC 4 (D6): the video_dir or audio_dir services discovery as a
  * grid of cards, on its own PLModel so the docked playlist stays as it is.
@@ -48,6 +49,7 @@ public:
 
 protected:
     void showEvent( QShowEvent * ) Q_DECL_OVERRIDE;
+    void hideEvent( QHideEvent * ) Q_DECL_OVERRIDE;
 
 private:
     void load();
@@ -66,6 +68,7 @@ private:
     QStackedWidget *body;
     CardView *view;
     LibraryEmptyState *empty;
+    Thumbnailer *thumbs;    /* Videos only */
     QTimer *settle;
     int expandingId;   /* a folder being expanded, to browse into */
     QSet<int> expandRequested;

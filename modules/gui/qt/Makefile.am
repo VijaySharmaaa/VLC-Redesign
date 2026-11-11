@@ -111,6 +111,7 @@ libqt_plugin_la_SOURCES = \
 	gui/qt/components/library/library_widgets.cpp gui/qt/components/library/library_widgets.hpp \
 	gui/qt/components/library/media_page.cpp gui/qt/components/library/media_page.hpp \
 	gui/qt/components/library/network_page.cpp gui/qt/components/library/network_page.hpp \
+	gui/qt/components/library/thumbnailer.cpp gui/qt/components/library/thumbnailer.hpp \
 	gui/qt/components/spectrum.cpp gui/qt/components/spectrum.hpp \
 	gui/qt/components/library/home_page.cpp \
 	gui/qt/components/library/home_page.hpp \
@@ -243,6 +244,7 @@ nodist_libqt_plugin_la_SOURCES = \
 	gui/qt/components/library/library_widgets.moc.cpp \
 	gui/qt/components/library/media_page.moc.cpp \
 	gui/qt/components/library/network_page.moc.cpp \
+	gui/qt/components/library/thumbnailer.moc.cpp \
 	gui/qt/components/spectrum.moc.cpp \
 	gui/qt/components/library/home_page.moc.cpp \
 	gui/qt/components/controller_widget.moc.cpp \

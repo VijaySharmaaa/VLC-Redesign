@@ -36,6 +36,7 @@ class QLineEdit;
 class QTimer;
 class QThreadPool;
 class QToolButton;
+class Thumbnailer;
 
 namespace LibraryData
 {
@@ -130,13 +131,15 @@ private:
 };
 
 /* Cards (Videos, Music) or rows (network folders); paints from the input
- * item of each row, never decodes art in paint */
+ * item of each row, never decodes art in paint. With a Thumbnailer (Videos)
+ * a card without art shows a frame of its video, a folder's the frame of
+ * its first video and its video count, and both how far they were watched. */
 class CardDelegate : public QStyledItemDelegate
 {
     Q_OBJECT
 public:
     enum Kind { VideoCard, AlbumCard, Row };
-    CardDelegate( Kind, LibraryFilter *, QObject *parent );
+    CardDelegate( Kind, LibraryFilter *, QObject *parent, Thumbnailer * = NULL );
     void setColumns( int cols, int cellW );
     int cardHeight( int cardW ) const;
     void paint( QPainter *, const QStyleOptionViewItem &, const QModelIndex & ) const Q_DECL_OVERRIDE;
@@ -150,10 +153,13 @@ private:
     void paintRow( QPainter *, const QStyleOptionViewItem &, const QModelIndex & ) const;
     QString metaLine( input_item_t *, const QModelIndex & ) const;
     QString artPath( input_item_t *, const QModelIndex & ) const;
+    /* 0..1 watched, -1 for no bar */
+    qreal progress( input_item_t *, const QModelIndex & ) const;
 
     Kind kind;
     LibraryFilter *filter;
     ArtLoader *art;
+    Thumbnailer *thumbs;
     int cols, cellW;
 };
 
@@ -230,5 +236,11 @@ private:
 /* "2010 · 1080p · H.264 · 5.1": what preparsing found so far of an item's
  * year, picture height, video codec and surround channels; empty if none */
 QString mediaMetaLine( input_item_t * );
+
+/* The item's local file or folder, empty when it is not one */
+QString localPath( input_item_t * );
+
+/* A card's progress (0..1) along the bottom of its picture */
+void paintProgress( QPainter *, const QRectF &thumb, qreal fraction, Qt::LayoutDirection );
 
 #endif

@@ -27,11 +27,13 @@
 #include <QSet>
 #include <QStringList>
 
+class ArtLoader;
 class LibraryEmptyState;
 class LibraryHeader;
 class QHBoxLayout;
 class QTreeWidget;
 class ResumeCard;
+class Thumbnailer;
 
 /* DESIGN_SPEC 4 "Home", from the recents (RecentsMRL): a row of cards for
  * what can resume, then a table of every recent item. Without recents (or
@@ -44,12 +46,14 @@ public:
 
 protected:
     void showEvent( QShowEvent * ) Q_DECL_OVERRIDE;
+    void hideEvent( QHideEvent * ) Q_DECL_OVERRIDE;
     bool eventFilter( QObject *, QEvent * ) Q_DECL_OVERRIDE;
     bool viewportEvent( QEvent * ) Q_DECL_OVERRIDE;
 
 private slots:
     void rebuild();
     void setMissing( const QStringList &mrls );
+    void updateCards();
 
 private:
     void layoutForWidth();
@@ -60,6 +64,8 @@ private:
     void popup( const QString mrl, const QPoint &globalPos );
 
     intf_thread_t *p_intf;
+    ArtLoader *art;
+    Thumbnailer *thumbs;
     LibraryHeader *header;
     QWidget *lists;
     QWidget *cardsSection, *recentSection;

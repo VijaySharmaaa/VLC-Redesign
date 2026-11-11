@@ -22,6 +22,7 @@
 
 #include "components/library/media_page.hpp"
 #include "components/library/library_widgets.hpp"
+#include "components/library/thumbnailer.hpp"
 #include "components/playlist/playlist_model.hpp"
 #include "input_manager.hpp"
 #include "util/theme.hpp"
@@ -62,8 +63,10 @@ MediaPage::MediaPage( intf_thread_t *_p_intf, Kind _kind, QWidget *parent )
 
     body = new QStackedWidget( this );
     filter = new LibraryFilter( this );
+    thumbs = kind == Videos ? new Thumbnailer( p_intf, this ) : NULL;
     CardDelegate *delegate = new CardDelegate( kind == Videos ? CardDelegate::VideoCard
-                                                              : CardDelegate::AlbumCard, filter, this );
+                                                              : CardDelegate::AlbumCard, filter, this,
+                                               thumbs );
     view = new CardView( delegate, kind == Videos ? videoColumns : albumColumns, body );
     view->setAccessibleName( title );
     view->setModel( filter );
@@ -99,6 +102,13 @@ void MediaPage::showEvent( QShowEvent *e )
         load();
     }
     QWidget::showEvent( e );
+}
+
+void MediaPage::hideEvent( QHideEvent *e )
+{
+    if( thumbs )
+        thumbs->cancel();
+    QWidget::hideEvent( e );
 }
 
 void MediaPage::load()
