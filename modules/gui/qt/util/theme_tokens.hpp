@@ -433,4 +433,17 @@ namespace RedesignTokens
     }
 }
 
+/* issues2 lane B */
+namespace RedesignTokens
+{
+    namespace Library
+    {
+        /* not in tokens.json: frames made by several processes at once,
+         * at most this many (and half the cores) */
+        static const int ThumbWorkersMax = 4;
+        static const int ThumbPollMs = 100;         /* looks for a written picture */
+        static const int ThumbCoverDirs = 16;       /* subfolders searched for a folder's video */
+    }
+}
+
 #endif

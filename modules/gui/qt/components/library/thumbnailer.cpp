@@ -41,6 +41,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QProcess>
+#include <QThread>
 #include <QTimer>
 
 using namespace RedesignTokens;
@@ -80,7 +81,30 @@ void ThumbJob::run()
         foreach( const QFileInfo &info, dir.entryInfoList( QDir::Files | QDir::Readable,
                                                            QDir::Name | QDir::IgnoreCase ) )
             videos << info.filePath();
-        emit listed( path, videos );
+        /* a folder of folders (a series by season): the first video down
+         * its subfolders, breadth first, in a bounded number of them (links
+         * can loop) */
+        QString cover = videos.isEmpty() ? QString() : videos.first();
+        QStringList todo( path );
+        for( int visited = 0; cover.isEmpty() && !todo.isEmpty()
+                              && visited < Library::ThumbCoverDirs; visited++ )
+        {
+            QDir sub( todo.takeFirst() );
+            if( visited > 0 )
+            {
+                sub.setNameFilters( videoFilters() );
+                const QFileInfoList files = sub.entryInfoList( QDir::Files | QDir::Readable,
+                                                               QDir::Name | QDir::IgnoreCase );
+                if( !files.isEmpty() )
+                    cover = files.first().filePath();
+                sub.setNameFilters( QStringList() );
+            }
+            foreach( const QFileInfo &info, sub.entryInfoList( QDir::Dirs | QDir::NoDotAndDotDot
+                                                               | QDir::Readable,
+                                                               QDir::Name | QDir::IgnoreCase ) )
+                todo << info.filePath();
+        }
+        emit listed( path, videos, cover );
         return;
     }
     const QFileInfo info( path );
@@ -105,7 +129,9 @@ void ThumbJob::run()
  * Thumbnailer
  **********************************************************************/
 Thumbnailer::Thumbnailer( intf_thread_t *_p_intf, QObject *parent )
-    : QObject( parent ), p_intf( _p_intf ), process( NULL )
+    : QObject( parent ), p_intf( _p_intf ),
+      /* each one decodes on all cores: half of them keeps VLC responsive */
+      maxJobs( qBound( 1, QThread::idealThreadCount() / 2, int( Library::ThumbWorkersMax ) ) )
 {
     /* portable mode: the dir functions already point next to vlc.exe */
     char *psz = config_GetUserDir( VLC_CACHE_DIR );
@@ -113,10 +139,9 @@ Thumbnailer::Thumbnailer( intf_thread_t *_p_intf, QObject *parent )
         cacheDir = QDir::fromNativeSeparators( qfu( psz ) ) + QLatin1String( "/thumbnails" );
     free( psz );
 
-    timeout = new QTimer( this );
-    timeout->setSingleShot( true );
-    timeout->setInterval( Library::ThumbTimeoutMs );
-    connect( timeout, &QTimer::timeout, this, [this]() { finish( false ); } );
+    poll = new QTimer( this );
+    poll->setInterval( Library::ThumbPollMs );
+    connect( poll, &QTimer::timeout, this, &Thumbnailer::check );
 
     connect( RecentsMRL::getInstance( p_intf ), &RecentsMRL::changed,
              this, &Thumbnailer::loadRecents );
@@ -126,8 +151,11 @@ Thumbnailer::Thumbnailer( intf_thread_t *_p_intf, QObject *parent )
 Thumbnailer::~Thumbnailer()
 {
     queue.clear();
-    stopProcess();
-    QFile::remove( tmpFile );
+    foreach( const Job &j, jobs )
+    {
+        stopProcess( j.process );
+        QFile::remove( j.tmpFile );
+    }
 }
 
 QString Thumbnailer::frame( const QString &path, int64_t lengthMs )
@@ -138,7 +166,17 @@ QString Thumbnailer::frame( const QString &path, int64_t lengthMs )
     QHash<QString, QString>::const_iterator it = frames.constFind( key );
     if( it != frames.constEnd() )
         return it.value();
-    if( !pendingFrames.contains( key ) )
+    if( pendingFrames.contains( key ) )
+    {
+        /* painted again, so on screen: ahead of the cards scrolled away */
+        for( int i = 1; i < queue.count(); i++ )
+            if( queue.at( i ).key == key )
+            {
+                queue.move( i, 0 );
+                break;
+            }
+    }
+    else
     {
         pendingFrames.insert( key );
         lengths.insert( key, lengthMs );
@@ -166,6 +204,14 @@ const QStringList *Thumbnailer::videos( const QString &dir )
     return NULL;
 }
 
+QString Thumbnailer::folderFrame( const QString &dir )
+{
+    if( !videos( dir ) )
+        return QString();
+    const QString cover = covers.value( keyOf( dir ) );
+    return cover.isEmpty() ? QString() : frame( cover, 0 );
+}
+
 qreal Thumbnailer::resume( const QString &path ) const
 {
     const qreal at = played.value( keyOf( path ), -1 );
@@ -189,16 +235,19 @@ int Thumbnailer::watchedIn( const QString &dir )
 void Thumbnailer::cancel()
 {
     foreach( const Request &r, queue )
-        pendingFrames.remove( keyOf( r.path ) );
+        pendingFrames.remove( r.key );
     queue.clear();
-    if( process )
+    foreach( const Job &j, jobs )
     {
-        pendingFrames.remove( keyOf( current.path ) );
-        stopProcess();
-        QFile::remove( tmpFile );
+        pendingFrames.remove( j.r.key );
+        stopProcess( j.process );
+        QFile::remove( j.tmpFile );
     }
+    jobs.clear();
+    poll->stop();
     /* listed again when shown: files come and go */
     dirs.clear();
+    covers.clear();
     watchedCounts.clear();
 }
 
@@ -220,19 +269,21 @@ void Thumbnailer::probed( const QString &path, const QString &file, bool cached 
     }
     /* the middle of a film opens on a scene, its start often on black */
     const int64_t lengthMs = lengths.value( key );
-    const Request r = { path, file, lengthMs > 0 ? int( lengthMs / 1000 * Library::ThumbAtPercent / 100 )
-                                                 : Library::ThumbUnknownAtS };
+    const Request r = { key, path, file,
+                        lengthMs > 0 ? int( lengthMs / 1000 * Library::ThumbAtPercent / 100 )
+                                     : Library::ThumbUnknownAtS };
     queue.prepend( r );
     /* scrolled past: dropped, asked again when painted again */
     while( queue.count() > Library::ThumbQueueMax )
-        pendingFrames.remove( keyOf( queue.takeLast().path ) );
+        pendingFrames.remove( queue.takeLast().key );
     startNext();
 }
 
-void Thumbnailer::listed( const QString &dir, const QStringList &videos )
+void Thumbnailer::listed( const QString &dir, const QStringList &videos, const QString &cover )
 {
     pendingDirs.remove( keyOf( dir ) );
     dirs.insert( keyOf( dir ), videos );
+    covers.insert( keyOf( dir ), cover );
     watchedCounts.remove( keyOf( dir ) );
     emit changed();
 }
@@ -260,37 +311,51 @@ void Thumbnailer::loadRecents()
 
 void Thumbnailer::startNext()
 {
-    if( process || queue.isEmpty() )
+    if( queue.isEmpty() )
         return;
-    const QString exe = QCoreApplication::applicationFilePath();
-    if( QFileInfo( exe ).baseName().compare( QLatin1String( "vlc" ), Qt::CaseInsensitive ) )
+    if( QFileInfo( QCoreApplication::applicationFilePath() ).baseName()
+            .compare( QLatin1String( "vlc" ), Qt::CaseInsensitive ) )
     {
         /* hosted by another program: no vlc.exe to ask */
         foreach( const Request &r, queue )
         {
-            pendingFrames.remove( keyOf( r.path ) );
-            failedFrames.insert( keyOf( r.path ) );
+            pendingFrames.remove( r.key );
+            failedFrames.insert( r.key );
         }
         queue.clear();
         return;
     }
-    current = queue.takeFirst();
-    const QString prefix = QFileInfo( current.file ).completeBaseName()
+    while( jobs.count() < maxJobs && !queue.isEmpty() )
+        start( queue.takeFirst() );
+}
+
+void Thumbnailer::start( const Request &r )
+{
+    Job j;
+    j.r = r;
+    const QString prefix = QFileInfo( r.file ).completeBaseName()
                          + QString( ".%1.part" ).arg( QCoreApplication::applicationPid() );
-    tmpFile = cacheDir + QLatin1Char( '/' ) + prefix + QLatin1String( ".png" );
+    j.tmpFile = cacheDir + QLatin1Char( '/' ) + prefix + QLatin1String( ".png" );
 
     QStringList args;
     /* no interface, window, sound, subtitles or text over the picture; not
      * the user's configuration (one instance, extra interfaces, the media
-     * library) and not the crash report question; local files only */
+     * library) and not the crash report question; local files only; no
+     * Lua scripts (playlist probes) and no preparsing of the item */
     args << "--intf=dummy" << "--dummy-quiet" << "--ignore-config" << "--no-one-instance"
          << "--no-media-library" << "--no-crashdump" << "--quiet" << "--no-stats"
-         << "--no-metadata-network-access" << "--vout=dummy" << "--no-audio"
+         << "--no-metadata-network-access" << "--no-lua" << "--no-auto-preparse"
+         << "--vout=dummy" << "--no-audio"
          << "--no-spu" << "--no-osd" << "--no-video-title-show" << "--no-sub-autodetect-file"
          /* the scene filter takes system memory pictures */
          << "--avcodec-hw=none"
-         << QString( "--start-time=%1" ).arg( current.atSec )
-         << QString( "--stop-time=%1" ).arg( current.atSec + Library::ThumbSpanS )
+         /* the first picture at once: no file cache (1 s) before it shows,
+          * a seek to the key frame before the time instead of decoding up
+          * to the time, and nothing dropped for being late */
+         << "--file-caching=0" << "--input-fast-seek"
+         << "--no-drop-late-frames" << "--no-skip-frames"
+         << QString( "--start-time=%1" ).arg( r.atSec )
+         << QString( "--stop-time=%1" ).arg( r.atSec + Library::ThumbSpanS )
          << "--video-filter=scene" << "--scene-format=png" << "--scene-replace"
          /* the first picture only */
          << QString( "--scene-ratio=%1" ).arg( INT_MAX )
@@ -298,59 +363,78 @@ void Thumbnailer::startNext()
          << "--scene-path=" + QDir::toNativeSeparators( cacheDir )
          << "--scene-prefix=" + prefix
          << "--play-and-exit"
-         << QDir::toNativeSeparators( QFileInfo( current.path ).absoluteFilePath() )
+         << QDir::toNativeSeparators( QFileInfo( r.path ).absoluteFilePath() )
          << "vlc://quit";
 
-    process = new QProcess( this );
+    QProcess *process = new QProcess( this );
+    j.process = process;
     process->setProcessChannelMode( QProcess::ForwardedChannels );
     connect( process, static_cast<void (QProcess::*)( int, QProcess::ExitStatus )>( &QProcess::finished ),
-             this, [this]( int, QProcess::ExitStatus status ) {
-        finish( status == QProcess::NormalExit );
+             this, [this, process]( int, QProcess::ExitStatus status ) {
+        finish( process, status == QProcess::NormalExit );
     } );
-    connect( process, &QProcess::errorOccurred, this, [this]( QProcess::ProcessError e ) {
+    connect( process, &QProcess::errorOccurred, this, [this, process]( QProcess::ProcessError e ) {
         if( e == QProcess::FailedToStart )
-            finish( false );
+            finish( process, false );
     } );
-    process->start( exe, args );
-    timeout->start();
+    j.clock.start();
+    jobs.append( j );
+    process->start( QCoreApplication::applicationFilePath(), args );
+    poll->start();
 }
 
-void Thumbnailer::finish( bool ok )
+/* The scene filter writes a .swp file and renames it: once the picture is
+ * there it is whole, and the rest of the playback is not waited for */
+void Thumbnailer::check()
 {
-    if( !process )
-        return;
-    stopProcess();   /* also after a timeout: the file is whole only after a normal exit */
-    const QString key = keyOf( current.path );
-    if( ok && QFileInfo( tmpFile ).size() > 0
-     && ( QFile::rename( tmpFile, current.file ) || QFileInfo( current.file ).size() > 0 ) )
+    QList<QProcess *> done, late;
+    foreach( const Job &j, jobs )
+        if( QFileInfo( j.tmpFile ).size() > 0 )
+            done << j.process;
+        else if( j.clock.elapsed() > Library::ThumbTimeoutMs )
+            late << j.process;
+    foreach( QProcess *p, done )
+        finish( p, true );
+    foreach( QProcess *p, late )
+        finish( p, false );
+}
+
+void Thumbnailer::finish( QProcess *process, bool ok )
+{
+    int i = 0;
+    while( i < jobs.count() && jobs.at( i ).process != process )
+        i++;
+    if( i == jobs.count() )
+        return;   /* already finished */
+    Job j = jobs.takeAt( i );
+    if( jobs.isEmpty() )
+        poll->stop();
+    stopProcess( j.process );   /* also after a timeout: the file is whole only once renamed */
+    if( ok && QFileInfo( j.tmpFile ).size() > 0
+     && ( QFile::rename( j.tmpFile, j.r.file ) || QFileInfo( j.r.file ).size() > 0 ) )
     {
-        pendingFrames.remove( key );
-        frames.insert( key, current.file );
+        pendingFrames.remove( j.r.key );
+        frames.insert( j.r.key, j.r.file );
         emit changed();
     }
-    else if( ok && current.atSec > 0 )
+    else if( ok && j.r.atSec > 0 )
     {
         /* past the end of a short video: its first picture then */
-        current.atSec = 0;
-        queue.prepend( current );
+        j.r.atSec = 0;
+        queue.prepend( j.r );
     }
     else
     {
-        pendingFrames.remove( key );
-        failedFrames.insert( key );
+        pendingFrames.remove( j.r.key );
+        failedFrames.insert( j.r.key );
     }
-    QFile::remove( tmpFile );
+    QFile::remove( j.tmpFile );
     startNext();
 }
 
-void Thumbnailer::stopProcess()
+void Thumbnailer::stopProcess( QProcess *p )
 {
-    timeout->stop();
-    if( !process )
-        return;
-    QProcess *p = process;
-    process = NULL;
-    p->disconnect( this );
+    p->disconnect();
     if( p->state() != QProcess::NotRunning )
     {
         p->kill();

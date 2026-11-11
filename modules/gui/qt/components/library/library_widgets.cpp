@@ -534,8 +534,7 @@ QString CardDelegate::artPath( input_item_t *input, const QModelIndex &source ) 
         return path;
     if( !LibraryData::isFolder( model, source ) )
         return thumbs->frame( local, input_item_GetDuration( input ) / 1000 );
-    const QStringList *videos = thumbs->videos( local );
-    return videos && !videos->isEmpty() ? thumbs->frame( videos->first(), 0 ) : path;
+    return thumbs->folderFrame( local );
 }
 
 qreal CardDelegate::progress( input_item_t *input, const QModelIndex &source ) const

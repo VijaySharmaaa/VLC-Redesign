@@ -21,6 +21,7 @@
 
 #include "qt.hpp"
 
+#include <QElapsedTimer>
 #include <QHash>
 #include <QObject>
 #include <QRunnable>
@@ -33,10 +34,13 @@ class QTimer;
 /* Frames of local videos for the library cards (issue I1-3). VLC 3 has no
  * thumbnailer API: the package's own vlc.exe grabs one frame, headless,
  * with the scene filter, into the cache directory, keyed by path, size and
- * modification time. One process at a time, killed after a timeout, when
- * the page is left (cancel) and when VLC quits; the user's media are only
- * read. Also lists local folders (the videos in them) and tells, from the
- * recents (RecentsMRL), where a file resumes and whether it was watched. */
+ * modification time. A few processes at a time (ThumbWorkersMax, half the
+ * cores), each killed as soon as its picture is written, after a timeout,
+ * when the page is left (cancel) and when VLC quits; the latest asked frame
+ * (a card on screen) goes first. The user's media are only read. Also lists
+ * local folders (the videos in them, and a video further down for a folder
+ * without its own) and tells, from the recents (RecentsMRL), where a file
+ * resumes and whether it was watched. */
 class Thumbnailer : public QObject
 {
     Q_OBJECT
@@ -50,6 +54,9 @@ public:
     QString frame( const QString &path, int64_t lengthMs );
     /* The videos of a local folder, by name; NULL while it is listed */
     const QStringList *videos( const QString &dir );
+    /* The frame of a folder's first video, or of the first one in its
+     * subfolders when it has none of its own; empty as frame() */
+    QString folderFrame( const QString &dir );
     /* Where a file resumes, 0..1, or -1 when it does not */
     qreal resume( const QString &path ) const;
     /* How many videos of a listed folder were played to their end (or
@@ -65,31 +72,41 @@ signals:
 
 private slots:
     void probed( const QString &path, const QString &file, bool cached );
-    void listed( const QString &dir, const QStringList &videos );
+    void listed( const QString &dir, const QStringList &videos, const QString &cover );
     void loadRecents();
 
 private:
     struct Request
     {
-        QString path, file;
+        QString key, path, file;
         int atSec;
     };
+    struct Job
+    {
+        Request r;
+        QString tmpFile;
+        QProcess *process;
+        QElapsedTimer clock;
+    };
     void startNext();
-    void finish( bool ok );
-    void stopProcess();
+    void start( const Request & );
+    void check();
+    void finish( QProcess *, bool ok );
+    static void stopProcess( QProcess * );
 
     intf_thread_t *p_intf;
-    QString cacheDir, tmpFile;
+    QString cacheDir;
     QHash<QString, QString> frames;          /* key: its PNG file */
     QSet<QString> pendingFrames, failedFrames, pendingDirs;
     QHash<QString, QStringList> dirs;
+    QHash<QString, QString> covers;          /* key: of dirs, a video under it */
     QHash<QString, int> watchedCounts;       /* key: of dirs, as painted */
     QHash<QString, int64_t> lengths;         /* key: length asked with */
     QHash<QString, qreal> played;            /* key: resume point, 1 when watched */
     QList<Request> queue;                    /* the latest asked first */
-    Request current;
-    QProcess *process;
-    QTimer *timeout;
+    QList<Job> jobs;                         /* running */
+    int maxJobs;
+    QTimer *poll;                            /* while jobs run */
 };
 
 /* The probe (size and date, the cached frame) of a file, or the listing of
@@ -105,7 +122,7 @@ public:
 signals:
     /* file empty: no such file */
     void probed( const QString &path, const QString &file, bool cached );
-    void listed( const QString &dir, const QStringList &videos );
+    void listed( const QString &dir, const QStringList &videos, const QString &cover );
 
 private:
     QString path, cacheDir;
