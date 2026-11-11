@@ -763,12 +763,19 @@ namespace
         }
         if (QHeaderView *h = qobject_cast<QHeaderView *>(w))
         {
+            /* setDefaultSectionSize() sets every shown section to the new
+             * default: the user's widths are read before it */
+            QVector<int> sizes(h->count());
+            for (int i = 0; i < h->count(); ++i)
+                sizes[i] = h->sectionSize(i);
             h->setMinimumSectionSize(rescaled(w, 7, h->minimumSectionSize(), from, to));
             h->setDefaultSectionSize(rescaled(w, 8, h->defaultSectionSize(), from, to));
+            /* a hidden section reads 0: resizing it would show it at 0 */
             for (int i = 0; i < h->count(); ++i)
-                if (h->sectionResizeMode(i) == QHeaderView::Interactive
-                    || h->sectionResizeMode(i) == QHeaderView::Fixed)
-                    h->resizeSection(i, rescaled(w, 9 + i, h->sectionSize(i), from, to));
+                if (!h->isSectionHidden(i)
+                    && (h->sectionResizeMode(i) == QHeaderView::Interactive
+                        || h->sectionResizeMode(i) == QHeaderView::Fixed))
+                    h->resizeSection(i, rescaled(w, 9 + i, sizes[i], from, to));
         }
         if (w->layout())
             rescaleLayout(w->layout(), from, to);
