@@ -164,6 +164,38 @@ public:
     {
         setTabBar( new SheetTabBar( this ) );
     }
+
+protected:
+    /* QTabWidget puts the corner a base line lower than the tabs and ends
+     * it on the pane: "More" takes the tabs' own box, top and bottom.
+     * These are the events after which QTabWidget lays the corner out. */
+    bool event( QEvent *e ) Q_DECL_OVERRIDE
+    {
+        const bool handled = QTabWidget::event( e );
+        switch( e->type() )
+        {
+            case QEvent::Resize:
+            case QEvent::Show:
+            case QEvent::LayoutRequest:
+            case QEvent::StyleChange:
+            case QEvent::FontChange:
+                alignCorner();
+                break;
+            default:
+                break;
+        }
+        return handled;
+    }
+
+private:
+    void alignCorner()
+    {
+        QWidget *corner = cornerWidget( Qt::TopRightCorner );
+        if( !corner || count() == 0 )
+            return;
+        const QRect tab = tabBar()->tabRect( 0 ).translated( tabBar()->pos() );
+        corner->setGeometry( corner->x(), tab.y(), corner->width(), tab.height() );
+    }
 };
 
 }
@@ -284,27 +316,44 @@ ExtendedDialog::ExtendedDialog( intf_thread_t *_p_intf )
     moreButton->setCheckable( true );
     moreButton->setToolButtonStyle( Qt::ToolButtonTextOnly );
     QMenu *moreMenu = new QMenu( moreButton );
-    const struct { QTabWidget *pages; QString title; } groups[] = {
-        { audioTab, qtr( "Audio Effects" ) },
-        { videoTab, qtr( "Video Effects" ) },
+    /* by page, the first (a top tab) has none; the theme's menus draw a
+     * section as a plain line, so each Advanced page names its group */
+    static const char * const audioIcons[] = { NULL, RedesignIcons::EffectCompressor,
+        RedesignIcons::EffectSpatializer, RedesignIcons::EffectWidener, RedesignIcons::EffectAdvanced };
+    static const char * const videoIcons[] = { NULL, RedesignIcons::EffectCrop,
+        RedesignIcons::EffectColors, RedesignIcons::EffectGeometry, RedesignIcons::EffectOverlay,
+        RedesignIcons::EffectAdvanced };
+    const struct {
+        QTabWidget *pages; QString title; QString advanced;
+        const char * const *icons; int iconCount;
+    } groups[] = {
+        { audioTab, qtr( "Audio Effects" ), qtr( "Advanced audio" ),
+          audioIcons, (int)( sizeof( audioIcons ) / sizeof( audioIcons[0] ) ) },
+        { videoTab, qtr( "Video Effects" ), qtr( "Advanced video" ),
+          videoIcons, (int)( sizeof( videoIcons ) / sizeof( videoIcons[0] ) ) },
     };
     for( size_t g = 0; g < sizeof( groups ) / sizeof( groups[0] ); g++ )
     {
         QTabWidget *pages = groups[g].pages;
         moreMenu->addSection( groups[g].title );
         for( int i = 1; i < pages->count(); i++ )
-            connect( moreMenu->addAction( pages->tabText( i ) ), &QAction::triggered,
+        {
+            /* Advanced is each group's last page */
+            QAction *action = moreMenu->addAction( i == pages->count() - 1
+                ? groups[g].advanced : pages->tabText( i ) );
+            if( i < groups[g].iconCount )
+                action->setIcon( Theme::themedIcon( groups[g].icons[i], Theme::Text2 ) );
+            connect( action, &QAction::triggered,
                      this, [this, pages, i]() { showPage( pages, i ); } );
+        }
     }
     moreButton->setMenu( moreMenu );
     moreButton->setObjectName( "effectsMore" );
-    /* the corner's height (QTabWidget gives it the tabs' less the bar's
-     * base line) and the sheet's right padding: the arrow stays in and
-     * "More" sits on the tabs' line */
+    /* the tabs' height (SheetTabs puts the corner on their box) and the
+     * sheet's right padding: the arrow stays in */
     QTabBar *tabs = mainTabW->findChild<QTabBar *>( QString(), Qt::FindDirectChildrenOnly );
     if( tabs )
-        moreButton->setFixedHeight( tabs->sizeHint().height()
-            - mainTabW->style()->pixelMetric( QStyle::PM_TabBarBaseHeight, NULL, mainTabW ) );
+        moreButton->setFixedHeight( tabs->sizeHint().height() );
     moreCorner = new QWidget( mainTabW );
     QHBoxLayout *cornerLayout = new QHBoxLayout( moreCorner );
     cornerLayout->setContentsMargins( 0, 0, t->px( Effects::TabsPadX ), 0 );
