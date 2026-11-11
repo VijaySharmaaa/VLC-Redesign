@@ -39,6 +39,7 @@
 
 #include "components/complete_preferences.hpp"
 #include "components/preferences_widgets.hpp"
+#include "util/theme.hpp"
 
 #include <vlc_config_cat.h>
 #include <vlc_intf_strings.h>
@@ -642,7 +643,7 @@ AdvPrefsPanel::AdvPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
 
     QLabel *titleLabel = new QLabel( head );
     QFont titleFont = QApplication::font();
-    titleFont.setPointSize( QFontInfo( titleFont ).pointSize() + 6 );
+    titleFont.setPixelSize( QFontInfo( titleFont ).pixelSize() + Theme::instance()->pt( 6 ) );
     titleLabel->setFont( titleFont );
 
     // Title <hr>

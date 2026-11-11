@@ -117,9 +117,9 @@ StandardPLPanel::StandardPLPanel( PlaylistWidget *_parent,
     /* Saved Settings */
     int i_savedViewMode = getSettings()->value( "Playlist/view-mode", TREE_VIEW ).toInt();
 
-    QFont font = QApplication::font();
-    font.setPointSize( QFontInfo( font ).pointSize() + getSettings()->value( "Playlist/zoom", 0 ).toInt() );
-    model->setData( QModelIndex(), font, Qt::FontRole );
+    zoom = getSettings()->value( "Playlist/zoom", 0 ).toInt();
+    applyZoom();
+    connect( Theme::instance(), &Theme::changed, this, &StandardPLPanel::applyZoom );
 
     showView( i_savedViewMode );
 
@@ -139,9 +139,7 @@ StandardPLPanel::~StandardPLPanel()
     if( treeView )
         getSettings()->setValue( "headerStateV2", treeView->header()->saveState() );
     getSettings()->setValue( "view-mode", currentViewIndex() );
-    getSettings()->setValue( "zoom",
-                QFontInfo( model->data( QModelIndex(), Qt::FontRole ).value<QFont>() ).pointSize()
-                - QFontInfo( QApplication::font() ).pointSize() );
+    getSettings()->setValue( "zoom", zoom );
     getSettings()->endGroup();
 }
 
@@ -719,13 +717,22 @@ void StandardPLPanel::createTreeView()
     viewStack->addWidget( treeView );
 }
 
+/* zoom: points over the application's font, at most 3, and 5 pt at least */
 void StandardPLPanel::updateZoom( int i )
 {
-    QVariant fontdata = model->data( QModelIndex(), Qt::FontRole );
-    QFont font = fontdata.value<QFont>();
-    font.setPointSize( QFontInfo( font ).pointSize() + i );
-    if ( font.pointSize() < 5 - QFontInfo( QApplication::font() ).pointSize() ) return;
-    if ( font.pointSize() > 3 + QFontInfo( QApplication::font() ).pointSize() ) return;
+    const Theme *t = Theme::instance();
+    if( zoom + i > 3
+     || QFontInfo( QApplication::font() ).pixelSize() + t->pt( zoom + i ) < t->pt( 5 ) )
+        return;
+    zoom += i;
+    applyZoom();
+}
+
+/* in pixels, so the rows follow the screen's scale */
+void StandardPLPanel::applyZoom()
+{
+    QFont font = QApplication::font();
+    font.setPixelSize( QFontInfo( font ).pixelSize() + Theme::instance()->pt( zoom ) );
     model->setData( QModelIndex(), font, Qt::FontRole );
 }
 

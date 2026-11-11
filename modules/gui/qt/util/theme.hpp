@@ -113,6 +113,10 @@ public:
      * device-independent px: tokens are px at 96 dpi and fonts are in
      * points, so metrics follow the logical dpi as the text does. */
     int px(int tokenPx) const { return qRound(tokenPx * scale); }
+    /* A stock point size or step in px: a font in pixels follows the
+     * screen's scale (setScreen), one in points keeps the dpi Qt 5.6
+     * resolved it at */
+    int pt(qreal points) const { return qRound(points * 4 / 3 * scale); }
     int metric(SizeRole) const;
     int duration(MotionRole) const;  /* 0 when Windows animations are off */
     /* How far a vertically centred line of this font must move up so its

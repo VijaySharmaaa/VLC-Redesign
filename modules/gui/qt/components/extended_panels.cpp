@@ -1033,7 +1033,7 @@ void AudioFilterControlWidget::connectConfigChanged( FilterSliderData *slider )
 void AudioFilterControlWidget::build()
 {
     QFont smallFont = QApplication::font();
-    smallFont.setPointSize( QFontInfo( smallFont ).pointSize() + i_smallfont );
+    smallFont.setPixelSize( QFontInfo( smallFont ).pixelSize() + Theme::instance()->pt( i_smallfont ) );
 
     QVBoxLayout *layout = new QVBoxLayout( this );
     slidersBox = new QGroupBox( qtr( "Enable" ) );
