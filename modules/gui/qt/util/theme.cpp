@@ -1158,7 +1158,9 @@ QToolButton[np="play"] { background: @accent@; border-radius: @playNowR@px; }
 QToolButton[np="play"]:hover { background: @accentHover@; }
 QToolButton[np="play"][keyFocus="true"]:focus { border-color: @onAccent@; }
 QToolButton[np="pill"] { color: @tx2@; padding: 0 @pillPadR@px 0 @pillPadL@px; }
-QToolButton[np="overlay"] { background: @scrim@; }
+QToolButton[np="overlay"] { background: @scrim@; border-radius: @miniRestoreR@px; }
+QToolButton[np="overlay"]:hover, QToolButton[np="overlay"]:pressed { background: @onVideoHover@; }
+QToolButton[np="overlay"][keyFocus="true"]:focus { border-color: @accent@; }  /* on black in both themes */
 QListView[np="tracks"], QListView[np="tracks"][keyFocus="true"]:focus { background: transparent; border: none; }
 /* Phase 3: deck (components/controller.cpp, deck_popover.cpp). Roles:
    deck = icon button (on = checked, open = [open="true"]), play = accent circle,
@@ -1368,8 +1370,12 @@ PrefsPage QComboBox { min-height: @prefsSelectInner@px; }
         { "playNowR", QString::number(px(Size::PlayNowBar) / 2) },
         { "pillPadL", QString::number(px(NowPlaying::PillPadLeft)) },
         { "pillPadR", QString::number(px(NowPlaying::PillPadRight)) },
-        { "scrim", css(QColor::fromRgba(qRgba(qRed(VideoSurface), qGreen(VideoSurface), qBlue(VideoSurface),
-                                              NowPlaying::MiniRestoreBgAlpha))) },
+        /* the tokens, not Theme's ColorRole values of the same names (they made the scrim blue) */
+        { "scrim", css(QColor::fromRgba(qRgba(qRed(RedesignTokens::VideoSurface), qGreen(RedesignTokens::VideoSurface),
+                                              qBlue(RedesignTokens::VideoSurface), NowPlaying::MiniRestoreBgAlpha))) },
+        { "onVideoHover", css(QColor::fromRgba(qRgba(qRed(RedesignTokens::OnVideo), qGreen(RedesignTokens::OnVideo),
+                                                     qBlue(RedesignTokens::OnVideo), VideoOverlay::HeaderBackHoverAlpha))) },
+        { "miniRestoreR", QString::number(px(NowPlaying::MiniRestoreChip) / 2) },
         /* Phase 3: deck */
         { "separatorInk", css(ink(InkAlpha::Separator)) },
         { "deckSepMargin", QString::number(px(Deck::SeparatorMargin)) },
