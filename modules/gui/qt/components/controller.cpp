@@ -1529,11 +1529,10 @@ void FullscreenControllerWidget::keyPressEvent( QKeyEvent *event )
 {
     if ( event->key() == Qt::Key_Escape && b_keysTaken )
     {
-        /* Tab gave it the keys: first the keys back to the video, a second
-         * Esc leaves full screen. After a click Esc is the video's, as before */
+        /* Tab gave it the keys: hand them back to the video, then Esc does
+         * what it does there (leaves full screen by default), as in stock */
         hideFSC();
         parentWidget()->activateWindow();
-        return;
     }
     emit keyPressed( event );
 }
