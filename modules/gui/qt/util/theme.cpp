@@ -1180,9 +1180,8 @@ QLabel[role="libraryDim"] { color: @dim@; }
 /* Phase 5: effects (dialogs/extended.cpp, components/extended_panels.cpp) */
 #effectsSheet QTabWidget::pane { background: transparent; border: none; }
 #effectsSheet QTabWidget#effectsTabs::pane { border-top: 1px solid @divider@; }
-/* the corner (dialogs/extended.cpp) starts a line below the tabs: the
-   label's box ends two lines higher, its centre is one line up, on theirs */
-QToolButton#effectsMore { padding-right: @iconGlyph@px; padding-bottom: @moreLift@px; }
+/* the corner (dialogs/extended.cpp) has the first tab's box: no lift */
+QToolButton#effectsMore { padding-right: @iconGlyph@px; }
 QToolButton#effectsMore::menu-indicator { image: url("@arrowDown@"); subcontrol-origin: padding; subcontrol-position: center right;
     width: @iconGlyph@px; height: @iconGlyph@px; }
 #effectsSheet QScrollArea, #effectsSheet QScrollArea > QWidget > QWidget { background: transparent; }
@@ -1309,7 +1308,6 @@ PrefsPage QComboBox { min-height: @prefsSelectInner@px; }
         /* focus rings and the transparent borders that keep their room:
            line widths, not scaled (as the painted rings) */
         { "ring", QString::number(Size::FocusRing) },
-        { "moreLift", QString::number(2 * Size::Hairline) },
         { "buttonPadX", QString::number(px(Size::ButtonPadX)) },
         { "buttonPadXFocus", QString::number(px(Size::ButtonPadX) - 1) },
         /* a group box's title is in the application font, Body */
