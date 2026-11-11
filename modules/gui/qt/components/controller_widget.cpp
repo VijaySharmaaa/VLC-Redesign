@@ -207,8 +207,6 @@ void SoundWidget::setMuted( bool mute )
 PlayButton::PlayButton() : b_round( false ), b_playing( false )
 {
     /* DESIGN_SPEC 3: the circle shrinks while pressed */
-    press.setStartValue( 1. );
-    press.setEndValue( 1. );
     connect( &press, &QVariantAnimation::valueChanged, this, [this]() { update(); } );
     connect( this, &QAbstractButton::pressed, this, [this]() {
         pressTo( RedesignTokens::Motion::PlayPressScale / 100. );
@@ -234,7 +232,10 @@ void PlayButton::pressTo( qreal scale )
 void PlayButton::paintEvent( QPaintEvent *e )
 {
     const QVariant v = press.currentValue();
-    const qreal scale = v.isValid() ? v.toReal() : 1.;
+    /* only while held or easing back: a release Qt never sent, or one
+     * skipped because animations went off, leaves no shrunken circle */
+    const qreal scale = ( isDown() || press.state() == QAbstractAnimation::Running )
+                        && v.isValid() ? v.toReal() : 1.;
     if( !b_round || scale <= 0. || qFuzzyCompare( scale, 1. ) )
     {
         QToolButton::paintEvent( e );
