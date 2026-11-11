@@ -130,6 +130,11 @@ public:
     static QIcon themedIcon(const char *name, ColorRole);
     /* A menu entry that removes or clears: drawn in DestructiveText */
     static void setDestructive(QAction *);
+    /* Whether the widget, which has focus, shows its focus ring: only for
+     * focus from the keyboard (Tab, an access key, arrow keys), and always
+     * in a text field, as CSS :focus-visible. In place of hasFocus() where
+     * a widget or delegate paints its own ring. */
+    static bool showsFocus(const QWidget *);
 
 signals:
     void changed();
@@ -147,6 +152,7 @@ private:
     intf_thread_t *p_intf;
     bool dark;
     bool highContrast;
+    bool keyboardInput;  /* the last key or mouse press was a key (showsFocus) */
     qreal scale;        /* logical dpi / 96, see px() */
     QString uiFamily, monoFamily;
     QHash<QString, QIcon> icons;

@@ -27,11 +27,14 @@
 #include <cassert>
 
 #include <QAbstractItemView>
+#include <QAbstractSpinBox>
 #include <QAction>
 #include <QApplication>
 #include <QCheckBox>
+#include <QComboBox>
 #include <QDir>
 #include <QEvent>
+#include <QFocusEvent>
 #include <QFile>
 #include <QFontDatabase>
 #include <QFontInfo>
@@ -45,6 +48,7 @@
 #include <QMenu>
 #include <QPainter>
 #include <QPalette>
+#include <QPlainTextEdit>
 #include <QProxyStyle>
 #include <QRadioButton>
 #include <QSaveFile>
@@ -55,6 +59,7 @@
 #include <QStyle>
 #include <QStyleFactory>
 #include <QStyleOptionMenuItem>
+#include <QTextEdit>
 #include <QVariantAnimation>
 #include <QWidget>
 
@@ -190,6 +195,24 @@ namespace
     const char toggleKnobProperty[] = "vlcToggleKnob";
     const char toggleHookedProperty[] = "vlcToggleHooked";
     const char editNudgeProperty[] = "vlcTextNudge";  /* the nudge in a line edit's margins */
+    /* true while the widget has focus from the keyboard: the stylesheet's
+     * focus rings are [keyFocus="true"]:focus (Theme::showsFocus) */
+    const char keyFocusProperty[] = "keyFocus";
+
+    /* a field the user types in shows its ring however it got focus, as
+     * CSS :focus-visible does */
+    bool isTextEntry(const QWidget *w)
+    {
+        if (const QLineEdit *edit = qobject_cast<const QLineEdit *>(w))
+            return !edit->isReadOnly();
+        if (const QTextEdit *edit = qobject_cast<const QTextEdit *>(w))
+            return !edit->isReadOnly();
+        if (const QPlainTextEdit *edit = qobject_cast<const QPlainTextEdit *>(w))
+            return !edit->isReadOnly();
+        if (const QComboBox *combo = qobject_cast<const QComboBox *>(w))
+            return combo->isEditable();
+        return qobject_cast<const QAbstractSpinBox *>(w) != NULL;
+    }
 
     /* DESIGN_SPEC 3: a QCheckBox with role="toggle" is drawn as a switch;
      * it stays a check box for the keyboard and accessibility */
@@ -341,6 +364,8 @@ namespace
                            const QWidget *w) const Q_DECL_OVERRIDE
         {
             Theme *t = Theme::instance();
+            if (pe == PE_FrameFocusRect && t && w && !Theme::showsFocus(w))
+                return;  /* focus from the mouse: no ring */
             if (t && isToggle(w) && (pe == PE_FrameFocusRect || pe == PE_IndicatorCheckBox))
             {
                 if (pe == PE_IndicatorCheckBox)
@@ -511,7 +536,7 @@ namespace
                                               -2 * Size::FocusRing - .5, -2 * Size::FocusRing - .5);
             p->save();
             p->setRenderHint(QPainter::Antialiasing);
-            if (opt->state & State_HasFocus)
+            if ((opt->state & State_HasFocus) && Theme::showsFocus(w))
             {
                 p->setPen(QPen(t->color(strongAccent(t)), Size::FocusRing));
                 p->setBrush(Qt::NoBrush);
@@ -546,7 +571,7 @@ namespace
 }
 
 Theme::Theme(intf_thread_t *_p_intf)
-    : p_intf(_p_intf), dark(false), highContrast(false), scale(1.)
+    : p_intf(_p_intf), dark(false), highContrast(false), keyboardInput(false), scale(1.)
 {
     assert(s_instance == NULL);
     s_instance = this;
@@ -970,6 +995,12 @@ QIcon Theme::themedIcon(const char *name, ColorRole role)
     return QIcon(new ThemedIconEngine(name, role));
 }
 
+bool Theme::showsFocus(const QWidget *w)
+{
+    const QWidget *focus = QApplication::focusWidget();  /* a focus proxy's target */
+    return w && focus && w->hasFocus() && focus->property(keyFocusProperty).toBool();
+}
+
 void Theme::setDestructive(QAction *action)
 {
     action->setProperty(destructiveProperty, true);
@@ -1053,11 +1084,11 @@ QAbstractSpinBox::up-arrow:disabled, QAbstractSpinBox::up-arrow:off { image: url
 /* popup lists: a combo's, and a completer's (a window of its own, see eventFilter) */
 QComboBox QAbstractItemView, QAbstractItemView[popup="true"] { background: @raised@; border: @popupBorder@; padding: 0; selection-background-color: @hoverFill@; selection-color: @tx@; outline: 0; }
 
-QLineEdit:focus, QAbstractSpinBox:focus, QComboBox:focus { border: @ring@px solid @focusRing@; padding: 0px @menuPadFocus@px; }
-QComboBox:focus { margin: 0; }
-QTextEdit:focus, QPlainTextEdit:focus, QPushButton:focus { border: @ring@px solid @focusRing@; }
-QToolButton:focus { border-color: @focusRing@; }
-QPushButton:focus { padding: @menuPadFocus@px @buttonPadXFocus@px; }
+QLineEdit[keyFocus="true"]:focus, QAbstractSpinBox[keyFocus="true"]:focus, QComboBox[keyFocus="true"]:focus { border: @ring@px solid @focusRing@; padding: 0px @menuPadFocus@px; }
+QComboBox[keyFocus="true"]:focus { margin: 0; }
+QTextEdit[keyFocus="true"]:focus, QPlainTextEdit[keyFocus="true"]:focus, QPushButton[keyFocus="true"]:focus { border: @ring@px solid @focusRing@; }
+QToolButton[keyFocus="true"]:focus { border-color: @focusRing@; }
+QPushButton[keyFocus="true"]:focus { padding: @menuPadFocus@px @buttonPadXFocus@px; }
 
 QTabWidget::pane { background: @panel@; border: 1px solid @dividerLine@; border-radius: @radiusLg@px; top: -1px; }
 /* a transparent ring on every tab, so focus only colours it */
@@ -1065,7 +1096,7 @@ QTabBar::tab { background: transparent; color: @mute@; border: @ring@px solid tr
     padding: @tabPadTop@px @tabPadX@px @tabPadBottom@px; }
 QTabBar::tab:hover { color: @tx@; }
 QTabBar::tab:selected { color: @tx@; border-bottom-color: @fill@; }
-QTabBar::tab:focus { color: @tx@; background: @hoverFill@; border-color: @focusRing@; border-radius: @radiusSm@px; }
+QTabBar[keyFocus="true"]::tab:focus { color: @tx@; background: @hoverFill@; border-color: @focusRing@; border-radius: @radiusSm@px; }
 
 /* the title's box starts at the top (origin margin), the frame half a line
    lower: the title sits centred on the frame's top line, the content below it */
@@ -1078,8 +1109,8 @@ QAbstractItemView { background: @surface@; alternate-background-color: @panel@; 
 QAbstractItemView::item:hover { background: @hoverFill@; }
 QAbstractItemView::item:selected { background: @accentTint@; color: @tx@; }
 /* views that draw their own row rings set [role] rules with no border, later */
-QAbstractItemView:focus { border: @ring@px solid @focusRing@; padding: 0; }
-QComboBox QAbstractItemView:focus, QAbstractItemView[popup="true"]:focus { border: @popupBorder@; padding: 0; }
+QAbstractItemView[keyFocus="true"]:focus { border: @ring@px solid @focusRing@; padding: 0; }
+QComboBox QAbstractItemView[keyFocus="true"]:focus, QAbstractItemView[popup="true"][keyFocus="true"]:focus { border: @popupBorder@; padding: 0; }
 QHeaderView::section { background: @panel@; color: @mute@; border: none; border-bottom: 1px solid @divider@; border-right: 1px solid @divider@; padding: @menuPad@px @menuTitlePadX@px; }
 
 QScrollBar:vertical { background: transparent; width: @scrollW@px; margin: 0; }
@@ -1097,7 +1128,7 @@ QStatusBar::item { border: none; }
 
 QLabel[role="hint"] { color: @mute@; }
 /* selectable hints (the error dialog's details) take focus */
-QLabel[role="hint"]:focus { border: 1px solid @focusRing@; border-radius: @radiusSm@px; }
+QLabel[role="hint"][keyFocus="true"]:focus { border: 1px solid @focusRing@; border-radius: @radiusSm@px; }
 
 .QSlider::groove:horizontal { height: @track@px; background: @trackInk@; border-radius: @trackRadius@px; }
 .QSlider::groove:vertical { width: @track@px; background: @trackInk@; border-radius: @trackRadius@px; }
@@ -1109,7 +1140,7 @@ QLabel[role="hint"]:focus { border: 1px solid @focusRing@; border-radius: @radiu
 /* opaque: the track must not show through the knob */
 .QSlider::handle:disabled { background: @toggleOffSolid@; }
 .QSlider { border: @ring@px solid transparent; border-radius: @radiusSm@px; }
-.QSlider:focus { border-color: @focusRing@; }
+.QSlider[keyFocus="true"]:focus { border-color: @focusRing@; }
 
 /* ---- Title bar (components/title_bar.cpp) ---- */
 QToolButton[role="caption"] { border-radius: 0; }
@@ -1125,10 +1156,10 @@ QLabel[np="chip"] { background: @accentTint@; color: @accTx@; border-radius: @ra
 QLabel[np="chip2"] { background: @divider@; color: @tx2@; border-radius: @radiusXs@px; padding: @chipPadY@px @chipPadX@px; }
 QToolButton[np="play"] { background: @accent@; border-radius: @playNowR@px; }
 QToolButton[np="play"]:hover { background: @accentHover@; }
-QToolButton[np="play"]:focus { border-color: @onAccent@; }
+QToolButton[np="play"][keyFocus="true"]:focus { border-color: @onAccent@; }
 QToolButton[np="pill"] { color: @tx2@; padding: 0 @pillPadR@px 0 @pillPadL@px; }
 QToolButton[np="overlay"] { background: @scrim@; }
-QListView[np="tracks"] { background: transparent; border: none; }
+QListView[np="tracks"], QListView[np="tracks"][keyFocus="true"]:focus { background: transparent; border: none; }
 /* Phase 3: deck (components/controller.cpp, deck_popover.cpp). Roles:
    deck = icon button (on = checked, open = [open="true"]), play = accent circle,
    speed = the speed label, deckSeparator, deckTime, popover, popoverDivider, popoverLink. */
@@ -1141,7 +1172,7 @@ QToolButton[role="deck"]:checked { background: transparent; color: @accTx@; }
 QToolButton[role="deck"][record="true"]:checked { background: @errorTint@; }
 QToolButton[role="deck"]:checked:hover { background: @hoverFill@; }
 QToolButton[role="deck"][open="true"], QToolButton[role="speed"][open="true"] { background: @openFill@; }
-QToolButton[role="deck"]:focus, QToolButton[role="speed"]:focus { border-color: @focusRing@; }
+QToolButton[role="deck"][keyFocus="true"]:focus, QToolButton[role="speed"][keyFocus="true"]:focus { border-color: @focusRing@; }
 QToolButton[role="speed"] { color: @tx2@; font-weight: 600; padding: 0 @speedPadX@px; }
 QToolButton[role="speed"][on="true"], QToolButton[role="speed"][open="true"] { color: @accTx@; }
 QToolButton[role="speed"]:disabled { color: @dim@; }
@@ -1149,19 +1180,19 @@ QToolButton[role="speed"]::menu-indicator { image: none; width: 0; }
 QToolButton[role="play"] { background: @accent@; border: @ring@px solid transparent; border-radius: @playRadius@px; padding: 0; }
 QToolButton[role="play"]:hover { background: @accentHover@; }
 QToolButton[role="play"]:pressed { background: @accent@; }
-QToolButton[role="play"]:focus { border-color: @tx@; }
+QToolButton[role="play"][keyFocus="true"]:focus { border-color: @tx@; }
 QFrame[role="deckSeparator"] { background: @separatorInk@; border: none; margin: 0 @deckSepMargin@px; }
 QLabel[role="deckTime"] { color: @tx2@; }
 QFrame[role="popover"] { background: @raised@; border: @popupBorder@; }
-QFrame[role="popover"] QListView { background: transparent; border: none; padding: 0; }
+QFrame[role="popover"] QListView, QFrame[role="popover"] QListView[keyFocus="true"]:focus { background: transparent; border: none; padding: 0; }
 QFrame[role="popover"] QLabel { color: @dim@; }
 QFrame[role="popoverDivider"] { background: @divider@; border: none; }
 QPushButton[role="popoverLink"] { background: transparent; color: @accTx@; border: @ring@px solid transparent; border-top: 1px solid @divider@;
     border-radius: 0; text-align: left; padding: @menuPad@px; }
 QPushButton[role="popoverLink"]:hover { background: @hoverFill@; }
-QPushButton[role="popoverLink"]:focus { border: @ring@px solid @focusRing@; border-radius: @radiusMd@px; }
+QPushButton[role="popoverLink"][keyFocus="true"]:focus { border: @ring@px solid @focusRing@; border-radius: @radiusMd@px; padding: @menuPad@px; }
 /* Phase 4: home (components/library/home_page.cpp); the delegate draws the row focus ring */
-QTreeView[role="homeRecent"] { background: transparent; border: none; padding: 0; outline: 0; }
+QTreeView[role="homeRecent"], QTreeView[role="homeRecent"][keyFocus="true"]:focus { background: transparent; border: none; padding: 0; outline: 0; }
 QTreeView[role="homeRecent"]::item { padding: 0 @homeCellPad@px; border-bottom: 1px solid @homeRowLine@; }
 QTreeView[role="homeRecent"]::item:first { padding-left: @homeRowPad@px; }
 QTreeView[role="homeRecent"]::item:last { padding-right: @homeRowPad@px; }
@@ -1169,11 +1200,12 @@ QTreeView[role="homeRecent"]::item:last { padding-right: @homeRowPad@px; }
 QPushButton[role="primary"] { background: @accent@; color: @onAccent@; border-color: @accent@; font-weight: 600; }
 QPushButton[role="primary"]:hover { background: @accentHover@; }
 /* like role="play": @focusRing@ is the accent fill itself in the dark theme */
-QPushButton[role="primary"]:focus { border-color: @tx@; }
+QPushButton[role="primary"][keyFocus="true"]:focus { border-color: @tx@; }
 /* Phase 4: library (components/library/) */
-QListView[role="library"], QScrollArea[role="library"] { background: transparent; border: none; padding: 0; outline: 0; }
+QListView[role="library"], QListView[role="library"][keyFocus="true"]:focus, QScrollArea[role="library"] {
+    background: transparent; border: none; padding: 0; outline: 0; }
 QScrollArea[role="library"] > QWidget > QWidget { background: transparent; }
-QLineEdit[role="librarySearch"]:focus { border: @ring@px solid @focusRing@; }
+QLineEdit[role="librarySearch"][keyFocus="true"]:focus { border: @ring@px solid @focusRing@; }
 QPushButton[role="outline"] { background: transparent; }
 QPushButton[role="outline"]:hover { background: @hoverFill@; }
 QLabel[role="libraryDim"] { color: @dim@; }
@@ -1188,7 +1220,7 @@ QToolButton#effectsMore::menu-indicator { image: url("@arrowDown@"); subcontrol-
 QPushButton[role="chip"] { background: transparent; color: @tx2@; border: 1px solid @chipBorder@; border-radius: @chipRadius@px; padding: 0 @fxChipPadX@px; }
 QPushButton[role="chip"]:hover { background: @hoverFill@; }
 QPushButton[role="chip"]:checked { background: @accentTint@; color: @accTx@; border-color: @accentBorder@; }
-QPushButton[role="chip"]:focus { border: @ring@px solid @focusRing@; padding: 0 @fxChipPadXFocus@px; }
+QPushButton[role="chip"][keyFocus="true"]:focus { border: @ring@px solid @focusRing@; padding: 0 @fxChipPadXFocus@px; }
 QPushButton[role="chip"]:disabled { background: transparent; color: @dim@; border-color: @dividerLine@; }
 QFrame[role="fxRow"] { background: @raised@; border-radius: @fxRowRadius@px; }
 QToolButton[role="stepper"] { background: @stepperFill@; }
@@ -1200,16 +1232,16 @@ QToolButton[role="openTile"] { background: @raised@; color: @tx2@; border: 1px s
 QToolButton[role="openTile"]:hover { background: @hover@; color: @tx@; }
 QToolButton[role="openTile"]:checked { background: @accentTint@; color: @accTx@; border-color: @accentBorder@; }
 /* 2 px, unlike the 1 px checked outline; the content stays centred */
-QToolButton[role="openTile"]:focus { border: @ring@px solid @focusRing@; }
+QToolButton[role="openTile"][keyFocus="true"]:focus { border: @ring@px solid @focusRing@; }
 #OpenDisk QRadioButton { background: @raised@; border: 1px solid transparent; border-radius: @radiusMd@px; padding: @menuPad@px @buttonPadX@px; spacing: 0; }
 #OpenDisk QRadioButton::indicator { image: none; width: 0; height: 0; border: none; }
 #OpenDisk QRadioButton:hover { background: @hover@; }
 #OpenDisk QRadioButton:checked { background: @accentTint@; color: @accTx@; border-color: @accentBorder@; }
-#OpenDisk QRadioButton:focus { border-color: @focusRing@; }
+#OpenDisk QRadioButton[keyFocus="true"]:focus { border-color: @focusRing@; }
 QToolButton[role="split"] { background: @accent@; color: @onAccent@; font-weight: 600; padding: @menuPad@px @buttonPadX@px; }
 QToolButton[role="split"][popupMode="1"] { padding-right: @splitPadR@px; }
 QToolButton[role="split"]:hover { background: @accentHover@; }
-QToolButton[role="split"]:focus { border-color: @onAccent@; }
+QToolButton[role="split"][keyFocus="true"]:focus { border-color: @onAccent@; }
 QToolButton[role="split"]::menu-arrow { image: url("@arrowDownOnAccent@"); }
 /* as QPushButton:disabled: on the dialog's own panel colour the outline is
    what is left of the button */
@@ -1218,15 +1250,15 @@ QToolButton[role="split"]::menu-arrow:disabled { image: url("@arrowDownDim@"); }
 QLabel[role="errorIcon"] { background: @errorTint@; border-radius: @errorIconR@px; }
 QPushButton[role="link"] { background: transparent; color: @accTx@; border: @ring@px solid transparent; }
 QPushButton[role="link"]:hover { background: @hoverFill@; }
-QPushButton[role="link"]:focus { border-color: @focusRing@; }
+QPushButton[role="link"][keyFocus="true"]:focus { border-color: @focusRing@; }
 /* netUrl = the network URL field: no arrow (netRecent lists its items), the accent ring as in 1.6.2 */
 QComboBox[role="netUrl"]::drop-down { width: 0; border: none; }
 QComboBox[role="netUrl"]::down-arrow { image: none; width: 0; }
-QComboBox[role="netUrl"]:focus { border-color: @focusRing@; }
+QComboBox[role="netUrl"][keyFocus="true"]:focus { border-color: @focusRing@; }
 QListWidget[role="netRecent"] { background: transparent; border: none; padding: 0; outline: 0; }
 QListWidget[role="netRecent"]::item { padding: @menuPad@px 0; border-radius: @radiusSm@px; }
 QListWidget[role="netRecent"]::item:selected { background: @hoverFill@; color: @tx@; }
-QListWidget[role="netRecent"]:focus { border: @ring@px solid @focusRing@; border-radius: @radiusMd@px; }
+QListWidget[role="netRecent"][keyFocus="true"]:focus { border: @ring@px solid @focusRing@; border-radius: @radiusMd@px; }
 /* Phase 5: preferences (components/prefs_page.cpp): the Simple Preferences
    group boxes as cards of rows */
 PrefsPage QScrollArea, PrefsPage QScrollArea > QWidget > QWidget { background: transparent; }
@@ -1406,6 +1438,39 @@ void Theme::applyWindowFrame(QWidget *w) const
 
 bool Theme::eventFilter(QObject *o, QEvent *e)
 {
+    /* focus rings for keyboard focus only: what moved the focus last */
+    if (e->type() == QEvent::KeyPress)
+        keyboardInput = true;
+    else if (e->type() == QEvent::MouseButtonPress || e->type() == QEvent::MouseButtonDblClick)
+        keyboardInput = false;
+    else if (e->type() == QEvent::FocusIn && o->isWidgetType())
+    {
+        QWidget *w = static_cast<QWidget *>(o);
+        const QVariant was = w->property(keyFocusProperty);
+        bool key;
+        switch (static_cast<QFocusEvent *>(e)->reason())
+        {
+        case Qt::TabFocusReason: case Qt::BacktabFocusReason: case Qt::ShortcutFocusReason:
+            key = true; break;
+        case Qt::MouseFocusReason:
+            key = false; break;
+        case Qt::OtherFocusReason:  /* arrow keys in a group, or setFocus() */
+            key = keyboardInput; break;
+        default:  /* back from another window, a menu or a pop-up: as it was */
+            key = was.isValid() ? was.toBool() : keyboardInput; break;
+        }
+        key = key || isTextEntry(w);
+        if (!was.isValid() || was.toBool() != key)
+        {
+            w->setProperty(keyFocusProperty, key);
+            if (was.toBool() != key)
+            {
+                w->style()->unpolish(w);
+                w->style()->polish(w);
+                w->update();
+            }
+        }
+    }
     /* a list that is a window of its own (QCompleter's popup) is styled
      * as a popup, without the focus ring of the lists in a window */
     if (e->type() == QEvent::Show && o->isWidgetType()
