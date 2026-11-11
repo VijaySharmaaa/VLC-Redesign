@@ -78,6 +78,9 @@ QScrollArea *scrolled( QWidget *page )
     area->setHorizontalScrollBarPolicy( Qt::ScrollBarAlwaysOff );
     /* not a Tab stop of its own: Tab scrolls to the control it reaches */
     area->setFocusPolicy( Qt::NoFocus );
+    /* taller than the sheet, the page scrolls instead of squeezing its
+     * rows (the equalizer's preamp and 2 Pass at 125 %) */
+    inner->setSizePolicy( QSizePolicy::Preferred, QSizePolicy::Minimum );
     area->setWidget( inner );
     return area;
 }
@@ -191,7 +194,7 @@ ExtendedDialog::ExtendedDialog( intf_thread_t *_p_intf )
     layout->setSpacing( t->px( Effects::TabsPadTop ) );
 
     /* Header: title, close */
-    QHBoxLayout *head = new QHBoxLayout;
+    head = new QHBoxLayout;
     head->setContentsMargins( t->px( Effects::HeadPadLeft ), t->px( Effects::HeadPadTop ),
                               t->px( Effects::HeadPadRight ), 0 );
     QLabel *title = new QLabel( qtr( "Effects and filters" ), content );
@@ -295,16 +298,18 @@ ExtendedDialog::ExtendedDialog( intf_thread_t *_p_intf )
     }
     moreButton->setMenu( moreMenu );
     moreButton->setObjectName( "effectsMore" );
-    /* the tabs' height and the sheet's right padding: the arrow stays in
-     * and "More" sits on the tabs' line */
+    /* the corner's height (QTabWidget gives it the tabs' less the bar's
+     * base line) and the sheet's right padding: the arrow stays in and
+     * "More" sits on the tabs' line */
     QTabBar *tabs = mainTabW->findChild<QTabBar *>( QString(), Qt::FindDirectChildrenOnly );
     if( tabs )
-        moreButton->setFixedHeight( tabs->sizeHint().height() );
-    QWidget *corner = new QWidget( mainTabW );
-    QHBoxLayout *cornerLayout = new QHBoxLayout( corner );
+        moreButton->setFixedHeight( tabs->sizeHint().height()
+            - mainTabW->style()->pixelMetric( QStyle::PM_TabBarBaseHeight, NULL, mainTabW ) );
+    moreCorner = new QWidget( mainTabW );
+    QHBoxLayout *cornerLayout = new QHBoxLayout( moreCorner );
     cornerLayout->setContentsMargins( 0, 0, t->px( Effects::TabsPadX ), 0 );
     cornerLayout->addWidget( moreButton, 0, Qt::AlignTop );
-    mainTabW->setCornerWidget( corner, Qt::TopRightCorner );
+    mainTabW->setCornerWidget( moreCorner, Qt::TopRightCorner );
     /* the left padding as a corner too: a tab-bar offset in the style
      * sheet moves the bar past the corners, the tabs then ran under "More" */
     QWidget *leftPad = new QWidget( mainTabW );
@@ -457,6 +462,19 @@ void ExtendedDialog::setBreakpoint( BreakpointWatcher::Size bp )
             setParent( dockParent, Qt::Widget );
             dock->addWidget( this );
         }
+        /* the drawer's tabs need the whole row for their labels: "More"
+         * goes up beside the close button */
+        if( drawer )
+        {
+            mainTabW->setCornerWidget( NULL, Qt::TopRightCorner );
+            head->insertWidget( 1, moreCorner );
+        }
+        else
+        {
+            head->removeWidget( moreCorner );
+            mainTabW->setCornerWidget( moreCorner, Qt::TopRightCorner );
+        }
+        moreCorner->show();
         if( shown )
             show();   /* setParent() hides */
     }

@@ -1003,7 +1003,7 @@ QPushButton:default { background: @accent@; color: @onAccent@; border-color: @ac
 QPushButton:default:hover { background: @accentHover@; }
 QPushButton:disabled { background: @panel@; color: @dim@; border-color: @divider@; }
 
-QToolButton { background: transparent; border: 2px solid transparent; border-radius: @radiusMd@px; }
+QToolButton { background: transparent; border: @ring@px solid transparent; border-radius: @radiusMd@px; }
 QToolButton:hover { background: @hoverFill@; }
 QToolButton:pressed { background: @openFill@; }
 QToolButton:checked { background: @accentTint@; }
@@ -1031,15 +1031,15 @@ QAbstractSpinBox::up-arrow:disabled, QAbstractSpinBox::up-arrow:off { image: url
 /* popup lists: a combo's, and a completer's (a window of its own, see eventFilter) */
 QComboBox QAbstractItemView, QAbstractItemView[popup="true"] { background: @raised@; border: @popupBorder@; padding: 0; selection-background-color: @hoverFill@; selection-color: @tx@; outline: 0; }
 
-QLineEdit:focus, QAbstractSpinBox:focus, QComboBox:focus { border: 2px solid @focusRing@; padding: 0px @menuPadFocus@px; }
+QLineEdit:focus, QAbstractSpinBox:focus, QComboBox:focus { border: @ring@px solid @focusRing@; padding: 0px @menuPadFocus@px; }
 QComboBox:focus { margin: 0; }
-QTextEdit:focus, QPlainTextEdit:focus, QPushButton:focus { border: 2px solid @focusRing@; }
+QTextEdit:focus, QPlainTextEdit:focus, QPushButton:focus { border: @ring@px solid @focusRing@; }
 QToolButton:focus { border-color: @focusRing@; }
 QPushButton:focus { padding: @menuPadFocus@px @buttonPadXFocus@px; }
 
 QTabWidget::pane { background: @panel@; border: 1px solid @divider@; border-radius: @radiusLg@px; top: -1px; }
 /* a transparent ring on every tab, so focus only colours it */
-QTabBar::tab { background: transparent; color: @mute@; border: 2px solid transparent;
+QTabBar::tab { background: transparent; color: @mute@; border: @ring@px solid transparent;
     padding: @tabPadTop@px @tabPadX@px @tabPadBottom@px; }
 QTabBar::tab:hover { color: @tx@; }
 QTabBar::tab:selected { color: @tx@; border-bottom-color: @fill@; }
@@ -1054,7 +1054,7 @@ QAbstractItemView { background: @surface@; alternate-background-color: @panel@; 
 QAbstractItemView::item:hover { background: @hoverFill@; }
 QAbstractItemView::item:selected { background: @accentTint@; color: @tx@; }
 /* views that draw their own row rings set [role] rules with no border, later */
-QAbstractItemView:focus { border: 2px solid @focusRing@; padding: 0; }
+QAbstractItemView:focus { border: @ring@px solid @focusRing@; padding: 0; }
 QComboBox QAbstractItemView:focus, QAbstractItemView[popup="true"]:focus { border: @popupBorder@; padding: 0; }
 QHeaderView::section { background: @panel@; color: @mute@; border: none; border-bottom: 1px solid @divider@; border-right: 1px solid @divider@; padding: @menuPad@px @menuTitlePadX@px; }
 
@@ -1084,7 +1084,7 @@ QLabel[role="hint"]:focus { border: 1px solid @focusRing@; border-radius: @radiu
 .QSlider::sub-page:horizontal:disabled, .QSlider::add-page:vertical:disabled { background: @toggleOff@; }
 /* opaque: the track must not show through the knob */
 .QSlider::handle:disabled { background: @toggleOffSolid@; }
-.QSlider { border: 2px solid transparent; border-radius: @radiusSm@px; }
+.QSlider { border: @ring@px solid transparent; border-radius: @radiusSm@px; }
 .QSlider:focus { border-color: @focusRing@; }
 
 /* ---- Title bar (components/title_bar.cpp) ---- */
@@ -1108,7 +1108,7 @@ QListView[np="tracks"] { background: transparent; border: none; }
 /* Phase 3: deck (components/controller.cpp, deck_popover.cpp). Roles:
    deck = icon button (on = checked, open = [open="true"]), play = accent circle,
    speed = the speed label, deckSeparator, deckTime, popover, popoverDivider, popoverLink. */
-QToolButton[role="deck"], QToolButton[role="speed"] { background: transparent; border: 2px solid transparent; border-radius: @radiusMd@px; padding: 0; }
+QToolButton[role="deck"], QToolButton[role="speed"] { background: transparent; border: @ring@px solid transparent; border-radius: @radiusMd@px; padding: 0; }
 QToolButton[role="deck"]:hover, QToolButton[role="speed"]:hover { background: @hoverFill@; }
 QToolButton[role="deck"]:pressed, QToolButton[role="speed"]:pressed { background: @openFill@; }
 QToolButton[role="deck"] { color: @tx@; font-weight: 600; }
@@ -1122,7 +1122,7 @@ QToolButton[role="speed"] { color: @tx2@; font-weight: 600; padding: 0 @speedPad
 QToolButton[role="speed"][on="true"], QToolButton[role="speed"][open="true"] { color: @accTx@; }
 QToolButton[role="speed"]:disabled { color: @dim@; }
 QToolButton[role="speed"]::menu-indicator { image: none; width: 0; }
-QToolButton[role="play"] { background: @accent@; border: 2px solid transparent; border-radius: @playRadius@px; padding: 0; }
+QToolButton[role="play"] { background: @accent@; border: @ring@px solid transparent; border-radius: @playRadius@px; padding: 0; }
 QToolButton[role="play"]:hover { background: @accentHover@; }
 QToolButton[role="play"]:pressed { background: @accent@; }
 QToolButton[role="play"]:focus { border-color: @tx@; }
@@ -1132,10 +1132,10 @@ QFrame[role="popover"] { background: @raised@; border: @popupBorder@; }
 QFrame[role="popover"] QListView { background: transparent; border: none; padding: 0; }
 QFrame[role="popover"] QLabel { color: @dim@; }
 QFrame[role="popoverDivider"] { background: @divider@; border: none; }
-QPushButton[role="popoverLink"] { background: transparent; color: @accTx@; border: 2px solid transparent; border-top: 1px solid @divider@;
+QPushButton[role="popoverLink"] { background: transparent; color: @accTx@; border: @ring@px solid transparent; border-top: 1px solid @divider@;
     border-radius: 0; text-align: left; padding: @menuPad@px; }
 QPushButton[role="popoverLink"]:hover { background: @hoverFill@; }
-QPushButton[role="popoverLink"]:focus { border: 2px solid @focusRing@; border-radius: @radiusMd@px; }
+QPushButton[role="popoverLink"]:focus { border: @ring@px solid @focusRing@; border-radius: @radiusMd@px; }
 /* Phase 4: home (components/library/home_page.cpp); the delegate draws the row focus ring */
 QTreeView[role="homeRecent"] { background: transparent; border: none; padding: 0; outline: 0; }
 QTreeView[role="homeRecent"]::item { padding: 0 @homeCellPad@px; border-bottom: 1px solid @homeRowLine@; }
@@ -1149,24 +1149,23 @@ QPushButton[role="primary"]:focus { border-color: @tx@; }
 /* Phase 4: library (components/library/) */
 QListView[role="library"], QScrollArea[role="library"] { background: transparent; border: none; padding: 0; outline: 0; }
 QScrollArea[role="library"] > QWidget > QWidget { background: transparent; }
-QLineEdit[role="librarySearch"]:focus { border: 2px solid @focusRing@; }
+QLineEdit[role="librarySearch"]:focus { border: @ring@px solid @focusRing@; }
 QPushButton[role="outline"] { background: transparent; }
 QPushButton[role="outline"]:hover { background: @hoverFill@; }
 QLabel[role="libraryDim"] { color: @dim@; }
 /* Phase 5: effects (dialogs/extended.cpp, components/extended_panels.cpp) */
 #effectsSheet QTabWidget::pane { background: transparent; border: none; }
 #effectsSheet QTabWidget#effectsTabs::pane { border-top: 1px solid @divider@; }
-/* the corner sits on the pane, which overlaps the bar by its 1 px line:
-   up by that line, "More" is on the tabs' line */
-#effectsSheet QTabWidget#effectsTabs::right-corner { top: -1px; }
-QToolButton#effectsMore { padding-right: @iconGlyph@px; }
+/* the corner (dialogs/extended.cpp) starts a line below the tabs: the
+   label's box ends two lines higher, its centre is one line up, on theirs */
+QToolButton#effectsMore { padding-right: @iconGlyph@px; padding-bottom: @moreLift@px; }
 QToolButton#effectsMore::menu-indicator { image: url("@arrowDown@"); subcontrol-origin: padding; subcontrol-position: center right;
     width: @iconGlyph@px; height: @iconGlyph@px; }
 #effectsSheet QScrollArea, #effectsSheet QScrollArea > QWidget > QWidget { background: transparent; }
 QPushButton[role="chip"] { background: transparent; color: @tx2@; border: 1px solid @chipBorder@; border-radius: @chipRadius@px; padding: 0 @fxChipPadX@px; }
 QPushButton[role="chip"]:hover { background: @hoverFill@; }
 QPushButton[role="chip"]:checked { background: @accentTint@; color: @accTx@; border-color: @accentBorder@; }
-QPushButton[role="chip"]:focus { border: 2px solid @focusRing@; padding: 0 @fxChipPadXFocus@px; }
+QPushButton[role="chip"]:focus { border: @ring@px solid @focusRing@; padding: 0 @fxChipPadXFocus@px; }
 QPushButton[role="chip"]:disabled { background: transparent; color: @dim@; border-color: @divider@; }
 QFrame[role="fxRow"] { background: @raised@; border-radius: @fxRowRadius@px; }
 QToolButton[role="stepper"] { background: @stepperFill@; }
@@ -1178,7 +1177,7 @@ QToolButton[role="openTile"] { background: @raised@; color: @tx2@; border: 1px s
 QToolButton[role="openTile"]:hover { background: @hover@; color: @tx@; }
 QToolButton[role="openTile"]:checked { background: @accentTint@; color: @accTx@; border-color: @accentBorder@; }
 /* 2 px, unlike the 1 px checked outline; the content stays centred */
-QToolButton[role="openTile"]:focus { border: 2px solid @focusRing@; }
+QToolButton[role="openTile"]:focus { border: @ring@px solid @focusRing@; }
 #OpenDisk QRadioButton { background: @raised@; border: 1px solid transparent; border-radius: @radiusMd@px; padding: @menuPad@px @buttonPadX@px; spacing: 0; }
 #OpenDisk QRadioButton::indicator { image: none; width: 0; height: 0; border: none; }
 #OpenDisk QRadioButton:hover { background: @hover@; }
@@ -1192,7 +1191,7 @@ QToolButton[role="split"]::menu-arrow { image: url("@arrowDownOnAccent@"); }
 QToolButton[role="split"]:disabled { background: @panel@; color: @dim@; }
 QToolButton[role="split"]::menu-arrow:disabled { image: url("@arrowDownDim@"); }
 QLabel[role="errorIcon"] { background: @errorTint@; border-radius: @errorIconR@px; }
-QPushButton[role="link"] { background: transparent; color: @accTx@; border: 2px solid transparent; }
+QPushButton[role="link"] { background: transparent; color: @accTx@; border: @ring@px solid transparent; }
 QPushButton[role="link"]:hover { background: @hoverFill@; }
 QPushButton[role="link"]:focus { border-color: @focusRing@; }
 /* netUrl = the network URL field: no arrow (netRecent lists its items), the accent ring as in 1.6.2 */
@@ -1202,7 +1201,7 @@ QComboBox[role="netUrl"]:focus { border-color: @focusRing@; }
 QListWidget[role="netRecent"] { background: transparent; border: none; padding: 0; outline: 0; }
 QListWidget[role="netRecent"]::item { padding: @menuPad@px 0; border-radius: @radiusSm@px; }
 QListWidget[role="netRecent"]::item:selected { background: @hoverFill@; color: @tx@; }
-QListWidget[role="netRecent"]:focus { border: 2px solid @focusRing@; border-radius: @radiusMd@px; }
+QListWidget[role="netRecent"]:focus { border: @ring@px solid @focusRing@; border-radius: @radiusMd@px; }
 /* Phase 5: preferences (components/prefs_page.cpp): the Simple Preferences
    group boxes as cards of rows */
 PrefsPage QScrollArea, PrefsPage QScrollArea > QWidget > QWidget { background: transparent; }
@@ -1278,6 +1277,10 @@ PrefsPage QComboBox { min-height: @prefsSelectInner@px; }
         { "tabPadTop", QString::number(tabPadY / 2) },
         { "tabPadBottom", QString::number(tabPadY - tabPadY / 2) },
         { "tabPadX", QString::number(px(Size::ButtonPadX) - Size::FocusRing) },
+        /* focus rings and the transparent borders that keep their room:
+           line widths, not scaled (as the painted rings) */
+        { "ring", QString::number(Size::FocusRing) },
+        { "moreLift", QString::number(2 * Size::Hairline) },
         { "buttonPadX", QString::number(px(Size::ButtonPadX)) },
         { "buttonPadXFocus", QString::number(px(Size::ButtonPadX) - 1) },
         { "groupTitleH", QString::number(metaH) },

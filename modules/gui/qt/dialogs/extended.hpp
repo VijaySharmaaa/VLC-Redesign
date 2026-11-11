@@ -36,6 +36,7 @@ class QBoxLayout;
 class QPushButton;
 class QTabWidget;
 class QToolButton;
+class QHBoxLayout;
 class QVariantAnimation;
 class OverlayHost;
 
@@ -98,6 +99,9 @@ private:
     QTabWidget *audioTab;
     QTabWidget *videoTab;
     QToolButton *moreButton;
+    /* "More" beside the tabs, or in the header in the narrow drawer */
+    QWidget *moreCorner;
+    QHBoxLayout *head;
     QPushButton *m_applyButton;
     QHash<QString, QVariant> m_hashConfigs[2];
 private slots:
