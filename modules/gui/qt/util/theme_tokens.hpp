@@ -443,6 +443,18 @@ namespace RedesignTokens
         static const int ThumbWorkersMax = 4;
         static const int ThumbPollMs = 100;         /* looks for a written picture */
         static const int ThumbCoverDirs = 16;       /* subfolders searched for a folder's video */
+        /* not in tokens.json: a folder being listed (a preparse, given up
+         * by VLC after its preparse-timeout of 5 s) that never gets its
+         * items is reported as not opened after this long */
+        static const int ExpandTimeoutMs = 8000;
+        /* not in tokens.json: the centred loading, empty and error states
+         * of a page or folder; the ring is the buffering ring's
+         * (VideoOverlay::Ring) on an ink track, one turn per Spinner */
+        static const int NoticeGlyph = 40;          /* as DESIGN_SPEC 5's error icon */
+        static const int NoticeRing = 40, NoticeRingWidth = 3;
+        /* the search and clear glyphs of the library's search and the
+         * playlist's filter: the prototype's 16 px glyph */
+        static const int FieldGlyph = 16;
     }
 }
 

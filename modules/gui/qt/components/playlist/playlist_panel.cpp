@@ -25,6 +25,7 @@
 #include "components/playlist/standardpanel.hpp"    /* context menu entries */
 #include "components/playlist/views.hpp"            /* PlListView */
 #include "components/playlist/sorting.h"            /* COLUMN_* */
+#include "components/library/library_widgets.hpp"     /* setupSearchField */
 #include "components/overlay_host.hpp"
 #include "input_manager.hpp"
 #include "dialogs_provider.hpp"
@@ -237,17 +238,12 @@ PlaylistPanel::PlaylistPanel( intf_thread_t *_p_intf, QBoxLayout *_dock, QWidget
     layout->addLayout( head );
 
     /* Filter: filters the shared model, so the separate window's views too */
-    /* like the library's search field: the search icon, Qt's clear button */
+    /* as the library's search field */
     QLineEdit *filter = new QLineEdit( content );
     filter->setAccessibleName( qtr( "Filter playlist" ) );
     filter->setPlaceholderText( qtr( "Filter playlist" ) );
     filter->setToolTip( qtr( "Filter playlist" ) );
-    filter->setClearButtonEnabled( true );
-    filter->addAction( Theme::themedIcon( RedesignIcons::IconSearch, Theme::Dim ),
-                       QLineEdit::LeadingPosition )->setText( qtr( "Filter" ) );
-    QAction *clear = filter->findChild<QAction *>( QLatin1String( "_q_qlineeditclearaction" ) );
-    if( clear )
-        clear->setText( qtr( "Clear filter" ) );
+    setupSearchField( filter, qtr( "Filter" ), qtr( "Clear filter" ) );
     filter->setFixedHeight( t->metric( Theme::SelectH ) );
     connect( filter, &QLineEdit::textChanged, this,
              [this]( const QString &text ) { model->filter( text, QModelIndex(), true ); } );

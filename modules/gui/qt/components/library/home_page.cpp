@@ -491,6 +491,10 @@ HomePage::HomePage( intf_thread_t *_p_intf, QWidget *parent )
         qtr( "Recently played items are not being saved. Turn on "
              "\"Save recently played items\" in Preferences, Interface." ), content );
     layout->addWidget( empty );
+    /* a search that matches nothing */
+    noResults = new LibraryNotice( content );   /* filled by rebuild() */
+    connect( noResults, &LibraryNotice::primaryClicked, header->search(), &QLineEdit::clear );
+    layout->addWidget( noResults );
     layout->addStretch( 1 );
     setWidget( content );
 
@@ -620,7 +624,11 @@ void HomePage::rebuild()
     lists->setVisible( !mrls.isEmpty() );
     empty->setVisible( mrls.isEmpty() );
     empty->setNoteVisible( !enabled );
-    header->setStatus( !mrls.isEmpty() && count == 0 ? qtr( "No results" ) : QString() );
+    if( !mrls.isEmpty() && count == 0 )
+        noResults->showMessage( RedesignIcons::IconSearch, Theme::Dim, qtr( "No results" ),
+                                qtr( "Nothing in your recent media matches \"%1\"." ).arg( search ),
+                                qtr( "Clear search" ), QString() );
+    noResults->setVisible( !mrls.isEmpty() && count == 0 );
 
     applyMissing();
     layoutForWidth();
