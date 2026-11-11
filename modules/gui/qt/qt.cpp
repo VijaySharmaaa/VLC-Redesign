@@ -265,7 +265,8 @@ vlc_module_begin ()
     add_float_with_range( "qt-fs-opacity", 0.8, 0.1, 1., OPACITY_FS_TEXT,
                           OPACITY_FS_LONGTEXT, false )
 
-    add_bool( "qt-video-autoresize", true, KEEPSIZE_TEXT,
+    /* off (P6-7): the window keeps the size the user gave it */
+    add_bool( "qt-video-autoresize", false, KEEPSIZE_TEXT,
               KEEPSIZE_LONGTEXT, false )
     add_bool( "qt-name-in-title", true, TITLE_TEXT,
               TITLE_LONGTEXT, false )

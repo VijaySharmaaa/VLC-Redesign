@@ -52,6 +52,7 @@ protected:
     bool eventFilter( QObject *, QEvent * ) Q_DECL_OVERRIDE;
 
 private:
+    static int SnapshotCB( vlc_object_t *, const char *, vlc_value_t, vlc_value_t, void * );
     void place();
     void fitText();
     QPoint restingPos() const;

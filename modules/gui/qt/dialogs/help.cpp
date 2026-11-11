@@ -133,7 +133,12 @@ AboutDialog::AboutDialog( intf_thread_t *_p_intf)
         link->setAutoDefault( false );
     }
     ui.closeButton->setText( qtr( "&Close" ) );
-    ui.closeButton->setDefault( true );
+    /* a secondary button (2.6.2), not the accent default; Enter still
+     * closes (QVLCDialog) */
+    ui.closeButton->setAutoDefault( false );
+    /* the keys on the sheet, not its first link (no ring on open): Tab
+     * reaches the links and Close */
+    setFocus( Qt::OtherFocusReason );
     connect( ui.authorsButton, &QPushButton::clicked, this, &AboutDialog::showAuthors );
     connect( ui.licenseButton, &QPushButton::clicked, this, &AboutDialog::showLicense );
     connect( ui.creditsButton, &QPushButton::clicked, this, &AboutDialog::showCredit );

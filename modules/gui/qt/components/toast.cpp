@@ -26,6 +26,9 @@
 #include "util/redesign_icons.hpp"
 
 #include <vlc_variables.h>
+#include <vlc_playlist.h>
+#include <vlc_input.h>
+#include <vlc_vout.h>
 
 #include <QPainter>
 #include <QPropertyAnimation>
@@ -36,10 +39,33 @@
 
 namespace O = RedesignTokens::Overlay;
 
-static int SnapshotCB( vlc_object_t *, const char *,
+/* In the thread that took the snapshot (never a vout's own): the core has
+ * just put the file name (OSD channel) and the preview (channel 0, only it
+ * uses that one) on the video; the toast says it instead (P6-9).
+ * shortcut: the vouts drop them on their next control pass, so they may
+ * show for a frame; upgrade with a core option to skip the snapshot OSD */
+int Toast::SnapshotCB( vlc_object_t *, const char *,
                        vlc_value_t, vlc_value_t newval, void *data )
 {
-    emit static_cast<Toast *>( data )->snapshotSaved( qfu( newval.psz_string ) );
+    Toast *toast = static_cast<Toast *>( data );
+    input_thread_t *input = playlist_CurrentInput( pl_Get( toast->p_intf ) );
+    if( input )
+    {
+        vout_thread_t **pp_vout;
+        size_t i_vout;
+        if( !input_Control( input, INPUT_GET_VOUTS, &pp_vout, &i_vout ) )
+        {
+            for( size_t i = 0; i < i_vout; i++ )
+            {
+                vout_FlushSubpictureChannel( pp_vout[i], VOUT_SPU_CHANNEL_OSD );
+                vout_FlushSubpictureChannel( pp_vout[i], 0 );
+                vlc_object_release( pp_vout[i] );
+            }
+            free( pp_vout );
+        }
+        vlc_object_release( input );
+    }
+    emit toast->snapshotSaved( qfu( newval.psz_string ) );
     return VLC_SUCCESS;
 }
 

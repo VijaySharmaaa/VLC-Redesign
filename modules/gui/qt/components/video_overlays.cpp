@@ -322,6 +322,10 @@ void BufferingOverlay::paintEvent( QPaintEvent * )
     Theme *t = Theme::instance();
     QPainter p( this );
     p.setRenderHint( QPainter::Antialiasing );
+    /* over the last frame; before the first one, over the video's black,
+     * not the cone or cover art page under it */
+    if( !THEMIM->getIM()->hasVideo() )
+        p.fillRect( rect(), t->color( Theme::VideoSurface ) );
     p.fillRect( rect(), QColor::fromRgba( RedesignTokens::BufferingScrim ) );
 
     /* ring, title and URL in a centred column; text in the dark theme's
@@ -370,11 +374,13 @@ ImmersiveBar::ImmersiveBar( intf_thread_t *_p_intf, QWidget *owner, QWidget *_ar
      * them from the window (nativeEvent), nor does a show (the overlay's
      * WA_ShowWithoutActivating) */
     setWindowFlags( windowFlags() & ~Qt::WindowDoesNotAcceptFocus );
-    const Theme *t = Theme::instance();
     layout = new QVBoxLayout( this );
     layout->setSpacing( 0 );
-    layout->setContentsMargins( t->px( V::ImmersivePadX ), t->px( V::ImmersivePadTop ),
-                                t->px( V::ImmersivePadX ), t->px( V::ImmersivePadBottom ) );
+    /* the deck pads itself, as in the docked layout */
+    layout->setContentsMargins( 0, 0, 0, 0 );
+    /* the video sets its size (restingRect): a minimum from a wider deck,
+     * before it drops its optional items, would push it past the edge */
+    layout->setSizeConstraint( QLayout::SetNoConstraint );
     rebuild( advanced );
 
     host = new OverlayHost( area, this );
@@ -879,15 +885,30 @@ void PlayerHeader::raiseDrawers()
     }
 }
 
-/* Where Tab from the window itself goes, when that is a deck control */
-const QWidget *PlayerHeader::firstDeckStop() const
+/* The deck in use is the immersive bar while it shows (a window of its own),
+ * else the main window's. first: where Tab from the window goes, when it is
+ * a deck control (the back button comes before it); last: where Shift+Tab
+ * wraps to from the back button */
+QWidget *PlayerHeader::deckStop( bool first ) const
 {
-    const QWidget *owner = parentWidget();
-    for( const QWidget *w = owner->nextInFocusChain(); w != owner; w = w->nextInFocusChain() )
+    QWidget *root = parentWidget();
+    foreach( QObject *c, root->children() )
     {
-        if( w->window() != owner || !w->isVisible() || !w->isEnabled()
+        ImmersiveBar *bar = dynamic_cast<ImmersiveBar *>( c );
+        if( bar && bar->isVisible() )
+        {
+            root = bar;
+            break;
+        }
+    }
+    for( QWidget *w = first ? root->nextInFocusChain() : root->previousInFocusChain(); w != root;
+         w = first ? w->nextInFocusChain() : w->previousInFocusChain() )
+    {
+        if( w->window() != root || !w->isVisible() || !w->isEnabled()
          || !( w->focusPolicy() & Qt::TabFocus ) )
             continue;
+        if( !first )
+            return w;
         for( const QWidget *p = w; p; p = p->parentWidget() )
             if( qobject_cast<const AbstractController *>( p ) )
                 return w;
@@ -925,7 +946,7 @@ bool PlayerHeader::eventFilter( QObject *o, QEvent *e )
     if( e->type() != QEvent::KeyPress )
         return false;
     const QKeyEvent *ke = static_cast<QKeyEvent *>( e );
-    if( o == parentWidget() || ( ke->key() == Qt::Key_Backtab && o == firstDeckStop() ) )
+    if( o == parentWidget() || ( ke->key() == Qt::Key_Backtab && o == deckStop( true ) ) )
     {
         /* Shift+Tab while the window itself, the video or the deck's first
          * control has the keys: to the back button, before the deck in the
@@ -944,8 +965,8 @@ bool PlayerHeader::eventFilter( QObject *o, QEvent *e )
     }
     if( o != backWindow->windowHandle() )
         return false;
-    /* in the back button's window: Tab goes on to the deck, Shift+Tab and
-     * Esc give the keys back */
+    /* in the back button's window: Tab goes on to the deck, Shift+Tab wraps
+     * to the deck's last control, Esc gives the keys back */
     if( ke->key() == Qt::Key_Tab && ke->modifiers() == Qt::NoModifier )
     {
         backWindow->giveFocusBack();
@@ -956,6 +977,12 @@ bool PlayerHeader::eventFilter( QObject *o, QEvent *e )
     if( ke->key() == Qt::Key_Backtab || ke->key() == Qt::Key_Escape )
     {
         backWindow->giveFocusBack();
+        QWidget *last = ke->key() == Qt::Key_Backtab ? deckStop( false ) : NULL;
+        if( last )
+        {
+            last->setFocus( Qt::BacktabFocusReason );
+            last->window()->activateWindow();   /* the immersive bar's */
+        }
         return true;
     }
     return false;

@@ -165,7 +165,7 @@ private:
     void followCursor();
     void setOpacity( qreal );
     void raiseDrawers();
-    const QWidget *firstDeckStop() const;
+    QWidget *deckStop( bool first ) const;
     QFont titleFont() const;
     int rowHeight() const;
     QRect backRect( int width ) const;  /* in the strip, mirrored right to left */

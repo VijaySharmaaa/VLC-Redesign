@@ -79,8 +79,9 @@ ErrorsDialog::ErrorsDialog( intf_thread_t *_p_intf )
     body->setWordWrap( true );
     body->setTextFormat( Qt::RichText );
     body->setAlignment( Qt::AlignLeft | Qt::AlignTop );
-    body->setTextInteractionFlags( Qt::TextSelectableByMouse | Qt::TextSelectableByKeyboard );
-    body->setFocusPolicy( Qt::StrongFocus );
+    /* selectable text, not a field: no caret, no focus ring, no Tab stop */
+    body->setTextInteractionFlags( Qt::TextSelectableByMouse );
+    body->setFocusPolicy( Qt::NoFocus );
     body->setAccessibleName( qtr( "Error details" ) );
     /* plain text, no box: it scrolls only once several errors pile up */
     QScrollArea *scroll = new QScrollArea;
@@ -88,7 +89,6 @@ ErrorsDialog::ErrorsDialog( intf_thread_t *_p_intf )
     scroll->setWidgetResizable( true );
     scroll->setHorizontalScrollBarPolicy( Qt::ScrollBarAlwaysOff );
     scroll->setWidget( body );
-    /* the named details are the Tab stop, not the unnamed area around them */
     scroll->setFocusPolicy( Qt::NoFocus );
 
     stopShowing = new QCheckBox( qtr( "Hide future errors" ) );
@@ -103,7 +103,7 @@ ErrorsDialog::ErrorsDialog( intf_thread_t *_p_intf )
     QPushButton *clearButton = new QPushButton( qtr( "Cl&ear" ), this );
     clearButton->setProperty( "role", "link" );
     clearButton->setToolTip( qtr( "Clear the errors listed" ) );
-    QPushButton *closeButton = new QPushButton( qtr( "&Close" ), this );
+    closeButton = new QPushButton( qtr( "&Close" ), this );
     /* Enter keeps closing (QVLCDialog): no button is the default */
     logButton->setAutoDefault( false );
     clearButton->setAutoDefault( false );
@@ -129,7 +129,6 @@ ErrorsDialog::ErrorsDialog( intf_thread_t *_p_intf )
     layout->setColumnStretch( 1, 1 );
     layout->setRowStretch( 1, 1 );
 
-    setTabOrder( body, stopShowing );
     setTabOrder( stopShowing, logButton );
     setTabOrder( logButton, clearButton );
     setTabOrder( clearButton, closeButton );
@@ -210,6 +209,9 @@ void ErrorsDialog::add( bool, const QString& title, const QString& text )
         /* errors show: the box may still say hidden from before a Reset */
         QSignalBlocker blocker( stopShowing );
         stopShowing->setChecked( false );
+        /* on open: the keys on Retry when it is offered, else on Close */
+        if( !isVisible() )
+            ( retryButton->isHidden() ? closeButton : retryButton )->setFocus();
         show();
     }
 }

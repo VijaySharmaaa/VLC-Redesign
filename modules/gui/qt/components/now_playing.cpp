@@ -112,16 +112,19 @@ static QAccessibleInterface *thinSeekFactory( const QString &className, QObject 
     return NULL;
 }
 
-/* Stripes at 135 degrees in the theme's two placeholder tints */
-void paintStripes( QPainter &p, const QRectF &r, qreal period )
+/* Stripes at 135 degrees in the theme's two placeholder tints; onVideo:
+ * the dark theme's, as video surfaces stay dark in both themes */
+void paintStripes( QPainter &p, const QRectF &r, qreal period, bool onVideo )
 {
     const Theme *t = Theme::instance();
+    const QColor s1 = onVideo ? QColor::fromRgb( RedesignTokens::Dark.stripe1 ) : t->color( Theme::Stripe1 );
+    const QColor s2 = onVideo ? QColor::fromRgb( RedesignTokens::Dark.stripe2 ) : t->color( Theme::Stripe2 );
     QLinearGradient g( 0, 0, period / 2, period / 2 );
     g.setSpread( QGradient::RepeatSpread );
-    g.setColorAt( 0, t->color( Theme::Stripe1 ) );
-    g.setColorAt( 0.5, t->color( Theme::Stripe1 ) );
-    g.setColorAt( 0.501, t->color( Theme::Stripe2 ) );
-    g.setColorAt( 1, t->color( Theme::Stripe2 ) );
+    g.setColorAt( 0, s1 );
+    g.setColorAt( 0.5, s1 );
+    g.setColorAt( 0.501, s2 );
+    g.setColorAt( 1, s2 );
     p.fillRect( r, g );
 }
 
@@ -155,8 +158,8 @@ QString codecName( const QString &fourcc )
 /**********************************************************************
  * ArtView
  **********************************************************************/
-ArtView::ArtView( int _stripe, int _radius, QWidget *parent )
-    : QWidget( parent ), stripe( _stripe ), radius( _radius )
+ArtView::ArtView( int _stripe, int _radius, QWidget *parent, bool _onVideo )
+    : QWidget( parent ), stripe( _stripe ), radius( _radius ), onVideo( _onVideo )
 {
 }
 
@@ -177,7 +180,7 @@ void ArtView::paintEvent( QPaintEvent * )
     clip.addRoundedRect( r, rad, rad );
     p.setClipPath( clip );
     if( art.isNull() )
-        paintStripes( p, r, t->px( stripe ) );
+        paintStripes( p, r, t->px( stripe ), onVideo );
     else
     {
         /* fill and crop, like CSS object-fit: cover */
@@ -849,7 +852,8 @@ MiniPlayer::MiniPlayer( intf_thread_t *_p_i, NowPlayingInfo *_info, QWidget *par
     l->setContentsMargins( Size::Hairline, Size::Hairline, Size::Hairline, Size::Hairline );
     l->setSpacing( 0 );
 
-    art = new ArtView( ThumbStripe, 0, this );
+    /* the video's place: dark in both themes */
+    art = new ArtView( ThumbStripe, 0, this, true );
     QGridLayout *overlay = new QGridLayout( art );
     const int inset = t->px( MiniRestoreInset );
     overlay->setContentsMargins( inset, inset, inset, inset );
@@ -908,6 +912,9 @@ void MiniPlayer::popIn()
 {
     const int ms = Theme::instance()->duration( Theme::MiniPlayer );
     setWindowOpacity( ms > 0 ? 0.0 : 1.0 );
+    /* the keys to the window, not its first button (no focus ring on
+     * open): Tab reaches Restore, Esc and the hotkeys work at once */
+    setFocus( Qt::OtherFocusReason );
     show();
     raise();
     activateWindow();
