@@ -55,6 +55,7 @@ private:
     void refresh();
     void place();
 
+    intf_thread_t *p_intf;
     InputManager *im;
     OverlayHost *host;
     QAbstractButton *button;
