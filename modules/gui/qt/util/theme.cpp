@@ -668,27 +668,29 @@ int Theme::textNudge(const QFont &font) const
     return n;
 }
 
+/* A size a widget or a layout was given, and what it became at each scale
+ * since: back on the first scale it is exactly what it was. A value set
+ * again in between (a page re-applying its own px()) is the new base; the
+ * base itself again is the base (a restyle puts back the font a widget was
+ * built with). Kept on the object, so it goes with it. */
+struct ThemeRescaled { int base; qreal baseScale; int last; };
+Q_DECLARE_METATYPE(ThemeRescaled)
+
 namespace
 {
-    /* A size a widget or a layout was given, and what it became at each
-     * scale since: back on the first scale it is exactly what it was. A
-     * value set again in between (a page re-applying its own px()) is the
-     * new base; the base itself again is the base (a restyle puts back the
-     * font a widget was built with). */
-    struct Rescaled { int base; qreal baseScale; int last; };
-    QHash<QPair<const void *, int>, Rescaled> rescaledValues;
-
-    int rescaled(const void *owner, int slot, int value, qreal from, qreal to)
+    int rescaled(QObject *owner, int slot, int value, qreal from, qreal to)
     {
         if (value <= 0 || value >= QWIDGETSIZE_MAX)
             return value;
-        Rescaled &r = rescaledValues[qMakePair(owner, slot)];
+        const QByteArray name = "themeRescaled" + QByteArray::number(slot);
+        ThemeRescaled r = owner->property(name.constData()).value<ThemeRescaled>();
         if (r.baseScale <= 0 || (value != r.last && value != r.base))
         {
             r.base = value;
             r.baseScale = from;
         }
         r.last = qRound(r.base * to / r.baseScale);
+        owner->setProperty(name.constData(), QVariant::fromValue(r));
         return r.last;
     }
 
@@ -716,10 +718,11 @@ namespace
             QLayoutItem *item = l->itemAt(i);
             if (QSpacerItem *s = item->spacerItem())
             {
+                /* not a QObject: kept on its layout, by its place there */
                 const QSize sz = s->sizeHint();
                 const QSizePolicy pol = s->sizePolicy();
-                s->changeSize(rescaled(s, 0, sz.width(), from, to),
-                              rescaled(s, 1, sz.height(), from, to),
+                s->changeSize(rescaled(l, 6 + 2 * i, sz.width(), from, to),
+                              rescaled(l, 7 + 2 * i, sz.height(), from, to),
                               pol.horizontalPolicy(), pol.verticalPolicy());
             }
             else if (item->layout())
@@ -740,12 +743,18 @@ namespace
         }
     }
 
-    /* the sizes, margins and gaps the widget was built with */
+    /* the sizes, margins and gaps the widget was built with. Not a
+     * window's minimum and maximum: set, they would stop its layout from
+     * setting them (a dialog would not grow to a bigger page); a window
+     * with its own token size sets it again on Theme::changed */
     void rescaleWidget(QWidget *w, qreal from, qreal to)
     {
-        const QSize min = w->minimumSize(), max = w->maximumSize();
-        w->setMinimumSize(rescaled(w, 0, min.width(), from, to), rescaled(w, 1, min.height(), from, to));
-        w->setMaximumSize(rescaled(w, 2, max.width(), from, to), rescaled(w, 3, max.height(), from, to));
+        if (!w->isWindow())
+        {
+            const QSize min = w->minimumSize(), max = w->maximumSize();
+            w->setMinimumSize(rescaled(w, 0, min.width(), from, to), rescaled(w, 1, min.height(), from, to));
+            w->setMaximumSize(rescaled(w, 2, max.width(), from, to), rescaled(w, 3, max.height(), from, to));
+        }
         QSize icon;
         QAbstractButton *button = qobject_cast<QAbstractButton *>(w);
         QAbstractItemView *view = qobject_cast<QAbstractItemView *>(w);
@@ -763,12 +772,19 @@ namespace
         }
         if (QHeaderView *h = qobject_cast<QHeaderView *>(w))
         {
+            /* setDefaultSectionSize() sets every shown section to the new
+             * default: the user's widths are read before it */
+            QVector<int> sizes(h->count());
+            for (int i = 0; i < h->count(); ++i)
+                sizes[i] = h->sectionSize(i);
             h->setMinimumSectionSize(rescaled(w, 7, h->minimumSectionSize(), from, to));
             h->setDefaultSectionSize(rescaled(w, 8, h->defaultSectionSize(), from, to));
+            /* a hidden section reads 0: resizing it would show it at 0 */
             for (int i = 0; i < h->count(); ++i)
-                if (h->sectionResizeMode(i) == QHeaderView::Interactive
-                    || h->sectionResizeMode(i) == QHeaderView::Fixed)
-                    h->resizeSection(i, rescaled(w, 9 + i, h->sectionSize(i), from, to));
+                if (!h->isSectionHidden(i)
+                    && (h->sectionResizeMode(i) == QHeaderView::Interactive
+                        || h->sectionResizeMode(i) == QHeaderView::Fixed))
+                    h->resizeSection(i, rescaled(w, 9 + i, sizes[i], from, to));
         }
         if (w->layout())
             rescaleLayout(w->layout(), from, to);

@@ -522,9 +522,8 @@ void MainInterface::computeMinimumSize( bool b_minimal )
  * then the decks rebuilt at them */
 void MainInterface::followScreen()
 {
-    const QList<QScreen *> screens = QGuiApplication::screens();
-    const int n = QApplication::desktop()->screenNumber( this );
-    if( n < 0 || n >= screens.size() || !Theme::instance()->setScreen( screens.at( n ) ) )
+    /* the screen Qt gave the window, the one screenChanged() reports */
+    if( !windowHandle() || !Theme::instance()->setScreen( windowHandle()->screen() ) )
         return;
     computeMinimumSize( b_minimalView );
     toolBarConfUpdated();
@@ -2397,6 +2396,19 @@ void MainInterface::handleKeyPress( QKeyEvent *e )
 
 void MainInterface::wheelEvent( QWheelEvent *e )
 {
+    /* the volume follows the wheel over the player and the deck, as over
+     * stock's window; a page or a docked panel (Effects, playlist) passes
+     * on a wheel it can't use (a list at its end), which it keeps */
+    QWidget *w = childAt( e->pos() );
+    const bool over = w && ( ( onPlayerPage() && stackCentralW->isAncestorOf( w ) )
+        || ( controls && ( w == controls || controls->isAncestorOf( w ) ) )
+        || ( inputC && ( w == inputC || inputC->isAncestorOf( w ) ) )
+        || ( nowPlayingBar && ( w == nowPlayingBar || nowPlayingBar->isAncestorOf( w ) ) ) );
+    if( !over )
+    {
+        e->accept();
+        return;
+    }
     int i_vlckey = qtWheelEventToVLCKey( e );
     var_SetInteger( p_intf->obj.libvlc, "key-pressed", i_vlckey );
     e->accept();

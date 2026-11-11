@@ -1124,6 +1124,7 @@ FullscreenControllerWidget::FullscreenControllerWidget( intf_thread_t *_p_i, QWi
     b_fullscreen        = false;
     i_hide_timeout      = 1;
     i_screennumber      = -1;
+    b_keysTaken         = false;
 
     vout.clear();
 
@@ -1526,9 +1527,10 @@ void FullscreenControllerWidget::leaveEvent( QEvent *event )
  */
 void FullscreenControllerWidget::keyPressEvent( QKeyEvent *event )
 {
-    if ( event->key() == Qt::Key_Escape && isActiveWindow() )
+    if ( event->key() == Qt::Key_Escape && b_keysTaken )
     {
-        /* first the keys back to the video, a second Esc leaves full screen */
+        /* Tab gave it the keys: first the keys back to the video, a second
+         * Esc leaves full screen. After a click Esc is the video's, as before */
         hideFSC();
         parentWidget()->activateWindow();
         return;
@@ -1558,6 +1560,7 @@ bool FullscreenControllerWidget::takeFocus()
     showFSC();
     w->setFocus( Qt::TabFocusReason );
     activateWindow();
+    b_keysTaken = true;
     return true;
 }
 

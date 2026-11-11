@@ -842,6 +842,12 @@ void PlayerHeader::place()
 {
     if( !active || asleep || !host->targetShown() )
     {
+        /* gone, not asleep: no cursor to watch, and awake when it is back */
+        if( !active || !host->targetShown() )
+        {
+            moveCheck.stop();
+            cursorHidden = asleep = false;
+        }
         fade->stop();
         backWindow->giveFocusBack();
         backWindow->hide();

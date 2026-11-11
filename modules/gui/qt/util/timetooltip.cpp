@@ -48,8 +48,6 @@ TimeTooltip::TimeTooltip( QWidget *parent ) :
     setAttribute( Qt::WA_TranslucentBackground );
     setAttribute( Qt::WA_TransparentForMouseEvents );
 
-    // Inherit from the system default font size -5
-    mFont = QFont( "Verdana", qMax( QFontInfo( qApp->font() ).pointSize() - 5, 7 ) );
     mTipX = -1;
 
     // By default the widget is unintialized and should not be displayed
@@ -58,6 +56,12 @@ TimeTooltip::TimeTooltip( QWidget *parent ) :
 
 void TimeTooltip::adjustPosition()
 {
+    // The application's font size -5 pt, at least 7 pt: in pixels, here, so
+    // it follows the screen's scale
+    const Theme *t = Theme::instance();
+    mFont = QFont( "Verdana" );
+    mFont.setPixelSize( qMax( QFontInfo( qApp->font() ).pixelSize() - t->pt( 5 ), t->pt( 7 ) ) );
+
     if( mDisplayedText.isEmpty() )
     {
         resize( 0, 0 );

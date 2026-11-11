@@ -847,6 +847,10 @@ MiniPlayer::MiniPlayer( intf_thread_t *_p_i, NowPlayingInfo *_info, QWidget *par
     setWindowTitle( qtr( "Mini player" ) );
     setWindowIcon( QApplication::windowIcon() );
     setFixedSize( t->px( MiniW ), t->px( MiniH ) );
+    /* Theme leaves a window's size to it */
+    connect( t, &Theme::changed, this, [this]() {
+        setFixedSize( Theme::instance()->px( NowPlaying::MiniW ), Theme::instance()->px( NowPlaying::MiniH ) );
+    } );
 
     QVBoxLayout *l = new QVBoxLayout( this );
     l->setContentsMargins( Size::Hairline, Size::Hairline, Size::Hairline, Size::Hairline );

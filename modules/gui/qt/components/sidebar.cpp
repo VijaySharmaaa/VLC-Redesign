@@ -185,11 +185,20 @@ void SidebarButton::paintEvent( QPaintEvent * )
     const int devicePx = qRound( iconPx * devicePixelRatioF() );
     const QIcon glyph = t->icon( QLatin1String( icon ), ink, QSize( devicePx, devicePx ) );
     const QRect iconAt = QStyle::visualRect( layoutDirection(), rect(), iconRect );
+    QImage glyphImage = glyph.pixmap( devicePx, devicePx ).toImage();
     if( kind == Back && isRightToLeft() )
         /* the arrow points the way back: to the right in RTL */
-        p.drawImage( iconAt, glyph.pixmap( devicePx, devicePx ).toImage().mirrored( true, false ) );
-    else
-        glyph.paint( &p, iconAt );
+        glyphImage = glyphImage.mirrored( true, false );
+    /* placed in device pixels round its box's centre (the rail: the
+     * square's): at a fractional scale (1.2) the logical box and Qt's own
+     * rounding put the glyph a pixel or two off */
+    const qreal dpr = devicePixelRatioF();
+    const QPointF centre = ( rail ? QRectF( rect() ) : QRectF( iconAt ) ).center() * dpr;
+    p.save();
+    p.scale( 1 / dpr, 1 / dpr );
+    p.drawImage( QRect( qRound( centre.x() - devicePx / 2. ), qRound( centre.y() - devicePx / 2. ),
+                        devicePx, devicePx ), glyphImage );
+    p.restore();
     if( rail )
         return;
 

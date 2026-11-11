@@ -100,12 +100,14 @@ private:
 
     int lastActivatedPLItemId;
     int currentRootIndexPLId;
+    int zoom;   /* points over the application's font, as saved */
 
     void createTreeView();
     void createIconView();
     void createListView();
     void createCoverView();
     void updateZoom( int i_zoom );
+    void applyZoom();
     virtual bool eventFilter ( QObject * watched, QEvent * event ) Q_DECL_OVERRIDE;
 
     /* Wait spinner */
