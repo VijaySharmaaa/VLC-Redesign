@@ -404,7 +404,7 @@ Branch `redesign/phase-6` from `redesign/phase-5` (c36cf50573). Six survey lanes
 - 100 % and monitor-move results come from the two-monitor runs before the owner's second screen was disconnected. The later per-monitor fixes (column widths, dialog minimums, rescale state on objects, `Theme::pt` fonts, following `windowHandle()->screen()`) were only exercised with a scale-change test hook, never on a real second monitor, and nothing after that was run on a true 100 % desktop (`QT_SCALE_FACTOR=0.8` breaks stock 3.0 too, so it can't stand in).
 - Narrator was never run: screen-reader results come from UI Automation (names, roles, values, Invoke) only.
 - Not run on Windows: animations off, high contrast at runtime, RTL, a monitor unplug.
-- The harness `baseline` state `04-effects` doesn't show the sheet at the default size (it opens as the XS drawer window, which the capture misses).
+- The harness `baseline` states `03-playlist` and `04-effects` don't show the panel at the default size (it opens as the XS drawer window, which the capture misses).
 - A Windows Firewall prompt ("allow VLC media player") appeared once during testing; it was cancelled, so no rule allows VLC. Tests only listen on 127.0.0.1.
 - The mouse wheel changes the volume only over the video, the deck and the Now Playing bar (owner decision P6-10).
 - RTL layout could not be run (needs a Windows setting); mirrored by code reading only.
@@ -422,6 +422,7 @@ Branch `redesign/phase-6` from `redesign/phase-5` (c36cf50573). Six survey lanes
 4. Home → Videos → Music → Network → Ctrl+P → Back at 1280×800: the window size never changes.
 5. Move the window to a monitor with another scale and back: text, icons and rows grow together and come back identical; paused time stays.
 6. Effects at 800×600: tabs show full labels, all 10 bands reachable by scrolling.
+7. Full screen, Tab (keys move into the controller), Esc: full screen is left at once. With Esc remapped (e.g. `--key-play-pause=Esc`), the remapped action runs once instead.
 
 ### Edge cases (`redesign/docs/EDGE_CASES.md`), Phase 6
 Evidence: `D:\Projects\VLC\spike-results\p6-edge\` (runtime sessions), `p6-va\`, `p6-vb\`, `p6-vc\`, `p6-v2a\`, `p6-v3a\`, `p6-v3b\`, `p6-design\`, `p6-final\` and each fix lane's folder. Not committed.
@@ -449,12 +450,12 @@ Evidence: `D:\Projects\VLC\spike-results\p6-edge\` (runtime sessions), `p6-va\`,
 | Recents length while playing | **fixed** | Updated in place, no page rebuild (focus kept). |
 | Prefs Save/Cancel/Reset; stop after Preferences | **pass** / **fixed** | Stopping a video after Preferences now goes Home; the docked playlist hides while Preferences shows. |
 | Open media: arrow keys, Capture | **fixed** / **deferred** | Arrow keys no longer reach Capture by accident; Capture itself still blocks in the DirectShow scan (stock). |
-| Closing during playback, 50× open/close | **pass** | Final build, 50 cycles each (Preferences, Effects docked and XS, Open media, playlist, Media info, Go to time, About): handles, GDI and USER flat. The docked Effects sheet's private bytes rise 1.5 MB by cycle 25 then level off over 150 cycles (heap churn from resizing the video area; stock's separate Effects window doesn't resize the video). Exit code 0 in 0.2–0.6 s with each surface open; with a modal dialog (Open media, About) the main window ignores close, as in stock. |
+| Closing during playback, 50× open/close | **pass** | Build before 8084378e09 (that commit only changes fullscreen Esc), 50 cycles each (Preferences, Effects docked and XS, Open media, playlist, Media info, Go to time, About): handles, GDI and USER flat. The docked Effects sheet's private bytes rise 1.5 MB by cycle 25 then level off over 150 cycles (heap churn from resizing the video area; stock's separate Effects window doesn't resize the video). Exit code 0 in 0.2–0.6 s with each surface open; with a modal dialog (Open media, About) the main window ignores close, as in stock. |
 | Overlays over the video after the native-window change | **pass** | Docked and XS panels, fullscreen controller, minimal view, mini player, audio mode, resize, dark and light. |
 | Mouse wheel over panels | **fixed** | The wheel over the Effects sheet or playlist no longer changes the volume. |
 
 ### Performance on the final build
-Evidence: `D:\Projects\VLC\spike-results\p6-perf-final\` (not committed). CPU is % of one core; A/B interleaved 6 rounds with stock.
+Evidence: `D:\Projects\VLC\spike-results\p6-perf-final\` (not committed). CPU is % of one core; A/B interleaved with stock (round 0 a warm-up, medians of 5). The 720p difference is within noise (stock rounds ran on a busier machine). Leak cycles and resize settle ran on the build before 8084378e09.
 
 | Metric | Redesign | Stock |
 |---|---|---|
