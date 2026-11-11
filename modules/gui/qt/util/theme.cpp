@@ -437,6 +437,12 @@ namespace
         void polish(QWidget *w) Q_DECL_OVERRIDE
         {
             QProxyStyle::polish(w);
+            /* the menu's minimum here, not in the stylesheet, which also
+             * expands each item's label to it (QRenderRule::adjustSize):
+             * every item was the minimum plus its icon column, paddings
+             * and the shortcut column wide */
+            if (qobject_cast<QMenu *>(w) && Theme::instance())
+                w->setMinimumWidth(Theme::instance()->metric(Theme::MenuMinW));
             QLineEdit *edit = qobject_cast<QLineEdit *>(w);
             /* not an item view's editor: it is as tall as its row, the
              * nudge cut the descenders and put the capitals on the frame */
@@ -1005,7 +1011,8 @@ QMenuBar::item { background: transparent; padding: @menuTitlePadY@px @menuTitleP
 QMenuBar::item:selected { background: @hoverFill@; color: @tx@; }
 QMenuBar::item:pressed { background: @openFill@; color: @tx@; }
 
-QMenu { background: @raised@; color: @tx@; border: @popupBorder@; padding: @menuPad@px; min-width: @menuMinW@px;
+/* no min-width: Qt 5.6 widens every item's label to it (ThemeStyle::polish) */
+QMenu { background: @raised@; color: @tx@; border: @popupBorder@; padding: @menuPad@px;
     -qt-style-features: background-color; }
 QMenu::separator { height: 1px; background: @border@; margin: @menuPad@px @menuSepX@px; }
 
@@ -1288,7 +1295,6 @@ PrefsPage QComboBox { min-height: @prefsSelectInner@px; }
         { "menuPad", QString::number(px(Size::MenuPanelPadding)) },
         { "menuPadFocus", QString::number(px(Size::MenuPanelPadding) - 1) },
         { "menuSepX", QString::number(2 * px(Size::MenuPanelPadding)) },
-        { "menuMinW", QString::number(px(Size::MenuMinW)) },
         { "menuTitlePadX", QString::number(px(Size::MenuTitlePadX)) },
         { "menuTitlePadY", QString::number(qMax(0, (px(Size::MenuTitleH) - lineH) / 2)) },
         { "tabPadTop", QString::number(tabPadY / 2) },
