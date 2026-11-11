@@ -328,7 +328,7 @@ vlc_module_begin ()
 
     add_bool( "qt-icon-change", true, ICONCHANGE_TEXT, ICONCHANGE_LONGTEXT, true )
 
-    add_integer_with_range( "qt-max-volume", 125, 60, 300, VOLUME_MAX_TEXT, VOLUME_MAX_TEXT, true)
+    add_integer_with_range( "qt-max-volume", 200, 60, 300, VOLUME_MAX_TEXT, VOLUME_MAX_TEXT, true)
 
     add_integer_with_range( "qt-fs-sensitivity", 3, 0, 4000, FULLSCREEN_CONTROL_PIXELS,
             FULLSCREEN_CONTROL_PIXELS, true)

@@ -155,12 +155,14 @@ void SoundWidget::userUpdateVolume( int i_sliderVolume )
 void SoundWidget::libUpdateVolume( float volume )
 {
     long i_volume = lroundf(volume * 100.f);
-    if( i_volume != volumeSlider->value()  )
-    {
-        b_ignore_valuechanged = true;
+    b_ignore_valuechanged = true;
+    /* the label as the OSD, also past a lowered qt-max-volume */
+    SoundSlider *soundSlider = qobject_cast<SoundSlider *>( volumeSlider );
+    if( soundSlider )
+        soundSlider->setLevel( i_volume );
+    else
         volumeSlider->setValue( i_volume );
-        b_ignore_valuechanged = false;
-    }
+    b_ignore_valuechanged = false;
     refreshLabels();
 }
 

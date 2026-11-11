@@ -561,13 +561,14 @@ void SeekSlider::startAnimLoading()
 
 /* DESIGN_SPEC 3: a flat 140 px track, 4 px high, a 1 px tick at 100 %, the
  * fill in the accent and in the boost colour above 100 %; the level as
- * text on the right. The maximum is qt-max-volume. */
+ * text on the right. The maximum is qt-max-volume; a wheel step is the
+ * volume hotkeys' (volume-step), whatever the maximum. */
 SoundSlider::SoundSlider( QWidget *_parent, float _i_step,
                           char *psz_colors, int max )
                         : QAbstractSlider( _parent )
 {
-    f_step = (float)(_i_step * 10000)
-           / (float)((max - SOUNDMIN) * AOUT_VOLUME_DEFAULT);
+    f_step = _i_step * 100.f / AOUT_VOLUME_DEFAULT;
+    i_level = SOUNDMIN;
     setRange( SOUNDMIN, max);
     setSingleStep( qMax( 1, qRound( f_step ) ) );
     setMouseTracking( true );
@@ -600,11 +601,11 @@ SoundSlider::SoundSlider( QWidget *_parent, float _i_step,
         switch (vlcButton & 0x00FF0000) {
         case KEY_MOUSEWHEELDOWN:
         case KEY_MOUSEWHEELLEFT:
-            newvalue = value() - f_step;
+            newvalue = value() - qRound( f_step );
             break;
         case KEY_MOUSEWHEELUP:
         case KEY_MOUSEWHEELRIGHT:
-            newvalue = value() + f_step;
+            newvalue = value() + qRound( f_step );
             break;
         default:
             return;
@@ -739,6 +740,20 @@ void SoundSlider::setMuted( bool m )
     update();
 }
 
+void SoundSlider::setLevel( int level )
+{
+    setValue( level );
+    i_level = level;
+    update();
+}
+
+void SoundSlider::sliderChange( SliderChange change )
+{
+    if( change == SliderValueChange )
+        i_level = value();
+    QAbstractSlider::sliderChange( change );
+}
+
 void SoundSlider::paintEvent( QPaintEvent *e )
 {
     const Theme *theme = Theme::instance();
@@ -779,6 +794,6 @@ void SoundSlider::paintEvent( QPaintEvent *e )
     painter.setFont( theme->font( Theme::Meta ) );
     painter.drawText( QRect( track.right() + 1, -theme->textNudge( painter.font() ),
                              width() - track.right() - 1, height() ),
-                      Qt::AlignRight | Qt::AlignVCenter, QString::number( value() ) + '%' );
+                      Qt::AlignRight | Qt::AlignVCenter, QString::number( i_level ) + '%' );
     e->accept();
 }
