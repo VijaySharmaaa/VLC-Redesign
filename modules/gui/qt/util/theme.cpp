@@ -668,27 +668,29 @@ int Theme::textNudge(const QFont &font) const
     return n;
 }
 
+/* A size a widget or a layout was given, and what it became at each scale
+ * since: back on the first scale it is exactly what it was. A value set
+ * again in between (a page re-applying its own px()) is the new base; the
+ * base itself again is the base (a restyle puts back the font a widget was
+ * built with). Kept on the object, so it goes with it. */
+struct ThemeRescaled { int base; qreal baseScale; int last; };
+Q_DECLARE_METATYPE(ThemeRescaled)
+
 namespace
 {
-    /* A size a widget or a layout was given, and what it became at each
-     * scale since: back on the first scale it is exactly what it was. A
-     * value set again in between (a page re-applying its own px()) is the
-     * new base; the base itself again is the base (a restyle puts back the
-     * font a widget was built with). */
-    struct Rescaled { int base; qreal baseScale; int last; };
-    QHash<QPair<const void *, int>, Rescaled> rescaledValues;
-
-    int rescaled(const void *owner, int slot, int value, qreal from, qreal to)
+    int rescaled(QObject *owner, int slot, int value, qreal from, qreal to)
     {
         if (value <= 0 || value >= QWIDGETSIZE_MAX)
             return value;
-        Rescaled &r = rescaledValues[qMakePair(owner, slot)];
+        const QByteArray name = "themeRescaled" + QByteArray::number(slot);
+        ThemeRescaled r = owner->property(name.constData()).value<ThemeRescaled>();
         if (r.baseScale <= 0 || (value != r.last && value != r.base))
         {
             r.base = value;
             r.baseScale = from;
         }
         r.last = qRound(r.base * to / r.baseScale);
+        owner->setProperty(name.constData(), QVariant::fromValue(r));
         return r.last;
     }
 
@@ -716,10 +718,11 @@ namespace
             QLayoutItem *item = l->itemAt(i);
             if (QSpacerItem *s = item->spacerItem())
             {
+                /* not a QObject: kept on its layout, by its place there */
                 const QSize sz = s->sizeHint();
                 const QSizePolicy pol = s->sizePolicy();
-                s->changeSize(rescaled(s, 0, sz.width(), from, to),
-                              rescaled(s, 1, sz.height(), from, to),
+                s->changeSize(rescaled(l, 6 + 2 * i, sz.width(), from, to),
+                              rescaled(l, 7 + 2 * i, sz.height(), from, to),
                               pol.horizontalPolicy(), pol.verticalPolicy());
             }
             else if (item->layout())
