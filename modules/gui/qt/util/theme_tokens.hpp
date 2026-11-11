@@ -15,8 +15,9 @@
  *
  * Deviation from tokens.json: the light theme's accTx is #9a4800, not
  * #b35300, so the active sidebar label (accTx on AccentTint12 over chrome)
- * reaches 4.8:1 instead of 3.8:1. The light glass is 0.88 opaque, not
- * 0.74: the design blurs what is under it, which Qt 5.6 widgets cannot.
+ * reaches 4.8:1 instead of 3.8:1. The glass is 0.88 opaque in both themes,
+ * not 0.72 / 0.74: the design blurs what is under it, which Qt 5.6 widgets
+ * cannot (P6-8).
  *
  * Per theme since Phase 6 (WCAG 1.4.3 / 1.4.11): progress and switch fills,
  * the volume boost, the destructive text and the outline of fields, selects
@@ -74,7 +75,7 @@ namespace RedesignTokens
         0xFF0A0A09, 0xFF0E0D0C, 0xFF121110, 0xFF141312, 0xFF1A1917, 0xFF23211F, 0xFF2C2A27, 0xFF35322F,
         0xFFF2EFEA, 0xFFCFCAC3, 0xFFA39E96, 0xFF8D877F, 0xFFFFA552,
         0xFFFFFFFF,
-        0xB81E1D1B, /* rgba(30,29,27,0.72) */
+        0xE01E1D1B, /* rgba(30,29,27,0.88): the design's 0.72 is under a blur Qt 5.6 lacks */
         0xF71A1917, /* rgba(26,25,23,0.97) */
         0xFF22201E, 0xFF1C1A18,
         0xFFFF8A1F, 0xFF1C1206, 0xFFFF5A1F, 0xFFFF7468,
@@ -85,7 +86,7 @@ namespace RedesignTokens
         0xFFD6D2CC, 0xFFEBE8E4, 0xFFF6F4F1, 0xFFF1EEEA, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFE6E2DD, 0xFFDBD6D0,
         0xFF1B1916, 0xFF3D3933, 0xFF5F5A53, 0xFF746E66, 0xFF9A4800,
         0xFF000000,
-        0xE0FAF9F7, /* rgba(250,249,247,0.88): tokens.json's 0.74 is under a blur Qt 5.6 lacks */
+        0xE0FAF9F7, /* rgba(250,249,247,0.88): the design's 0.74 is under a blur Qt 5.6 lacks */
         0xF7FFFFFF,
         0xFFE7E3DD, 0xFFDFDAD3,
         0xFF9A4800, 0xFFFFFFFF, 0xFFD9400A, 0xFFB02515,
