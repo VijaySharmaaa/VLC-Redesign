@@ -38,7 +38,8 @@ class SpectrumWidget : public QWidget
 {
     Q_OBJECT
 public:
-    enum { BANDS = RedesignTokens::NowPlaying::SpectrumBars };
+    /* measured per block; the bars shown each take the loudest of a run of them */
+    enum { BANDS = RedesignTokens::NowPlaying::SpectrumMaxBars };
     SpectrumWidget( intf_thread_t *, QWidget *parent );
     virtual ~SpectrumWidget();
     QSize sizeHint() const Q_DECL_OVERRIDE;

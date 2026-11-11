@@ -275,15 +275,22 @@ void SpectrumWidget::paintEvent( QPaintEvent * )
     const qreal gap = t->px( NowPlaying::SpectrumGap );
     const qreal minH = t->px( NowPlaying::SpectrumMinBar );
     const qreal radius = t->px( NowPlaying::SpectrumBarRadius );
-    const qreal w = ( width() - 2 * padX - gap * ( BANDS - 1 ) ) / BANDS;
+    /* as many bars as fit at about SpectrumBarW, within the token range */
+    const int bars = qBound<int>( NowPlaying::SpectrumMinBars,
+                                  int( ( width() - 2 * padX + gap ) / ( t->px( NowPlaying::SpectrumBarW ) + gap ) ),
+                                  BANDS );
+    const qreal w = ( width() - 2 * padX - gap * ( bars - 1 ) ) / bars;
     if( w <= 0 )
         return;
     QColor even = t->color( Theme::Accent ), odd = even;
     even.setAlpha( NowPlaying::SpectrumAlphaEven );
     odd.setAlpha( NowPlaying::SpectrumAlphaOdd );
-    for( unsigned b = 0; b < BANDS; b++ )
+    for( int b = 0; b < bars; b++ )
     {
-        const qreal h = minH + shown[b] * ( height() - minH );
+        /* bands [b*BANDS/bars, (b+1)*BANDS/bars): never empty, all covered */
+        const float level = *std::max_element( shown + b * BANDS / bars,
+                                               shown + ( b + 1 ) * BANDS / bars );
+        const qreal h = minH + level * ( height() - minH );
         /* rounded top only: the radius below is cut off by the widget */
         p.setBrush( b % 2 ? odd : even );
         p.drawRoundedRect( QRectF( padX + b * ( w + gap ), height() - h, w, h + radius ),

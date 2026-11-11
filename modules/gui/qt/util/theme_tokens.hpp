@@ -255,7 +255,7 @@ namespace RedesignTokens
         static const int TrackMinRows = 3;
 
         /* spectrum strip: bars rise and fall at full height per 250 ms, linear */
-        static const int SpectrumH = 84, SpectrumBars = 64, SpectrumGap = 3, SpectrumPadX = 44;
+        static const int SpectrumH = 84, SpectrumGap = 3, SpectrumPadX = 44;
         static const int SpectrumMinBar = 3, SpectrumBarRadius = 2;
         static const int SpectrumAlphaEven = 217, SpectrumAlphaOdd = 140; /* accent 0.85 / 0.55 */
         static const int SpectrumMotion = 250, SpectrumFrame = 33;        /* ms, ~30 fps */
@@ -441,6 +441,13 @@ namespace RedesignTokens
         /* not in tokens.json: the mini player's Restore, a round chip like the
          * player header's back (VideoOverlay::HeaderBack*), clear of the corner */
         static const int MiniRestoreChip = 32, MiniRestoreGlyph = 20, MiniRestoreEdge = 10;
+
+        /* not in tokens.json: the spectrum's bar count follows its width,
+         * bars = (width - 2 padX + gap) / (SpectrumBarW + gap), clamped. A bar
+         * near 18 px is the 64-bar look of a ~1500 px window; 48 keeps small
+         * windows' bars from turning to hairlines; the decoder thread measures
+         * SpectrumMaxBars bands per block whatever is shown (a 4K window) */
+        static const int SpectrumBarW = 18, SpectrumMinBars = 48, SpectrumMaxBars = 160;
     }
 }
 
