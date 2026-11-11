@@ -45,6 +45,7 @@
 #include <QScrollArea>
 #include <QStackedWidget>
 #include <QStyledItemDelegate>
+#include <QTreeView>
 #include <QVBoxLayout>
 
 #include <algorithm>
@@ -147,9 +148,8 @@ public:
     void paint( QPainter *p, const QStyleOptionViewItem &option,
                 const QModelIndex &index ) const Q_DECL_OVERRIDE
     {
-        const QVariant from = option.widget ? option.widget->property( "keycapsFrom" ) : QVariant();
         const QString key = index.data().toString();
-        if( !from.isValid() || index.column() < from.toInt() || key.isEmpty() )
+        if( !isKeycap( option, index ) )
         {
             QStyledItemDelegate::paint( p, option, index );
             return;
@@ -193,9 +193,25 @@ public:
     QSize sizeHint( const QStyleOptionViewItem &option,
                     const QModelIndex &index ) const Q_DECL_OVERRIDE
     {
+        const Theme *t = Theme::instance();
         QSize s = QStyledItemDelegate::sizeHint( option, index );
-        s.setHeight( qMax( s.height(), Theme::instance()->metric( Theme::PlaylistRowH ) ) );
+        s.setHeight( qMax( s.height(), t->metric( Theme::PlaylistRowH ) ) );
+        if( isKeycap( option, index ) )
+        {
+            /* the keycap, whole, as paint() draws it */
+            const QStyle *style = option.widget ? option.widget->style() : QApplication::style();
+            const int margin = style->pixelMetric( QStyle::PM_FocusFrameHMargin, 0, option.widget ) + 1;
+            s.setWidth( QFontMetrics( t->font( Theme::Mono ) ).width( index.data().toString() )
+                        + 2 * t->px( Prefs::KeycapPadX ) + 2 + 2 * margin );
+        }
         return s;
+    }
+
+private:
+    static bool isKeycap( const QStyleOptionViewItem &option, const QModelIndex &index )
+    {
+        const QVariant from = option.widget ? option.widget->property( "keycapsFrom" ) : QVariant();
+        return from.isValid() && index.column() >= from.toInt() && !index.data().toString().isEmpty();
     }
 };
 
@@ -417,6 +433,12 @@ static void toRows( QWidget *box, const QString &orphan, bool inCard, bool place
                 list->setSizePolicy( list->sizePolicy().horizontalPolicy(), QSizePolicy::Expanding );
                 list->setMinimumHeight( ( Prefs::HotkeysMinRows + 1 ) * t->metric( Theme::PlaylistRowH ) );
                 list->setItemDelegate( new ListRowDelegate( list ) );
+                /* the hotkey columns as wide as their keycaps */
+                QTreeView *tree = qobject_cast<QTreeView *>( list );
+                const QVariant from = list->property( "keycapsFrom" );
+                if( tree && from.isValid() )
+                    for( int c = from.toInt(); c < tree->model()->columnCount(); c++ )
+                        tree->resizeColumnToContents( c );
                 filled = true;
             }
             layout->addWidget( r.block, list && !inCard );
