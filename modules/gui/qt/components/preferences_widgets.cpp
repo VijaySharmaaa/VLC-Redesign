@@ -636,6 +636,11 @@ void ModuleListConfigControl::checkbox_lists( module_t *p_parser )
     const char *module_name = module_GetLongName( p_parser );
     const char *module_shortcut = module_get_object( p_parser );
 
+    /* the interface's own spectrum tap (qt.cpp): the audio mode puts it on,
+     * never the user */
+    if( !strcmp( module_shortcut, "qt" ) && module_provides( p_parser, "audio filter" ) )
+        return;
+
     if ( !strcmp(module_name, "AMD VQ Enhancer"))
         module_shortcut = "amf_vqenhancer";
 
