@@ -319,14 +319,19 @@ MainInterface::MainInterface( intf_thread_t *_p_intf, bool customFrame ) : QVLCM
         if( current == bgWidget || ( isLibraryPage( current ) && !b_browsing ) )
             showTab( audioPage );
     } );
-    /* a cleared playlist has nothing left to show in the bar */
-    connect( THEMIM, &MainInputManager::playlistNotEmpty, this, [this]( bool notEmpty ) {
-        if( !notEmpty && !THEMIM->getIM()->hasInput() )
-        {
-            b_nowPlayingSeen = false;
-            updateNowPlayingBar();
-        }
-    } );
+    /* a cleared playlist has nothing left to show in the bar, nor on the
+     * player page (its last item and deck would stay): cleared while
+     * stopped, or the input ends after it */
+    const auto nothingLeft = [this]() {
+        if( THEMIM->getIM()->hasInput() || !THEMIM->hasEmptyPlaylist() )
+            return;
+        b_nowPlayingSeen = false;
+        if( onPlayerPage() )
+            sidebar->showPage( Sidebar::Home );
+        updateNowPlayingBar();
+    };
+    connect( THEMIM, &MainInputManager::playlistNotEmpty, this, nothingLeft );
+    connect( THEMIM, &MainInputManager::inputChanged, this, nothingLeft );
 
     /* END CONNECTS ON IM */
 
