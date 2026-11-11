@@ -495,10 +495,15 @@ namespace
             const bool on = opt->state & (State_On | State_NoChange);
             const QVariant knob = w->property(toggleKnobProperty);
             const qreal at = knob.isValid() ? knob.toReal() : on ? 1. : 0.;
-            const QRectF ring = QRectF(opt->rect).adjusted(Size::FocusRing / 2., Size::FocusRing / 2.,
-                                                           -Size::FocusRing / 2., -Size::FocusRing / 2.);
-            const QRectF track = QRectF(opt->rect).adjusted(2 * Size::FocusRing + .5, 2 * Size::FocusRing + .5,
-                                                            -2 * Size::FocusRing - .5, -2 * Size::FocusRing - .5);
+            /* on the widget's exact centre, as a centred label's capitals
+             * are: the style's whole-pixel indicator rect rounds it up */
+            QRectF box(opt->rect);
+            if (w && w->rect().contains(opt->rect))
+                box.moveCenter(QPointF(box.center().x(), w->height() / 2.));
+            const QRectF ring = box.adjusted(Size::FocusRing / 2., Size::FocusRing / 2.,
+                                             -Size::FocusRing / 2., -Size::FocusRing / 2.);
+            const QRectF track = box.adjusted(2 * Size::FocusRing + .5, 2 * Size::FocusRing + .5,
+                                              -2 * Size::FocusRing - .5, -2 * Size::FocusRing - .5);
             p->save();
             p->setRenderHint(QPainter::Antialiasing);
             if (opt->state & State_HasFocus)
