@@ -52,7 +52,8 @@ static_assert( Size::SidebarRailBelow == Breakpoint::M,
 /* One sidebar entry, painted from tokens: the stylesheet cannot left-align
  * a tool button's content nor set the 12 px icon-label gap. Open is the
  * accent "Open media" button, Nav a library item, Section a preferences
- * section (an accent bar when active), Back the preferences' back row. */
+ * section (tinted as a library item when active, no bar: the owner's
+ * call), Back the preferences' back row. */
 class SidebarButton : public QAbstractButton
 {
 public:
@@ -138,18 +139,6 @@ void SidebarButton::paintEvent( QPaintEvent * )
     p.drawRoundedRect( QRectF( rect() ).adjusted( ringOut, ringOut, -ringOut, -ringOut ),
                        radius - ringOut, radius - ringOut );
 
-    if( kind == Section && isChecked() )
-    {
-        /* the active section's bar, on its leading edge; the accent is
-         * too faint on light surfaces (as the menus' check marks) */
-        const int inset = t->px( Size::SidebarBarInset );
-        const qreal barRadius = t->px( Size::SidebarBarRadius );
-        p.setBrush( t->color( t->isDark() ? Theme::Accent : Theme::AccentText ) );
-        p.drawRoundedRect( QStyle::visualRect( layoutDirection(), rect(),
-                               QRect( 0, inset, t->px( Size::SidebarBarW ), height() - 2 * inset ) ),
-                           barRadius, barRadius );
-    }
-
     if( hasFocus() )
     {
         /* the accent is 2.4:1 on light surfaces */
@@ -195,7 +184,18 @@ void SidebarButton::paintEvent( QPaintEvent * )
      * square's): at a fractional scale (1.2) the logical box and Qt's own
      * rounding put the glyph a pixel or two off */
     const qreal dpr = devicePixelRatioF();
-    const QPointF centre = ( rail ? QRectF( rect() ) : QRectF( iconAt ) ).center() * dpr;
+    QPointF centre = ( rail ? QRectF( rect() ) : QRectF( iconAt ) ).center();
+    if( primary && !rail )
+    {
+        /* the + on the label's optical middle, between its capitals' and
+         * its lowercase letters' middles: on the box's middle it sat above
+         * a mostly lowercase label (#10) */
+        const QFontMetricsF fmf( font );
+        const qreal baseline = ( height() - fmf.height() ) / 2 + fmf.ascent() - t->textNudge( font );
+        centre.setY( baseline - ( fmf.tightBoundingRect( QStringLiteral( "H" ) ).height()
+                                  + fmf.xHeight() ) / 4 );
+    }
+    centre *= dpr;
     p.save();
     p.scale( 1 / dpr, 1 / dpr );
     p.drawImage( QRect( qRound( centre.x() - devicePx / 2. ), qRound( centre.y() - devicePx / 2. ),
