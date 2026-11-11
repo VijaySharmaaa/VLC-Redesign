@@ -488,8 +488,7 @@ namespace
 
     private:
         /* The prototype's switch: off, an outlined track and a Text2 knob;
-         * on, an accent track and an OnAccent knob. The light theme's
-         * darker fill takes a white knob (OnAccentFill). */
+         * on, an accent track and an OnAccent knob. */
         static void drawToggle(Theme *t, const QStyleOption *opt, QPainter *p, const QWidget *w)
         {
             const bool on = opt->state & (State_On | State_NoChange);
@@ -1263,8 +1262,7 @@ PrefsPage QComboBox { min-height: @prefsSelectInner@px; }
         { "accent", css(color(Accent)) },
         { "accentHover", css(color(AccentHover)) },
         { "fill", css(color(AccentFill)) },
-        /* the light fill has no lighter hover that keeps 3:1 */
-        { "fillHover", css(color(dark ? AccentHover : AccentFill)) },
+        { "fillHover", css(color(AccentHover)) },
         { "controlLine", css(color(ControlLine)) },
         /* the accent is 2.4:1 on light surfaces: focus rings need >= 3:1 */
         { "focusRing", css(color(dark ? Accent : AccentText)) },
