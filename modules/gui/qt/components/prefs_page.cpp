@@ -218,6 +218,10 @@ static QFrame *buildRow( const Row &r, const QString &orphan, bool first, QList<
             toggle->setAccessibleName( toggle->text().remove( QLatin1Char( '&' ) ) );
         toggle->setText( QString() );
         toggle->setProperty( "role", "toggle" );
+        /* as tall as the row, as its state label is: both on the row's
+         * exact centre (drawToggle draws on the widget's), where a fixed
+         * height was placed on a centre rounded to whole pixels */
+        toggle->setSizePolicy( toggle->sizePolicy().horizontalPolicy(), QSizePolicy::Preferred );
         QLabel *state = new QLabel;
         state->setProperty( "role", "hint" );
         state->setFont( Theme::instance()->font( Theme::Meta ) );
