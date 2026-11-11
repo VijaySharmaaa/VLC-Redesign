@@ -218,6 +218,10 @@ static QFrame *buildRow( const Row &r, const QString &orphan, bool first, QList<
             toggle->setAccessibleName( toggle->text().remove( QLatin1Char( '&' ) ) );
         toggle->setText( QString() );
         toggle->setProperty( "role", "toggle" );
+        /* as tall as the row, as its state label is: both on the row's
+         * exact centre (drawToggle draws on the widget's), where a fixed
+         * height was placed on a centre rounded to whole pixels */
+        toggle->setSizePolicy( toggle->sizePolicy().horizontalPolicy(), QSizePolicy::Preferred );
         QLabel *state = new QLabel;
         state->setProperty( "role", "hint" );
         state->setFont( Theme::instance()->font( Theme::Meta ) );
@@ -444,9 +448,15 @@ PrefsPage::PrefsPage( intf_thread_t *_p_intf, QWidget *_tabAnchor )
                                     qtr( "Restore every setting to its default." ), resetButton, false ) );
     advLayout->addWidget( card );
     advLayout->addStretch( 1 );
+    /* the prototype's column: at most ContentMaxW wide, on the left; the
+     * sections' scroll areas keep the page's width (their bar on its edge) */
+    advanced->setMaximumWidth( t->px( Prefs::ContentMaxW ) );
     stack->addWidget( advanced );
 
-    QHBoxLayout *buttons = new QHBoxLayout;
+    QWidget *buttonBar = new QWidget;
+    buttonBar->setMaximumWidth( t->px( Prefs::ContentMaxW ) );
+    QHBoxLayout *buttons = new QHBoxLayout( buttonBar );
+    buttons->setContentsMargins( 0, 0, 0, 0 );
     buttons->setSpacing( t->px( Prefs::ButtonGap ) );
     buttons->addStretch( 1 );
     cancelButton = new QPushButton( qtr( "&Cancel" ) );
@@ -459,7 +469,7 @@ PrefsPage::PrefsPage( intf_thread_t *_p_intf, QWidget *_tabAnchor )
     saveButton->setToolTip( qtr( "Save the preferences" ) );
     connect( saveButton, &QPushButton::clicked, this, &PrefsPage::save );
     buttons->addWidget( saveButton );
-    right->addLayout( buttons );
+    right->addWidget( buttonBar );
 
     /* where config_SaveConfigFile() writes */
     char *path = var_InheritString( p_intf, "config" );
@@ -521,6 +531,7 @@ void PrefsPage::showSection( int i )
         scroller->setFocusPolicy( Qt::NoFocus );
         QList<QWidget *> order;
         toRows( scroller->widget(), QString(), false, false, order );
+        scroller->widget()->setMaximumWidth( Theme::instance()->px( Prefs::ContentMaxW ) );
         /* built after the page, its widgets end the window's focus chain:
          * move them after the sections and before Advanced's buttons,
          * Cancel and Save, in row order */

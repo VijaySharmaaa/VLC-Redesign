@@ -319,14 +319,19 @@ MainInterface::MainInterface( intf_thread_t *_p_intf, bool customFrame ) : QVLCM
         if( current == bgWidget || ( isLibraryPage( current ) && !b_browsing ) )
             showTab( audioPage );
     } );
-    /* a cleared playlist has nothing left to show in the bar */
-    connect( THEMIM, &MainInputManager::playlistNotEmpty, this, [this]( bool notEmpty ) {
-        if( !notEmpty && !THEMIM->getIM()->hasInput() )
-        {
-            b_nowPlayingSeen = false;
-            updateNowPlayingBar();
-        }
-    } );
+    /* a cleared playlist has nothing left to show in the bar, nor on the
+     * player page (its last item and deck would stay): cleared while
+     * stopped, or the input ends after it */
+    const auto nothingLeft = [this]() {
+        if( THEMIM->getIM()->hasInput() || !THEMIM->hasEmptyPlaylist() )
+            return;
+        b_nowPlayingSeen = false;
+        if( onPlayerPage() )
+            sidebar->showPage( Sidebar::Home );
+        updateNowPlayingBar();
+    };
+    connect( THEMIM, &MainInputManager::playlistNotEmpty, this, nothingLeft );
+    connect( THEMIM, &MainInputManager::inputChanged, this, nothingLeft );
 
     /* END CONNECTS ON IM */
 
@@ -383,6 +388,13 @@ MainInterface::MainInterface( intf_thread_t *_p_intf, bool customFrame ) : QVLCM
     connect( stackCentralW, &QStackedWidget::currentChanged,
              this, &MainInterface::updateDeckPlacement );
     updateDeckPlacement();
+    /* Preferences own the content area: the docked playlist steps aside
+     * (playlistVisible keeps the choice) and is back on the way out */
+    connect( stackCentralW, &QStackedWidget::currentChanged, this, [this]() {
+        if( b_plDocked && !b_videoFullScreen )
+            showPlaylistPanel( playlistVisible
+                && stackCentralW->currentWidget() != sidebar->page( Sidebar::Preferences ) );
+    } );
 
     connect( this, &MainInterface::askToQuit, THEDP, &DialogsProvider::quit );
 
@@ -1036,22 +1048,27 @@ inline void MainInterface::showTab( QWidget *widget, bool video_closing )
     if ( widget == playlistWidget && !isPlDocked() )
         widget = bgWidget;
 
-    stackCentralOldWidget = stackCentralW->currentWidget();
+    QWidget *leaving = stackCentralW->currentWidget();
+    /* Preferences is a detour with its own way back (Sidebar::returnTo):
+     * never the page a stopping video returns to, nor what it replaces */
+    QWidget *prefs = sidebar->page( Sidebar::Preferences );
+    if( leaving != prefs && widget != prefs )
+        stackCentralOldWidget = leaving;
     if( !isFullScreen() )
-        stackWidgetsSizes[stackCentralOldWidget] = stackAreaSize();
+        stackWidgetsSizes[leaving] = stackAreaSize();
 
     /* If we are playing video, embedded */
     if( !video_closing && videoWidget && THEMIM->getIM()->hasVideo() )
     {
         /* Video -> Playlist */
-        if( videoWidget == stackCentralOldWidget && widget == playlistWidget )
+        if( videoWidget == leaving && widget == playlistWidget )
         {
             stackCentralW->removeWidget( videoWidget );
             videoWidget->show(); videoWidget->raise();
         }
 
         /* Playlist -> Video */
-        if( playlistWidget == stackCentralOldWidget && widget == videoWidget )
+        if( playlistWidget == leaving && widget == videoWidget )
         {
             playlistWidget->artContainer->removeWidget( videoWidget );
             videoWidget->show(); videoWidget->raise();
@@ -1059,7 +1076,7 @@ inline void MainInterface::showTab( QWidget *widget, bool video_closing )
         }
 
         /* Background or library page -> Video */
-        if( playlistWidget != stackCentralOldWidget && widget == videoWidget )
+        if( playlistWidget != leaving && widget == videoWidget )
         {
             /* In rare case when video is started before the interface */
             if( playlistWidget != NULL )
@@ -1077,7 +1094,7 @@ inline void MainInterface::showTab( QWidget *widget, bool video_closing )
     const auto stockView = [this]( QWidget *w ) {
         return w == bgWidget || w == videoWidget || w == playlistWidget;
     };
-    if( b_autoresize && stockView( stackCentralOldWidget ) && stockView( widget )
+    if( b_autoresize && stockView( leaving ) && stockView( widget )
      && stackWidgetsSizes.contains( widget ) )
         resizeStack( stackWidgetsSizes[widget].width(), stackWidgetsSizes[widget].height() );
 
@@ -1085,14 +1102,15 @@ inline void MainInterface::showTab( QWidget *widget, bool video_closing )
     msg_Dbg( p_intf, "Stack state changed to %s, index %i",
               stackCentralW->currentWidget()->metaObject()->className(),
               stackCentralW->currentIndex() );
-    msg_Dbg( p_intf, "New stackCentralOldWidget %s at index %i",
-              stackCentralOldWidget->metaObject()->className(),
-              stackCentralW->indexOf( stackCentralOldWidget ) );
+    if( stackCentralOldWidget )
+        msg_Dbg( p_intf, "New stackCentralOldWidget %s at index %i",
+                 stackCentralOldWidget->metaObject()->className(),
+                 stackCentralW->indexOf( stackCentralOldWidget ) );
 #endif
 
     /* This part is done later, to account for the new pl size */
     if( !video_closing && videoWidget && THEMIM->getIM()->hasVideo() &&
-        videoWidget == stackCentralOldWidget && widget == playlistWidget )
+        videoWidget == leaving && widget == playlistWidget )
     {
         playlistWidget->artContainer->addWidget( videoWidget );
         playlistWidget->artContainer->setCurrentWidget( videoWidget );
@@ -1607,6 +1625,10 @@ void MainInterface::displayNormalView()
     sidebar->setVisible( false );
     showPlaylistPanel( false );   /* setMinimalView() brings it back */
     controls->setVisible( false );
+    /* full screen from a library page: the bar shown there would stay
+     * under the video, its controls Tab stops (setMinimalView() brings
+     * it back) */
+    nowPlayingBar->setVisible( false );
 #ifndef QT_NO_STATUSBAR
     statusBar()->setVisible( false );
 #endif
@@ -2222,7 +2244,7 @@ void MainInterface::dropEventPlay( QDropEvent *event, bool b_play, bool b_playli
     if( mimeData->urls().count() == 1 && THEMIM->getIM()->hasInput() )
     {
         if( !input_AddSlave( THEMIM->getInput(), SLAVE_TYPE_SPU,
-                 qtu( mimeData->urls()[0].toString() ), true, true, true ) )
+                 qtu( mimeData->urls()[0].toString() ), true, false, true ) )
         {
             showToast( qtr( "Loaded subtitle: %1" )
                        .arg( QFileInfo( mimeData->urls()[0].path() ).fileName() ) );

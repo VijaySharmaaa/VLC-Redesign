@@ -96,6 +96,9 @@ MediaInfoDialog::MediaInfoDialog( intf_thread_t *_p_intf,
     layout->addWidget( closeButton, 2, 7 );
 
     BUTTONACT( closeButton, close );
+    /* the keys start on Close, not on the tabs (the first in the chain),
+     * so the active tab shows its underline (2.1.3), not the focus ring */
+    closeButton->setFocus();
 
     /* The tabs buttons are shown in the main dialog for space and cosmetics */
     BUTTONACT( saveMetaButton, saveMeta );
