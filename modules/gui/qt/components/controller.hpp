@@ -319,6 +319,8 @@ protected:
 
     bool eventFilter( QObject *watched, QEvent *event ) Q_DECL_OVERRIDE;
 
+    bool takeFocus();
+
 private slots:
     void showFSC();
     void planHideFSC();

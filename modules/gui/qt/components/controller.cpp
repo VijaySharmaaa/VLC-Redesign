@@ -1147,6 +1147,9 @@ FullscreenControllerWidget::FullscreenControllerWidget( intf_thread_t *_p_i, QWi
     QString line = getSettings()->value( "MainWindow/FSCtoolbar", FSC_TB_DEFAULT ).toString();
     parseAndCreate( line, controlLayout );
     controlLayout2->addLayout( controlLayout );
+    /* Tab reaches it (takeFocus): in the order on screen, as the deck */
+    QWidget *previous = NULL;
+    tabInLayoutOrder( controlLayout, previous );
 
     /* hiding timer */
     p_hideTimer = new QTimer( this );
@@ -1417,6 +1420,14 @@ bool FullscreenControllerWidget::eventFilter( QObject *watched, QEvent *event )
         if ( !wParent->isActiveWindow() && !isActiveWindow() )
             hideFSC();
     }
+    /* Tab in full screen: the keys into the controller, as in the
+     * immersive bar (Esc gives them back) */
+    if ( watched == wParent && event->type() == QEvent::KeyPress )
+    {
+        const QKeyEvent *ke = static_cast<QKeyEvent *>( event );
+        if ( ke->key() == Qt::Key_Tab && ke->modifiers() == Qt::NoModifier && takeFocus() )
+            return true;
+    }
 
     return AbstractController::eventFilter( watched, event );
 }
@@ -1515,7 +1526,39 @@ void FullscreenControllerWidget::leaveEvent( QEvent *event )
  */
 void FullscreenControllerWidget::keyPressEvent( QKeyEvent *event )
 {
+    if ( event->key() == Qt::Key_Escape && isActiveWindow() )
+    {
+        /* first the keys back to the video, a second Esc leaves full screen */
+        hideFSC();
+        parentWidget()->activateWindow();
+        return;
+    }
     emit keyPressed( event );
+}
+
+/* Shows it and gives the keys to its first control */
+bool FullscreenControllerWidget::takeFocus()
+{
+    vlc_mutex_lock( &lock );
+    const bool b_fs = b_fullscreen;
+    vlc_mutex_unlock( &lock );
+    if ( !b_fs )
+        return false;
+    QWidget *w = nextInFocusChain();
+    while ( w != this && !( isAncestorOf( w ) && w->isEnabled() && w->isVisibleTo( this )
+                            && ( w->focusPolicy() & Qt::TabFocus ) ) )
+        w = w->nextInFocusChain();
+    if ( w == this )
+        return false;
+    /* no hide while it has the keys: the mouse plans one again */
+    p_hideTimer->stop();
+#if HAVE_TRANSPARENCY
+    p_slowHideTimer->stop();
+#endif
+    showFSC();
+    w->setFocus( Qt::TabFocusReason );
+    activateWindow();
+    return true;
 }
 
 /* */
