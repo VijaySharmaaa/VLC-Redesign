@@ -372,6 +372,7 @@ MainInterface::MainInterface( intf_thread_t *_p_intf, bool customFrame ) : QVLCM
         }
     } );
     installEventFilter( this );
+    connect( this, &MainInterface::miniPlayerToggled, this, &MainInterface::placeVideo );
 
     toast = new Toast( p_intf, this, stackCentralW );
     connect( stackCentralW, &QStackedWidget::currentChanged, toast,
@@ -1632,6 +1633,7 @@ void MainInterface::displayNormalView()
     statusBar()->setVisible( false );
 #endif
     inputC->setVisible( false );
+    placeVideo();
 }
 
 /*
@@ -1740,6 +1742,22 @@ void MainInterface::setDeckVisible( bool visible )
     /* in the immersive layout the deck floats over the video instead */
     controls->setVisible( visible && !library && !deckFloats() );
     inputC->setVisible( visible && !library && !deckFloats() );
+    placeVideo();
+}
+
+/* I1-2: the one video window plays where it is seen: in the mini player,
+ * in the now-playing bar's thumb on a library page, else on the player
+ * page (full screen included). Audio keeps the art: no video, no move. */
+void MainInterface::placeVideo()
+{
+    if( !videoWidget )
+        return;
+    QWidget *host = NULL;
+    if( isMiniPlayerVisible() )
+        host = miniPlayer->videoHost();
+    else if( nowPlayingBar->isVisibleTo( this ) )
+        host = nowPlayingBar->videoHost();
+    videoWidget->setHost( host );
 }
 
 bool MainInterface::isLibraryPage( QWidget *w ) const
@@ -1804,7 +1822,8 @@ bool MainInterface::showPreferences()
 }
 
 /* DESIGN_SPEC 9 / D3: the mini player stands in for the main window, which
- * hides (the video keeps playing in it, unseen); restore brings it back. */
+ * hides (the video plays in the mini player, placeVideo()); restore brings
+ * it back. */
 void MainInterface::toggleMiniPlayer()
 {
     if( !miniPlayer )

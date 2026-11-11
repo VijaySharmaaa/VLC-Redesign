@@ -44,6 +44,7 @@
 #include <QMouseEvent>
 #include <QPropertyAnimation>
 #include <QAbstractNativeEventFilter>
+#include <QPointer>
 
 class QMenu;
 class QSlider;
@@ -60,6 +61,9 @@ public:
     bool request( struct vout_window_t * );
     void release( bool forced );
     void sync( void );
+    /* The picture in host (the now-playing bar's thumb, the mini player's
+     * art), scaled to fit; NULL brings it back here */
+    void setHost( QWidget * );
 
 protected:
     QPaintEngine *paintEngine() const Q_DECL_OVERRIDE
@@ -73,6 +77,7 @@ protected:
     bool nativeEventFilter(const QByteArray &eventType, void *message, long *result) override;
 #endif
     virtual void resizeEvent(QResizeEvent *) Q_DECL_OVERRIDE;
+    bool eventFilter( QObject *, QEvent * ) Q_DECL_OVERRIDE;
     void mousePressEvent(QMouseEvent *) Q_DECL_OVERRIDE;
     void mouseMoveEvent(QMouseEvent *) Q_DECL_OVERRIDE;
     void mouseReleaseEvent(QMouseEvent *) Q_DECL_OVERRIDE;
@@ -86,6 +91,12 @@ private:
 
     QWidget *stable;
     QLayout *layout;
+    QPointer<QWidget> host;
+    QList<QPointer<QWidget> > watched;
+    QWidget *nativeVideo() const;
+    void place();
+    void follow();
+    void fitHost();
 
     bool enable_mouse_events;
 

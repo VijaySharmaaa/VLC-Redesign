@@ -118,6 +118,7 @@ class NowPlayingBar : public QWidget
     Q_OBJECT
 public:
     NowPlayingBar( intf_thread_t *, NowPlayingInfo *, QWidget *parent );
+    QWidget *videoHost() const { return thumb; }   /* VideoWidget::setHost */
 signals:
     void expandRequested();
 protected:
@@ -164,14 +165,15 @@ private:
     int artMax;
 };
 
-/* DESIGN_SPEC 9: a small always-on-top window with the transport. The
- * video keeps playing in the main window, which is hidden meanwhile. */
+/* DESIGN_SPEC 9: a small always-on-top window with the transport, the
+ * video playing in its art (the main window is hidden meanwhile). */
 class MiniPlayer : public QWidget
 {
     Q_OBJECT
 public:
     MiniPlayer( intf_thread_t *, NowPlayingInfo *, QWidget *parent );
     void popIn();
+    QWidget *videoHost() const { return art; }   /* VideoWidget::setHost */
 signals:
     void restoreRequested();
     void keyPressed( QKeyEvent * );

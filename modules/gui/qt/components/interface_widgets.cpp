@@ -48,6 +48,7 @@
 #include <QPainter>
 #include <QTimer>
 #include <QUrl>
+#include <QWindow>
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
 #include <QRandomGenerator>
 
@@ -66,7 +67,6 @@ static inline int qrand() {
 #endif
 
 #if defined(_WIN32)
-#include <QWindow>
 #include <qpa/qplatformnativeinterface.h>
 #endif
 
@@ -170,6 +170,7 @@ bool VideoWidget::request( struct vout_window_t *p_wnd )
     }
 
     enable_mouse_events = var_InheritBool(p_window, "mouse-events");
+    place();   /* into the host, if there is one by now */
     return true;
 }
 
@@ -191,7 +192,8 @@ QSize VideoWidget::physicalSize() const
     HWND hwnd;
     RECT rect;
 
-    QWindow *window = windowHandle();
+    /* the picture's own window: it may be in a host (setHost) */
+    QWindow *window = stable->windowHandle();
     hwnd = static_cast<HWND>(QGuiApplication::platformNativeInterface()->nativeResourceForWindow("handle", window));
 
     GetClientRect(hwnd, &rect);
@@ -396,13 +398,116 @@ void VideoWidget::release( bool forced )
     {
         if( forced )
             WindowOrphaned(p_window);
+        stable->hide();   /* in a host, its art shows again */
         layout->removeWidget( stable );
         stable->deleteLater();
         stable = NULL;
         p_window = NULL;
     }
+    follow();
 
     updateGeometry();
+}
+
+void VideoWidget::setHost( QWidget *h )
+{
+    if( h == host )
+        return;
+    host = h;
+    place();
+}
+
+/* The native window that shows the picture now */
+QWidget *VideoWidget::nativeVideo() const
+{
+    return stable && stable->parentWidget() != this ? stable : const_cast<VideoWidget *>( this );
+}
+
+void VideoWidget::place()
+{
+    if( stable )
+    {
+        QWidget *to = host ? host.data() : this;
+        if( stable->parentWidget() != to )
+        {
+            /* this widget is native already: the host and its parents stay
+             * plain widgets (Tab and screen readers, see main_interface) */
+            stable->setAttribute( Qt::WA_DontCreateNativeAncestors );
+            layout->removeWidget( stable );
+            stable->setParent( to );   /* the same HWND, as for the playlist */
+            if( to == this )
+            {
+                stable->clearMask();
+                layout->addWidget( stable );
+            }
+            stable->show();
+        }
+        if( to != this )
+            fitHost();
+        reportSize();
+    }
+    follow();
+}
+
+/* The whole host, but the host's own controls (the mini player's Restore):
+ * a native window covers the widgets under it */
+void VideoWidget::fitHost()
+{
+    stable->setGeometry( host->rect() );
+    QRegion shown( host->rect() );
+    foreach( QWidget *c, host->findChildren<QWidget *>( QString(), Qt::FindDirectChildrenOnly ) )
+        if( c != stable && !c->isHidden() )
+            shown -= c->geometry();
+    if( shown == QRegion( host->rect() ) )
+        stable->clearMask();
+    else
+        stable->setMask( shown );
+}
+
+/* Watches the parents of the native video window */
+void VideoWidget::follow()
+{
+    foreach( const QPointer<QWidget> &w, watched )
+        if( w )
+            w->removeEventFilter( this );
+    watched.clear();
+    for( QWidget *w = nativeVideo(); w && !w->isWindow(); w = w->parentWidget() )
+    {
+        w->installEventFilter( this );
+        watched << w;
+    }
+}
+
+bool VideoWidget::eventFilter( QObject *o, QEvent *e )
+{
+    switch( e->type() )
+    {
+    case QEvent::ParentChange:   /* Ctrl+L moves this widget into the playlist */
+        follow();
+        /* fall through */
+    case QEvent::Move:
+    {
+        /* Qt 5.6 moves a native window when its own widget moves or shows,
+         * not when a plain parent moves: after the mini player the window's
+         * content moved and the video stayed lower, over the deck */
+        QWidget *v = nativeVideo();
+        QWindow *win = v->windowHandle();
+        if( win && v->isVisible() )
+        {
+            const QRect r( v->mapTo( v->nativeParentWidget(), QPoint() ), v->size() );
+            if( r != win->geometry() )
+                win->setGeometry( r );
+        }
+        break;
+    }
+    case QEvent::Resize:
+        if( o == host && stable && stable->parentWidget() == host )
+            fitHost();
+        break;
+    default:
+        break;
+    }
+    return false;
 }
 
 /**********************************************************************

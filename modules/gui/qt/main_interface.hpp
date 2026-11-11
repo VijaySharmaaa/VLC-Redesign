@@ -175,6 +175,7 @@ protected:
     /* The deck, or under the library once something played, the
      * now-playing bar */
     void setDeckVisible( bool );
+    void placeVideo();
     bool isLibraryPage( QWidget * ) const;
     /* Where Back from Preferences goes: the view it was opened from, or
      * Home for a player view with nothing left to show (or none) */
