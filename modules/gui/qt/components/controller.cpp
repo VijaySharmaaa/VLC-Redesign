@@ -346,10 +346,11 @@ void AbstractController::createAndAddWidget( QBoxLayout *controlLayout_,
         if( !widg ) return;
 
         /* DESIGN_SPEC 3's "*" items, in the menus too: a narrow deck drops
-         * them (ControlsWidget::fitWidth) */
+         * them (ControlsWidget::fitWidth). Stop stays at every width (the
+         * owner's I1 decision) */
         switch( i_type )
         {
-        case STOP_BUTTON: case LOOP_BUTTON: case RANDOM_BUTTON: case SPEED_LABEL:
+        case LOOP_BUTTON: case RANDOM_BUTTON: case SPEED_LABEL:
         case MINIPLAYER_BUTTON: case FULLSCREEN_BUTTON:
             widg->setProperty( "deckOptional", true );
             break;
