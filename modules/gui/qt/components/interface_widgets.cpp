@@ -464,14 +464,17 @@ void VideoWidget::fitHost()
         stable->setMask( shown );
 }
 
-/* Watches the parents of the native video window */
+/* Watches the native video window and the plain widgets between it and its
+ * native parent (a native parent moves its child windows itself) */
 void VideoWidget::follow()
 {
     foreach( const QPointer<QWidget> &w, watched )
         if( w )
             w->removeEventFilter( this );
     watched.clear();
-    for( QWidget *w = nativeVideo(); w && !w->isWindow(); w = w->parentWidget() )
+    QWidget *v = nativeVideo();
+    QWidget *np = v->nativeParentWidget();
+    for( QWidget *w = v; w && w != np && !w->isWindow(); w = w->parentWidget() )
     {
         w->installEventFilter( this );
         watched << w;
@@ -484,19 +487,21 @@ bool VideoWidget::eventFilter( QObject *o, QEvent *e )
     {
     case QEvent::ParentChange:   /* Ctrl+L moves this widget into the playlist */
         follow();
-        /* fall through */
+        break;
     case QEvent::Move:
     {
         /* Qt 5.6 moves a native window when its own widget moves or shows,
          * not when a plain parent moves: after the mini player the window's
-         * content moved and the video stayed lower, over the deck */
+         * content moved and the video stayed lower, over the deck. Move it
+         * by as much. Not from pos(): Qt copies the window's position (in
+         * native parent coordinates) into it, so placing from pos() fed
+         * each move into the next and the video ran off screen. */
         QWidget *v = nativeVideo();
         QWindow *win = v->windowHandle();
-        if( win && v->isVisible() )
+        if( o != v && win && v->isVisible() )
         {
-            const QRect r( v->mapTo( v->nativeParentWidget(), QPoint() ), v->size() );
-            if( r != win->geometry() )
-                win->setGeometry( r );
+            const QMoveEvent *m = static_cast<QMoveEvent *>( e );
+            win->setGeometry( win->geometry().translated( m->pos() - m->oldPos() ) );
         }
         break;
     }
