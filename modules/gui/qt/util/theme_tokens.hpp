@@ -202,7 +202,6 @@ namespace RedesignTokens
          * start; the ring only shows when buffering lasts longer than that */
         static const int BufferingShowDelay = 400;
         static const int ImmersiveMargin = 16;    /* from the edges of the video */
-        static const int ImmersivePadTop = 10, ImmersivePadX = 16, ImmersivePadBottom = 12;
         static const int ImmersiveBorderAlpha = 26; /* ink 0.10 */
         static const int ImmersiveOffset = 12;    /* the idle hide sinks it 12 px */
         /* the player header over the top of the video: back, title, meta */
