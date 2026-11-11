@@ -60,6 +60,7 @@
     I_DIR_OR_FOLDER( N_( "Enter a new name for the directory:" ), \
                      N_( "Enter a new name for the folder:" ) )
 
+#include <QFontInfo>
 #include <QHeaderView>
 #include <QMenu>
 #include <QKeyEvent>
@@ -117,7 +118,7 @@ StandardPLPanel::StandardPLPanel( PlaylistWidget *_parent,
     int i_savedViewMode = getSettings()->value( "Playlist/view-mode", TREE_VIEW ).toInt();
 
     QFont font = QApplication::font();
-    font.setPointSize( font.pointSize() + getSettings()->value( "Playlist/zoom", 0 ).toInt() );
+    font.setPointSize( QFontInfo( font ).pointSize() + getSettings()->value( "Playlist/zoom", 0 ).toInt() );
     model->setData( QModelIndex(), font, Qt::FontRole );
 
     showView( i_savedViewMode );
@@ -139,8 +140,8 @@ StandardPLPanel::~StandardPLPanel()
         getSettings()->setValue( "headerStateV2", treeView->header()->saveState() );
     getSettings()->setValue( "view-mode", currentViewIndex() );
     getSettings()->setValue( "zoom",
-                model->data( QModelIndex(), Qt::FontRole ).value<QFont>().pointSize()
-                - QApplication::font().pointSize() );
+                QFontInfo( model->data( QModelIndex(), Qt::FontRole ).value<QFont>() ).pointSize()
+                - QFontInfo( QApplication::font() ).pointSize() );
     getSettings()->endGroup();
 }
 
@@ -722,9 +723,9 @@ void StandardPLPanel::updateZoom( int i )
 {
     QVariant fontdata = model->data( QModelIndex(), Qt::FontRole );
     QFont font = fontdata.value<QFont>();
-    font.setPointSize( font.pointSize() + i );
-    if ( font.pointSize() < 5 - QApplication::font().pointSize() ) return;
-    if ( font.pointSize() > 3 + QApplication::font().pointSize() ) return;
+    font.setPointSize( QFontInfo( font ).pointSize() + i );
+    if ( font.pointSize() < 5 - QFontInfo( QApplication::font() ).pointSize() ) return;
+    if ( font.pointSize() > 3 + QFontInfo( QApplication::font() ).pointSize() ) return;
     model->setData( QModelIndex(), font, Qt::FontRole );
 }
 

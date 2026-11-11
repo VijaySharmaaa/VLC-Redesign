@@ -141,6 +141,10 @@ public:
     void setArt( input_item_t *p_item, QString fileUrl );
 
     QString getName() { return oldName; }
+    /* the position and seekability again, for widgets built while the
+     * input plays or pauses (a toolbar rebuilt): paused, nothing else
+     * would tell them */
+    void resendPosition();
     static const QString decodeArtURL( input_item_t *p_item );
 
 private:

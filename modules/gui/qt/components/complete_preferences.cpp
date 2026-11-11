@@ -24,6 +24,7 @@
 # include "config.h"
 #endif
 
+#include <QFontInfo>
 #include <QApplication>
 #include <QLabel>
 #include <QTreeWidget>
@@ -641,7 +642,7 @@ AdvPrefsPanel::AdvPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
 
     QLabel *titleLabel = new QLabel( head );
     QFont titleFont = QApplication::font();
-    titleFont.setPointSize( titleFont.pointSize() + 6 );
+    titleFont.setPointSize( QFontInfo( titleFont ).pointSize() + 6 );
     titleLabel->setFont( titleFont );
 
     // Title <hr>

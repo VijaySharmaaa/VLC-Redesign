@@ -39,6 +39,7 @@
 
 #include <vlc_modules.h>
 
+#include <QFontInfo>
 #include <QTreeWidget>
 #include <QStringList>
 #include <QTabWidget>
@@ -1386,7 +1387,7 @@ ExtensionInfoDialog::ExtensionInfoDialog( const QModelIndex &index,
     QLabel *label = new QLabel( index.data(Qt::DisplayRole).toString(), this );
     QFont font = label->font();
     font.setBold( true );
-    font.setPointSizeF( font.pointSizeF() * 1.3f );
+    font.setPointSizeF( QFontInfo( font ).pointSizeF() * 1.3f );
     label->setFont( font );
     layout->addWidget( label, 0, 0, 1, -1 );
 
@@ -1470,7 +1471,7 @@ AddonInfoDialog::AddonInfoDialog( const QModelIndex &index,
     label = new QLabel( index.data(Qt::DisplayRole).toString(), this );
     QFont font = label->font();
     font.setBold( true );
-    font.setPointSizeF( font.pointSizeF() * 1.3f );
+    font.setPointSizeF( QFontInfo( font ).pointSizeF() * 1.3f );
     label->setFont( font );
     layout->addWidget( label, 0, 0, 1, -1 );
 

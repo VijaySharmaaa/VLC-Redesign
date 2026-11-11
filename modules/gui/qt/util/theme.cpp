@@ -26,6 +26,7 @@
 
 #include <cassert>
 
+#include <QAbstractItemView>
 #include <QAction>
 #include <QApplication>
 #include <QCheckBox>
@@ -35,6 +36,9 @@
 #include <QFontDatabase>
 #include <QFontInfo>
 #include <QFontMetrics>
+#include <QFormLayout>
+#include <QGridLayout>
+#include <QHeaderView>
 #include <QIconEngine>
 #include <QKeyEvent>
 #include <QLineEdit>
@@ -46,6 +50,7 @@
 #include <QSaveFile>
 #include <QScreen>
 #include <QSettings>
+#include <QSpacerItem>
 #include <QStringList>
 #include <QStyle>
 #include <QStyleFactory>
@@ -433,6 +438,11 @@ namespace
         {
             QProxyStyle::polish(w);
             QLineEdit *edit = qobject_cast<QLineEdit *>(w);
+            /* not an item view's editor: it is as tall as its row, the
+             * nudge cut the descenders and put the capitals on the frame */
+            if (edit && edit->parentWidget()
+                && qobject_cast<QAbstractItemView *>(edit->parentWidget()->parentWidget()))
+                edit = NULL;
             if (edit && Theme::instance())
             {
                 /* the text up by the nudge, the field's height unchanged;
@@ -485,10 +495,15 @@ namespace
             const bool on = opt->state & (State_On | State_NoChange);
             const QVariant knob = w->property(toggleKnobProperty);
             const qreal at = knob.isValid() ? knob.toReal() : on ? 1. : 0.;
-            const QRectF ring = QRectF(opt->rect).adjusted(Size::FocusRing / 2., Size::FocusRing / 2.,
-                                                           -Size::FocusRing / 2., -Size::FocusRing / 2.);
-            const QRectF track = QRectF(opt->rect).adjusted(2 * Size::FocusRing + .5, 2 * Size::FocusRing + .5,
-                                                            -2 * Size::FocusRing - .5, -2 * Size::FocusRing - .5);
+            /* on the widget's exact centre, as a centred label's capitals
+             * are: the style's whole-pixel indicator rect rounds it up */
+            QRectF box(opt->rect);
+            if (w && w->rect().contains(opt->rect))
+                box.moveCenter(QPointF(box.center().x(), w->height() / 2.));
+            const QRectF ring = box.adjusted(Size::FocusRing / 2., Size::FocusRing / 2.,
+                                             -Size::FocusRing / 2., -Size::FocusRing / 2.);
+            const QRectF track = box.adjusted(2 * Size::FocusRing + .5, 2 * Size::FocusRing + .5,
+                                              -2 * Size::FocusRing - .5, -2 * Size::FocusRing - .5);
             p->save();
             p->setRenderHint(QPainter::Antialiasing);
             if (opt->state & State_HasFocus)
@@ -634,10 +649,14 @@ void Theme::reload()
     emit changed();
 }
 
-int Theme::textNudge(const QFont &f) const
+int Theme::textNudge(const QFont &font) const
 {
-    /* at the font's own dpi: a widget's or a painter's font carries its screen's */
-    const QString key = f.key() + QLatin1Char('|') + QString::number(QFontInfo(f).pixelSize());
+    /* by family and size only: the offset is about half a pixel at 13 px,
+     * and a weight's own rounding put a semibold label (Play) a pixel
+     * below a regular one (Cancel) */
+    QFont f(font.family());
+    f.setPixelSize(QFontInfo(font).pixelSize());
+    const QString key = f.family() + QLatin1Char('|') + QString::number(f.pixelSize());
     QHash<QString, int>::const_iterator it = nudges.constFind(key);
     if (it != nudges.constEnd())
         return it.value();
@@ -649,20 +668,140 @@ int Theme::textNudge(const QFont &f) const
     return n;
 }
 
+namespace
+{
+    /* A size a widget or a layout was given, and what it became at each
+     * scale since: back on the first scale it is exactly what it was. A
+     * value set again in between (a page re-applying its own px()) is the
+     * new base; the base itself again is the base (a restyle puts back the
+     * font a widget was built with). */
+    struct Rescaled { int base; qreal baseScale; int last; };
+    QHash<QPair<const void *, int>, Rescaled> rescaledValues;
+
+    int rescaled(const void *owner, int slot, int value, qreal from, qreal to)
+    {
+        if (value <= 0 || value >= QWIDGETSIZE_MAX)
+            return value;
+        Rescaled &r = rescaledValues[qMakePair(owner, slot)];
+        if (r.baseScale <= 0 || (value != r.last && value != r.base))
+        {
+            r.base = value;
+            r.baseScale = from;
+        }
+        r.last = qRound(r.base * to / r.baseScale);
+        return r.last;
+    }
+
+    void rescaleLayout(QLayout *l, qreal from, qreal to)
+    {
+        int m[4];
+        l->getContentsMargins(&m[0], &m[1], &m[2], &m[3]);
+        for (int i = 0; i < 4; ++i)
+            m[i] = rescaled(l, i, m[i], from, to);
+        l->setContentsMargins(m[0], m[1], m[2], m[3]);
+        if (QGridLayout *g = qobject_cast<QGridLayout *>(l))
+        {
+            g->setHorizontalSpacing(rescaled(l, 4, g->horizontalSpacing(), from, to));
+            g->setVerticalSpacing(rescaled(l, 5, g->verticalSpacing(), from, to));
+        }
+        else if (QFormLayout *f = qobject_cast<QFormLayout *>(l))
+        {
+            f->setHorizontalSpacing(rescaled(l, 4, f->horizontalSpacing(), from, to));
+            f->setVerticalSpacing(rescaled(l, 5, f->verticalSpacing(), from, to));
+        }
+        else
+            l->setSpacing(rescaled(l, 4, l->spacing(), from, to));
+        for (int i = 0; i < l->count(); ++i)
+        {
+            QLayoutItem *item = l->itemAt(i);
+            if (QSpacerItem *s = item->spacerItem())
+            {
+                const QSize sz = s->sizeHint();
+                const QSizePolicy pol = s->sizePolicy();
+                s->changeSize(rescaled(s, 0, sz.width(), from, to),
+                              rescaled(s, 1, sz.height(), from, to),
+                              pol.horizontalPolicy(), pol.verticalPolicy());
+            }
+            else if (item->layout())
+                rescaleLayout(item->layout(), from, to);
+        }
+        l->invalidate();
+    }
+
+    /* a font set in pixels (Theme::font()), after the stylesheet: a
+     * restyle puts back the font the widget had before it */
+    void rescaleFont(QWidget *w, qreal from, qreal to)
+    {
+        if (w->testAttribute(Qt::WA_SetFont) && w->font().pixelSize() > 0)
+        {
+            QFont f = w->font();
+            f.setPixelSize(rescaled(w, 4, f.pixelSize(), from, to));
+            w->setFont(f);
+        }
+    }
+
+    /* the sizes, margins and gaps the widget was built with */
+    void rescaleWidget(QWidget *w, qreal from, qreal to)
+    {
+        const QSize min = w->minimumSize(), max = w->maximumSize();
+        w->setMinimumSize(rescaled(w, 0, min.width(), from, to), rescaled(w, 1, min.height(), from, to));
+        w->setMaximumSize(rescaled(w, 2, max.width(), from, to), rescaled(w, 3, max.height(), from, to));
+        QSize icon;
+        QAbstractButton *button = qobject_cast<QAbstractButton *>(w);
+        QAbstractItemView *view = qobject_cast<QAbstractItemView *>(w);
+        if (button)
+            icon = button->iconSize();
+        else if (view)
+            icon = view->iconSize();
+        if (icon.isValid())
+        {
+            icon = QSize(rescaled(w, 5, icon.width(), from, to), rescaled(w, 6, icon.height(), from, to));
+            if (button)
+                button->setIconSize(icon);
+            else
+                view->setIconSize(icon);
+        }
+        if (QHeaderView *h = qobject_cast<QHeaderView *>(w))
+        {
+            h->setMinimumSectionSize(rescaled(w, 7, h->minimumSectionSize(), from, to));
+            h->setDefaultSectionSize(rescaled(w, 8, h->defaultSectionSize(), from, to));
+            for (int i = 0; i < h->count(); ++i)
+                if (h->sectionResizeMode(i) == QHeaderView::Interactive
+                    || h->sectionResizeMode(i) == QHeaderView::Fixed)
+                    h->resizeSection(i, rescaled(w, 9 + i, h->sectionSize(i), from, to));
+        }
+        if (w->layout())
+            rescaleLayout(w->layout(), from, to);
+    }
+}
+
 bool Theme::setScreen(const QScreen *screen)
 {
-    if (!screen || qFuzzyCompare(screen->logicalDotsPerInchY() / 96., scale))
+    const qreal from = scale, to = screen ? screen->logicalDotsPerInchY() / 96. : scale;
+    if (!screen || qFuzzyCompare(to, scale))
         return false;
-    msg_Dbg(p_intf, "theme: screen %s, scale %.3f -> %.3f",
-            qtu(screen->name()), scale, screen->logicalDotsPerInchY() / 96.);
-    scale = screen->logicalDotsPerInchY() / 96.;
+    msg_Dbg(p_intf, "theme: screen %s, scale %.3f -> %.3f", qtu(screen->name()), scale, to);
+    /* P6-6: every page grows with the text; read at the old scale, as the
+     * style's own metrics still are */
+    foreach (QWidget *w, QApplication::allWidgets())
+        rescaleWidget(w, from, to);
+    scale = to;
     icons.clear();
     nudges.clear();
     if (!highContrast)
+    {
+        /* the fonts that follow the application's, at this scale */
+        QApplication::setFont(font(Body));
         qApp->setStyleSheet(styleSheet());
+    }
+    foreach (QWidget *w, QApplication::allWidgets())
+        rescaleFont(w, from, to);
     /* shortcut: one scale for the whole application, the main window's; a
      * dialog on another screen keeps it. Per-window scales need px() per
-     * widget: upgrade when dialogs often sit apart from the main window. */
+     * widget: upgrade when dialogs often sit apart from the main window.
+     * shortcut: high contrast keeps the system's point fonts, which Qt 5.6
+     * measures at the dpi they were resolved at: text can clip after a move
+     * to a screen of another scale; give it pixel fonts too if that matters. */
     emit changed();
     return true;
 }
@@ -728,8 +867,10 @@ QFont Theme::font(TypeRole role) const
                               Type::Body, Type::Meta, Type::Overline, Type::Mono,
                               Type::NavTitle };
     QFont f(role == Mono ? monoFamily : uiFamily);
-    /* points follow the Windows text scale; tokens are px at 96 dpi */
-    f.setPointSizeF(px[role] * 72.0 / 96.0);
+    /* pixels at this scale: Qt 5.6 measures a point size at the primary
+     * screen's dpi (QFontMetrics(font), a widget font resolved before a
+     * screen change) but paints it at the window's */
+    f.setPixelSize(this->px(px[role]));
     if (role == Display || role == PageTitle || role == PanelTitle || role == Overline
         || role == NavTitle)
         f.setWeight(QFont::DemiBold);
@@ -862,7 +1003,7 @@ QPushButton:default { background: @accent@; color: @onAccent@; border-color: @ac
 QPushButton:default:hover { background: @accentHover@; }
 QPushButton:disabled { background: @panel@; color: @dim@; border-color: @divider@; }
 
-QToolButton { background: transparent; border: 2px solid transparent; border-radius: @radiusMd@px; }
+QToolButton { background: transparent; border: @ring@px solid transparent; border-radius: @radiusMd@px; }
 QToolButton:hover { background: @hoverFill@; }
 QToolButton:pressed { background: @openFill@; }
 QToolButton:checked { background: @accentTint@; }
@@ -890,15 +1031,15 @@ QAbstractSpinBox::up-arrow:disabled, QAbstractSpinBox::up-arrow:off { image: url
 /* popup lists: a combo's, and a completer's (a window of its own, see eventFilter) */
 QComboBox QAbstractItemView, QAbstractItemView[popup="true"] { background: @raised@; border: @popupBorder@; padding: 0; selection-background-color: @hoverFill@; selection-color: @tx@; outline: 0; }
 
-QLineEdit:focus, QAbstractSpinBox:focus, QComboBox:focus { border: 2px solid @focusRing@; padding: 0px @menuPadFocus@px; }
+QLineEdit:focus, QAbstractSpinBox:focus, QComboBox:focus { border: @ring@px solid @focusRing@; padding: 0px @menuPadFocus@px; }
 QComboBox:focus { margin: 0; }
-QTextEdit:focus, QPlainTextEdit:focus, QPushButton:focus { border: 2px solid @focusRing@; }
+QTextEdit:focus, QPlainTextEdit:focus, QPushButton:focus { border: @ring@px solid @focusRing@; }
 QToolButton:focus { border-color: @focusRing@; }
 QPushButton:focus { padding: @menuPadFocus@px @buttonPadXFocus@px; }
 
 QTabWidget::pane { background: @panel@; border: 1px solid @divider@; border-radius: @radiusLg@px; top: -1px; }
 /* a transparent ring on every tab, so focus only colours it */
-QTabBar::tab { background: transparent; color: @mute@; border: 2px solid transparent;
+QTabBar::tab { background: transparent; color: @mute@; border: @ring@px solid transparent;
     padding: @tabPadTop@px @tabPadX@px @tabPadBottom@px; }
 QTabBar::tab:hover { color: @tx@; }
 QTabBar::tab:selected { color: @tx@; border-bottom-color: @fill@; }
@@ -913,7 +1054,7 @@ QAbstractItemView { background: @surface@; alternate-background-color: @panel@; 
 QAbstractItemView::item:hover { background: @hoverFill@; }
 QAbstractItemView::item:selected { background: @accentTint@; color: @tx@; }
 /* views that draw their own row rings set [role] rules with no border, later */
-QAbstractItemView:focus { border: 2px solid @focusRing@; padding: 0; }
+QAbstractItemView:focus { border: @ring@px solid @focusRing@; padding: 0; }
 QComboBox QAbstractItemView:focus, QAbstractItemView[popup="true"]:focus { border: @popupBorder@; padding: 0; }
 QHeaderView::section { background: @panel@; color: @mute@; border: none; border-bottom: 1px solid @divider@; border-right: 1px solid @divider@; padding: @menuPad@px @menuTitlePadX@px; }
 
@@ -943,7 +1084,7 @@ QLabel[role="hint"]:focus { border: 1px solid @focusRing@; border-radius: @radiu
 .QSlider::sub-page:horizontal:disabled, .QSlider::add-page:vertical:disabled { background: @toggleOff@; }
 /* opaque: the track must not show through the knob */
 .QSlider::handle:disabled { background: @toggleOffSolid@; }
-.QSlider { border: 2px solid transparent; border-radius: @radiusSm@px; }
+.QSlider { border: @ring@px solid transparent; border-radius: @radiusSm@px; }
 .QSlider:focus { border-color: @focusRing@; }
 
 /* ---- Title bar (components/title_bar.cpp) ---- */
@@ -967,7 +1108,7 @@ QListView[np="tracks"] { background: transparent; border: none; }
 /* Phase 3: deck (components/controller.cpp, deck_popover.cpp). Roles:
    deck = icon button (on = checked, open = [open="true"]), play = accent circle,
    speed = the speed label, deckSeparator, deckTime, popover, popoverDivider, popoverLink. */
-QToolButton[role="deck"], QToolButton[role="speed"] { background: transparent; border: 2px solid transparent; border-radius: @radiusMd@px; padding: 0; }
+QToolButton[role="deck"], QToolButton[role="speed"] { background: transparent; border: @ring@px solid transparent; border-radius: @radiusMd@px; padding: 0; }
 QToolButton[role="deck"]:hover, QToolButton[role="speed"]:hover { background: @hoverFill@; }
 QToolButton[role="deck"]:pressed, QToolButton[role="speed"]:pressed { background: @openFill@; }
 QToolButton[role="deck"] { color: @tx@; font-weight: 600; }
@@ -981,7 +1122,7 @@ QToolButton[role="speed"] { color: @tx2@; font-weight: 600; padding: 0 @speedPad
 QToolButton[role="speed"][on="true"], QToolButton[role="speed"][open="true"] { color: @accTx@; }
 QToolButton[role="speed"]:disabled { color: @dim@; }
 QToolButton[role="speed"]::menu-indicator { image: none; width: 0; }
-QToolButton[role="play"] { background: @accent@; border: 2px solid transparent; border-radius: @playRadius@px; padding: 0; }
+QToolButton[role="play"] { background: @accent@; border: @ring@px solid transparent; border-radius: @playRadius@px; padding: 0; }
 QToolButton[role="play"]:hover { background: @accentHover@; }
 QToolButton[role="play"]:pressed { background: @accent@; }
 QToolButton[role="play"]:focus { border-color: @tx@; }
@@ -991,10 +1132,10 @@ QFrame[role="popover"] { background: @raised@; border: @popupBorder@; }
 QFrame[role="popover"] QListView { background: transparent; border: none; padding: 0; }
 QFrame[role="popover"] QLabel { color: @dim@; }
 QFrame[role="popoverDivider"] { background: @divider@; border: none; }
-QPushButton[role="popoverLink"] { background: transparent; color: @accTx@; border: 2px solid transparent; border-top: 1px solid @divider@;
+QPushButton[role="popoverLink"] { background: transparent; color: @accTx@; border: @ring@px solid transparent; border-top: 1px solid @divider@;
     border-radius: 0; text-align: left; padding: @menuPad@px; }
 QPushButton[role="popoverLink"]:hover { background: @hoverFill@; }
-QPushButton[role="popoverLink"]:focus { border: 2px solid @focusRing@; border-radius: @radiusMd@px; }
+QPushButton[role="popoverLink"]:focus { border: @ring@px solid @focusRing@; border-radius: @radiusMd@px; }
 /* Phase 4: home (components/library/home_page.cpp); the delegate draws the row focus ring */
 QTreeView[role="homeRecent"] { background: transparent; border: none; padding: 0; outline: 0; }
 QTreeView[role="homeRecent"]::item { padding: 0 @homeCellPad@px; border-bottom: 1px solid @homeRowLine@; }
@@ -1008,24 +1149,23 @@ QPushButton[role="primary"]:focus { border-color: @tx@; }
 /* Phase 4: library (components/library/) */
 QListView[role="library"], QScrollArea[role="library"] { background: transparent; border: none; padding: 0; outline: 0; }
 QScrollArea[role="library"] > QWidget > QWidget { background: transparent; }
-QLineEdit[role="librarySearch"]:focus { border: 2px solid @focusRing@; }
+QLineEdit[role="librarySearch"]:focus { border: @ring@px solid @focusRing@; }
 QPushButton[role="outline"] { background: transparent; }
 QPushButton[role="outline"]:hover { background: @hoverFill@; }
 QLabel[role="libraryDim"] { color: @dim@; }
 /* Phase 5: effects (dialogs/extended.cpp, components/extended_panels.cpp) */
 #effectsSheet QTabWidget::pane { background: transparent; border: none; }
 #effectsSheet QTabWidget#effectsTabs::pane { border-top: 1px solid @divider@; }
-/* the corner sits on the pane, which overlaps the bar by its 1 px line:
-   up by that line, "More" is on the tabs' line */
-#effectsSheet QTabWidget#effectsTabs::right-corner { top: -1px; }
-QToolButton#effectsMore { padding-right: @iconGlyph@px; }
+/* the corner (dialogs/extended.cpp) starts a line below the tabs: the
+   label's box ends two lines higher, its centre is one line up, on theirs */
+QToolButton#effectsMore { padding-right: @iconGlyph@px; padding-bottom: @moreLift@px; }
 QToolButton#effectsMore::menu-indicator { image: url("@arrowDown@"); subcontrol-origin: padding; subcontrol-position: center right;
     width: @iconGlyph@px; height: @iconGlyph@px; }
 #effectsSheet QScrollArea, #effectsSheet QScrollArea > QWidget > QWidget { background: transparent; }
 QPushButton[role="chip"] { background: transparent; color: @tx2@; border: 1px solid @chipBorder@; border-radius: @chipRadius@px; padding: 0 @fxChipPadX@px; }
 QPushButton[role="chip"]:hover { background: @hoverFill@; }
 QPushButton[role="chip"]:checked { background: @accentTint@; color: @accTx@; border-color: @accentBorder@; }
-QPushButton[role="chip"]:focus { border: 2px solid @focusRing@; padding: 0 @fxChipPadXFocus@px; }
+QPushButton[role="chip"]:focus { border: @ring@px solid @focusRing@; padding: 0 @fxChipPadXFocus@px; }
 QPushButton[role="chip"]:disabled { background: transparent; color: @dim@; border-color: @divider@; }
 QFrame[role="fxRow"] { background: @raised@; border-radius: @fxRowRadius@px; }
 QToolButton[role="stepper"] { background: @stepperFill@; }
@@ -1037,7 +1177,7 @@ QToolButton[role="openTile"] { background: @raised@; color: @tx2@; border: 1px s
 QToolButton[role="openTile"]:hover { background: @hover@; color: @tx@; }
 QToolButton[role="openTile"]:checked { background: @accentTint@; color: @accTx@; border-color: @accentBorder@; }
 /* 2 px, unlike the 1 px checked outline; the content stays centred */
-QToolButton[role="openTile"]:focus { border: 2px solid @focusRing@; }
+QToolButton[role="openTile"]:focus { border: @ring@px solid @focusRing@; }
 #OpenDisk QRadioButton { background: @raised@; border: 1px solid transparent; border-radius: @radiusMd@px; padding: @menuPad@px @buttonPadX@px; spacing: 0; }
 #OpenDisk QRadioButton::indicator { image: none; width: 0; height: 0; border: none; }
 #OpenDisk QRadioButton:hover { background: @hover@; }
@@ -1051,7 +1191,7 @@ QToolButton[role="split"]::menu-arrow { image: url("@arrowDownOnAccent@"); }
 QToolButton[role="split"]:disabled { background: @panel@; color: @dim@; }
 QToolButton[role="split"]::menu-arrow:disabled { image: url("@arrowDownDim@"); }
 QLabel[role="errorIcon"] { background: @errorTint@; border-radius: @errorIconR@px; }
-QPushButton[role="link"] { background: transparent; color: @accTx@; border: 2px solid transparent; }
+QPushButton[role="link"] { background: transparent; color: @accTx@; border: @ring@px solid transparent; }
 QPushButton[role="link"]:hover { background: @hoverFill@; }
 QPushButton[role="link"]:focus { border-color: @focusRing@; }
 /* netUrl = the network URL field: no arrow (netRecent lists its items), the accent ring as in 1.6.2 */
@@ -1061,7 +1201,7 @@ QComboBox[role="netUrl"]:focus { border-color: @focusRing@; }
 QListWidget[role="netRecent"] { background: transparent; border: none; padding: 0; outline: 0; }
 QListWidget[role="netRecent"]::item { padding: @menuPad@px 0; border-radius: @radiusSm@px; }
 QListWidget[role="netRecent"]::item:selected { background: @hoverFill@; color: @tx@; }
-QListWidget[role="netRecent"]:focus { border: 2px solid @focusRing@; border-radius: @radiusMd@px; }
+QListWidget[role="netRecent"]:focus { border: @ring@px solid @focusRing@; border-radius: @radiusMd@px; }
 /* Phase 5: preferences (components/prefs_page.cpp): the Simple Preferences
    group boxes as cards of rows */
 PrefsPage QScrollArea, PrefsPage QScrollArea > QWidget > QWidget { background: transparent; }
@@ -1087,13 +1227,8 @@ PrefsPage QComboBox { min-height: @prefsSelectInner@px; }
 #else
     const bool dwmRounds = false;
 #endif
-    /* at this scale: QFontMetrics reads a point size at the primary
-     * screen's dpi, which is not the main window's after setScreen() */
-    QFont bodyAt = font(Body), metaAt = font(Meta);
-    bodyAt.setPixelSize(px(Type::Body));
-    metaAt.setPixelSize(px(Type::Meta));
-    const int lineH = QFontMetrics(bodyAt).height();
-    const int metaH = QFontMetrics(metaAt).height();
+    const int lineH = QFontMetrics(font(Body)).height();
+    const int metaH = QFontMetrics(font(Meta)).height();
     /* the tab's ring takes 2 px at the top and the bottom: the padding
      * shares the rest evenly, the tab keeps its height */
     const int tabPadY = qMax(0, 2 * qMax(0, (px(Size::MenuItemH) - lineH) / 2) - Size::FocusRing);
@@ -1142,6 +1277,10 @@ PrefsPage QComboBox { min-height: @prefsSelectInner@px; }
         { "tabPadTop", QString::number(tabPadY / 2) },
         { "tabPadBottom", QString::number(tabPadY - tabPadY / 2) },
         { "tabPadX", QString::number(px(Size::ButtonPadX) - Size::FocusRing) },
+        /* focus rings and the transparent borders that keep their room:
+           line widths, not scaled (as the painted rings) */
+        { "ring", QString::number(Size::FocusRing) },
+        { "moreLift", QString::number(2 * Size::Hairline) },
         { "buttonPadX", QString::number(px(Size::ButtonPadX)) },
         { "buttonPadXFocus", QString::number(px(Size::ButtonPadX) - 1) },
         { "groupTitleH", QString::number(metaH) },

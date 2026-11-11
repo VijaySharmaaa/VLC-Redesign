@@ -131,7 +131,7 @@ void paintStripes( QPainter &p, const QRectF &r, qreal period, bool onVideo )
 QFont fontAt( Theme::TypeRole role, int tokenPx, bool semibold )
 {
     QFont f = Theme::instance()->font( role );
-    f.setPointSizeF( tokenPx * 72.0 / 96.0 );
+    f.setPixelSize( Theme::instance()->px( tokenPx ) );
     f.setWeight( semibold ? QFont::DemiBold : QFont::Normal );
     return f;
 }

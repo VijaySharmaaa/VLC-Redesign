@@ -22,6 +22,7 @@
 #include "timetooltip.hpp"
 #include "util/theme.hpp"
 
+#include <QFontInfo>
 #include <QApplication>
 #include <QPainter>
 #include <QBitmap>
@@ -48,7 +49,7 @@ TimeTooltip::TimeTooltip( QWidget *parent ) :
     setAttribute( Qt::WA_TransparentForMouseEvents );
 
     // Inherit from the system default font size -5
-    mFont = QFont( "Verdana", qMax( qApp->font().pointSize() - 5, 7 ) );
+    mFont = QFont( "Verdana", qMax( QFontInfo( qApp->font() ).pointSize() - 5, 7 ) );
     mTipX = -1;
 
     // By default the widget is unintialized and should not be displayed

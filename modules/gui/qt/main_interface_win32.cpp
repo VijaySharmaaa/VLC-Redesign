@@ -40,6 +40,7 @@
 
 #include <cassert>
 
+#include <QTimer>
 #include <QWindow>
 #include <qpa/qplatformnativeinterface.h>
 /* the contribs only expose qplatformnativeinterface.h among the QPA
@@ -48,6 +49,9 @@
 #include VLC_QT_WSI_H
 
 #include <windowsx.h>   /* GET_X_LPARAM */
+#ifndef WM_DPICHANGED
+# define WM_DPICHANGED 0x02E0   /* Windows 8.1, missing from XP headers */
+#endif
 
 /* Same declaration as the Windows platform plugin, which reads "WindowsCustomMargins" */
 Q_DECLARE_METATYPE(QMargins)
@@ -126,10 +130,20 @@ void MainInterfaceWin32::updateCustomFrame( bool fullscreen )
     QMargins margins;
     if( !fullscreen )
     {
-        /* frames are in system DPI: Qt 5.6 does not scale the non-client area */
+        /* the frames at the dpi of the window's screen: Windows 10 scales
+         * the non-client area per monitor (Qt 5.6 does not know) */
+        typedef UINT (WINAPI *GetDpiForWindowFn)( HWND );
+        typedef BOOL (WINAPI *AdjustForDpiFn)( LPRECT, DWORD, BOOL, DWORD, UINT );
+        const HMODULE user32 = GetModuleHandleW( L"user32.dll" );
+        const GetDpiForWindowFn dpiFor = reinterpret_cast<GetDpiForWindowFn>(
+                GetProcAddress( user32, "GetDpiForWindow" ) );
+        const AdjustForDpiFn adjustForDpi = reinterpret_cast<AdjustForDpiFn>(
+                GetProcAddress( user32, "AdjustWindowRectExForDpi" ) );
         RECT r = { 0, 0, 0, 0 };
-        AdjustWindowRectEx( &r, GetWindowLong( hwnd, GWL_STYLE ), FALSE,
-                            GetWindowLong( hwnd, GWL_EXSTYLE ) );
+        const DWORD style = GetWindowLong( hwnd, GWL_STYLE );
+        const DWORD exStyle = GetWindowLong( hwnd, GWL_EXSTYLE );
+        if( !dpiFor || !adjustForDpi || !adjustForDpi( &r, style, FALSE, exStyle, dpiFor( hwnd ) ) )
+            AdjustWindowRectEx( &r, style, FALSE, exStyle );
         margins.setTop( r.top );
     }
     /* Qt keeps the client size when the margins change: a maximised window
@@ -361,6 +375,11 @@ bool MainInterfaceWin32::nativeEventFilter(const QByteArray &, void *message, lo
                 return true;
         }
     }
+
+    /* another monitor's dpi: Windows drew the frames anew, the caption
+     * cut follows (after the move, not inside it) */
+    if( msg->message == WM_DPICHANGED && msg->hwnd == WinId( this ) )
+        QTimer::singleShot( 0, this, [this]() { updateCustomFrame( isFullScreen() ); } );
 
     if (msg->message == taskbar_wmsg)
     {
