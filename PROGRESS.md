@@ -379,6 +379,8 @@ Branch `redesign/phase-6` from `redesign/phase-5` (c36cf50573). Six survey lanes
 - P6-7 `qt-video-autoresize` is off by default (the window keeps its size when a video starts).
 - P6-8 Dark immersive glass 0.88 (no-blur fallback, like light).
 - P6-9 The stock on-video text is suppressed only for messages a toast already shows (snapshot, subtitle added).
+- P6-10 The mouse wheel changes the volume only over the video, the deck and the Now Playing bar.
+- P6-11 Esc leaves fullscreen at once, also after Tab moved the keys into the fullscreen controller.
 - Go to time keeps the stock Reset button; Media information stays editable (stock features).
 
 ### What changed (by area)
@@ -397,15 +399,14 @@ Branch `redesign/phase-6` from `redesign/phase-5` (c36cf50573). Six survey lanes
 - Moving the window to another monitor during playback can leave it taller (pre-existing; resizing to Windows' suggested rect would change behaviour).
 - High contrast keeps system point fonts, so text may clip after a monitor move (`shortcut:` in `Theme::setScreen`).
 - Focus ring and painted line widths are not scaled per monitor (token says unscaled).
-- The mouse wheel sets the volume only over the player, the deck and the now-playing bar (not over library pages, the sidebar, Preferences or the docked Effects/playlist panels).
 - "Display preview" for snapshots (`snapshot-preview`) is shown but ignored: the toast replaces it (P6-9).
-- The fullscreen controller is now reachable with Tab (stock: not a Tab stop); the first Esc gives the keys back, the second leaves fullscreen.
+- The fullscreen controller is now reachable with Tab (stock: not a Tab stop); Esc still leaves fullscreen at once (owner decision P6-11).
 - 100 % and monitor-move results come from the two-monitor runs before the owner's second screen was disconnected. The later per-monitor fixes (column widths, dialog minimums, rescale state on objects, `Theme::pt` fonts, following `windowHandle()->screen()`) were only exercised with a scale-change test hook, never on a real second monitor, and nothing after that was run on a true 100 % desktop (`QT_SCALE_FACTOR=0.8` breaks stock 3.0 too, so it can't stand in).
 - Narrator was never run: screen-reader results come from UI Automation (names, roles, values, Invoke) only.
 - Not run on Windows: animations off, high contrast at runtime, RTL, a monitor unplug.
 - The harness `baseline` state `04-effects` doesn't show the sheet at the default size (it opens as the XS drawer window, which the capture misses).
 - A Windows Firewall prompt ("allow VLC media player") appeared once during testing; it was cancelled, so no rule allows VLC. Tests only listen on 127.0.0.1.
-- **Waiting for the owner's sign-off:** the wheel no longer changes the volume over library pages, the sidebar or Preferences; after Tab moves the keys into the fullscreen controller, the first Esc gives them back instead of leaving fullscreen (a second Esc leaves; Esc after a mouse click still leaves at once).
+- The mouse wheel changes the volume only over the video, the deck and the Now Playing bar (owner decision P6-10).
 - RTL layout could not be run (needs a Windows setting); mirrored by code reading only.
 
 ### Deferred (pre-existing, stock)
