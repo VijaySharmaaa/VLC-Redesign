@@ -45,6 +45,10 @@ class PlayerHeader;
  * area itself when no video size is known. */
 QRect videoPictureRect( intf_thread_t *, const QRect &area );
 
+/* The floating decks' glass (the immersive bar, the fullscreen controller):
+ * fill and border over the whole widget, rounded by radius */
+void paintDeckGlass( QWidget *, int radius );
+
 /* Centre of the video while it is paused; a click resumes. */
 class PausedBadge : public OverlayWindow
 {
@@ -55,6 +59,7 @@ private:
     void refresh();
     void place();
 
+    intf_thread_t *p_intf;
     InputManager *im;
     OverlayHost *host;
     QAbstractButton *button;

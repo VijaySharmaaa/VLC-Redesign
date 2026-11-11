@@ -160,8 +160,8 @@ QRect videoPictureRect( intf_thread_t *p_intf, const QRect &area )
 /**********************************************************************
  * Paused badge
  **********************************************************************/
-PausedBadge::PausedBadge( intf_thread_t *p_intf, QWidget *owner, QWidget *video )
-    : OverlayWindow( owner, TakeInput ), im( THEMIM->getIM() ), wanted( false )
+PausedBadge::PausedBadge( intf_thread_t *_p_intf, QWidget *owner, QWidget *video )
+    : OverlayWindow( owner, TakeInput ), p_intf( _p_intf ), im( THEMIM->getIM() ), wanted( false )
 {
     BadgeButton *badge = new BadgeButton( this );
     button = badge;
@@ -199,6 +199,15 @@ void PausedBadge::refresh()
     if( now == wanted )
         return;
     wanted = now;
+    /* the hotkeys module put its play or pause icon on the video (OSD
+     * channel) just before this change; the badge says it instead.
+     * shortcut: the icon may show for a frame before the flush, upgrade
+     * with a core option to skip the play/pause OSD icon */
+    foreach( vout_thread_t *vout, THEMIM->getVouts() )
+    {
+        vout_FlushSubpictureChannel( vout, VOUT_SPU_CHANNEL_OSD );
+        vlc_object_release( vout );
+    }
     pop->stop();
     const int ms = Theme::instance()->duration( Theme::PausedBadgeFade );
     if( wanted && ms )
@@ -688,13 +697,17 @@ QRect ImmersiveBar::restingRect() const
  * DWM acrylic, Windows 10+ only), upgrade with the Phase 6 Mica/acrylic work */
 void ImmersiveBar::paintEvent( QPaintEvent * )
 {
+    paintDeckGlass( this, Theme::instance()->metric( Theme::RadiusTile ) );
+}
+
+void paintDeckGlass( QWidget *w, int radius )
+{
     Theme *t = Theme::instance();
-    const int radius = t->metric( Theme::RadiusTile );
-    QPainter p( this );
+    QPainter p( w );
     p.setRenderHint( QPainter::Antialiasing );
     p.setPen( t->ink( V::ImmersiveBorderAlpha ) );
     p.setBrush( t->color( Theme::Glass ) );
-    p.drawRoundedRect( QRectF( rect() ).adjusted( .5, .5, -.5, -.5 ), radius, radius );
+    p.drawRoundedRect( QRectF( w->rect() ).adjusted( .5, .5, -.5, -.5 ), radius, radius );
 }
 
 /**********************************************************************

@@ -33,6 +33,7 @@
 #include "components/controller_widget.hpp"
 #include "components/interface_widgets.hpp"
 #include "components/deck_popover.hpp"
+#include "components/video_overlays.hpp"                  /* paintDeckGlass */
 #include "util/buttons/DeckButtonsLayout.hpp"
 #include "util/buttons/BrowseButton.hpp"
 #include "util/buttons/RoundButton.hpp"
@@ -346,10 +347,11 @@ void AbstractController::createAndAddWidget( QBoxLayout *controlLayout_,
         if( !widg ) return;
 
         /* DESIGN_SPEC 3's "*" items, in the menus too: a narrow deck drops
-         * them (ControlsWidget::fitWidth) */
+         * them (ControlsWidget::fitWidth). Stop stays at every width (the
+         * owner's I1 decision) */
         switch( i_type )
         {
-        case STOP_BUTTON: case LOOP_BUTTON: case RANDOM_BUTTON: case SPEED_LABEL:
+        case LOOP_BUTTON: case RANDOM_BUTTON: case SPEED_LABEL:
         case MINIPLAYER_BUTTON: case FULLSCREEN_BUTTON:
             widg->setProperty( "deckOptional", true );
             break;
@@ -1126,23 +1128,31 @@ FullscreenControllerWidget::FullscreenControllerWidget( intf_thread_t *_p_i, QWi
 
     vout.clear();
 
-    setWindowFlags( Qt::Tool | Qt::FramelessWindowHint | Qt::X11BypassWindowManagerHint );
+    /* the immersive bar's glass (paintEvent): rounded, no square shadow */
+    setWindowFlags( Qt::Tool | Qt::FramelessWindowHint | Qt::NoDropShadowWindowHint
+                    | Qt::X11BypassWindowManagerHint );
+    setAttribute( Qt::WA_TranslucentBackground );
     setAttribute( Qt::WA_ShowWithoutActivating );
     setMinimumWidth( FSC_WIDTH );
     isWideFSC = false;
 
-    setFrameShape( QFrame::StyledPanel );
-    setFrameStyle( QFrame::Sunken );
+    setFrameShape( QFrame::NoFrame );
     setSizePolicy( QSizePolicy::Minimum, QSizePolicy::Minimum );
 
+    /* the deck's own padding and gaps, as ControlsWidget's */
+    const Theme *t = Theme::instance();
     QVBoxLayout *controlLayout2 = new QVBoxLayout( this );
-    controlLayout2->setContentsMargins( 4, 6, 4, 2 );
+    controlLayout2->setContentsMargins( 0, 0, 0, 0 );
+    controlLayout2->setSpacing( 0 );
 
     /* First line */
     InputControlsWidget *inputC = new InputControlsWidget( p_intf, this );
     controlLayout2->addWidget( inputC );
 
     controlLayout = new QHBoxLayout;
+    controlLayout->setContentsMargins( t->px( Deck::PadX ), t->px( Deck::RowGap ),
+                                       t->px( Deck::PadX ), t->px( Deck::PadBottom ) );
+    controlLayout->setSpacing( t->px( Deck::Gap ) );
     QString line = getSettings()->value( "MainWindow/FSCtoolbar", FSC_TB_DEFAULT ).toString();
     parseAndCreate( line, controlLayout );
     controlLayout2->addLayout( controlLayout );
@@ -1212,8 +1222,10 @@ void FullscreenControllerWidget::restoreFSC()
             wh->setScreen(QGuiApplication::screens()[targetScreen()]);
         }
 
+        /* all of it: a position saved for a shorter bar (an older deck, a
+         * smaller scale) would push its bottom row off the screen */
         if( currentRes == screenRes &&
-            currentRes.contains( previousPosition, true ) )
+            currentRes.contains( QRect( previousPosition, size() ) ) )
         {
             /* Restore to the last known position */
             move( previousPosition );
@@ -1238,9 +1250,11 @@ void FullscreenControllerWidget::centerFSC( int number )
 {
     QRect currentRes = QGuiApplication::screens()[ number ]->geometry();
 
-    /* screen has changed, calculate new position */
+    /* screen has changed, calculate new position: off the bottom edge as
+     * the immersive bar is off the video's */
     QPoint pos = QPoint( currentRes.x() + (currentRes.width() / 2) - (width() / 2),
-            currentRes.y() + currentRes.height() - height());
+            currentRes.y() + currentRes.height() - height()
+            - Theme::instance()->px( VideoOverlay::ImmersiveMargin ) );
     move( pos );
 }
 
@@ -1314,6 +1328,12 @@ void FullscreenControllerWidget::updateFullwidthGeometry( int number )
     setMinimumWidth( screenGeometry.width() );
     setGeometry( screenGeometry.x(), screenGeometry.y() + screenGeometry.height() - height(), screenGeometry.width(), height() );
     adjustSize();
+}
+
+/* docked full width at the screen's bottom, square; floating, rounded */
+void FullscreenControllerWidget::paintEvent( QPaintEvent * )
+{
+    paintDeckGlass( this, isWideFSC ? 0 : Theme::instance()->metric( Theme::RadiusTile ) );
 }
 
 void FullscreenControllerWidget::toggleFullwidth()
