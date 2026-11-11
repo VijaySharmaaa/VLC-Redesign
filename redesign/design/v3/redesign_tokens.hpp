@@ -152,6 +152,12 @@ namespace RedesignTokens
     {
         static const int AboutLogo = 64, AboutW = 440;
     }
+
+    /* ---- Preferences page (px) ---- */
+    namespace Prefs
+    {
+        static const int ContentMaxW = 720;   /* the prototype's max-width */
+    }
 }
 
 #endif

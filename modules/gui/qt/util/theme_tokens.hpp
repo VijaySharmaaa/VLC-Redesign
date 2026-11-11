@@ -384,6 +384,7 @@ namespace RedesignTokens
     namespace Prefs
     {
         static const int ContentPadY = 28, ContentPadX = 32, HeaderBelow = 16;
+        static const int ContentMaxW = 720;   /* the prototype's max-width */
         /* the card and its rows */
         static const int CardRadius = 8, RowMinH = 60, RowPadX = 18, RowPadY = 12;
         static const int RowGap = 20, DescGap = 3, ButtonGap = 8;
