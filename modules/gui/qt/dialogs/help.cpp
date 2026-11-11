@@ -105,9 +105,8 @@ AboutDialog::AboutDialog( intf_thread_t *_p_intf)
     setWindowFlags( Qt::Dialog | Qt::WindowTitleHint | Qt::WindowSystemMenuHint |
                     Qt::WindowCloseButtonHint );
     Theme *t = Theme::instance();
-    /* the card's width; its height follows the wrapped blurb. The spacing
-     * reuses the library empty state's */
-    setMinimumWidth( t->px( RedesignTokens::Dialogs::AboutW ) );
+    /* the card's width (applyTheme); its height follows the wrapped blurb.
+     * The spacing reuses the library empty state's */
     const int pad = t->px( RedesignTokens::Library::EmptyPad );
     ui.bodyLayout->setContentsMargins( pad, pad, pad, pad );
     ui.bodyLayout->setSpacing( t->px( RedesignTokens::Library::EmptyGap ) );
@@ -179,6 +178,8 @@ AboutDialog::AboutDialog( intf_thread_t *_p_intf)
 /* Rich text bakes its colours in: rebuild it when the theme changes. */
 void AboutDialog::applyTheme()
 {
+    /* the screen's scale may have changed: Theme leaves a window's minimum */
+    setMinimumWidth( Theme::instance()->px( RedesignTokens::Dialogs::AboutW ) );
     const QString link = QApplication::palette().color( QPalette::Link ).name();
     QString translatedString = qtr( "<p>VLC media player is a free and open source media player, encoder, and streamer made by the volunteers of the <a href=\"http://www.videolan.org/\"><span style=\" text-decoration: underline; color:#0057ae;\">VideoLAN</span></a> community.</p><p>VLC uses its internal codecs, works on essentially every popular platform, and can read almost all files, CDs, DVDs, network streams, capture cards and other media formats!</p><p><a href=\"http://www.videolan.org/contribute/\"><span style=\" text-decoration: underline; color:#0057ae;\">Help and join us!</span></a>" );
     /* the translated text names the old link colour; use the theme's */

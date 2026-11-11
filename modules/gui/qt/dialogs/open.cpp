@@ -332,6 +332,9 @@ OpenDialog::OpenDialog( QWidget *parent,
 
     setMinimumSize( sizeHint() );
     setMaximumWidth( 900 );
+    /* at another screen's scale that hint is stale (the hidden pages too):
+     * from then on the layout's minimum, which follows the page shown */
+    connect( Theme::instance(), &Theme::changed, this, [this]() { setMinimumSize( 0, 0 ); } );
     resize( getSettings()->value( "OpenDialog/size", QSize( 500, 400 ) ).toSize() );
 }
 

@@ -740,12 +740,18 @@ namespace
         }
     }
 
-    /* the sizes, margins and gaps the widget was built with */
+    /* the sizes, margins and gaps the widget was built with. Not a
+     * window's minimum and maximum: set, they would stop its layout from
+     * setting them (a dialog would not grow to a bigger page); a window
+     * with its own token size sets it again on Theme::changed */
     void rescaleWidget(QWidget *w, qreal from, qreal to)
     {
-        const QSize min = w->minimumSize(), max = w->maximumSize();
-        w->setMinimumSize(rescaled(w, 0, min.width(), from, to), rescaled(w, 1, min.height(), from, to));
-        w->setMaximumSize(rescaled(w, 2, max.width(), from, to), rescaled(w, 3, max.height(), from, to));
+        if (!w->isWindow())
+        {
+            const QSize min = w->minimumSize(), max = w->maximumSize();
+            w->setMinimumSize(rescaled(w, 0, min.width(), from, to), rescaled(w, 1, min.height(), from, to));
+            w->setMaximumSize(rescaled(w, 2, max.width(), from, to), rescaled(w, 3, max.height(), from, to));
+        }
         QSize icon;
         QAbstractButton *button = qobject_cast<QAbstractButton *>(w);
         QAbstractItemView *view = qobject_cast<QAbstractItemView *>(w);
