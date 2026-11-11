@@ -230,6 +230,45 @@ static const char * const MenuStatusBar      = "call_to_action";
 static const char * const MenuHelp           = "help";
 static const char * const MenuUpdates        = "update";
 static const char * const MenuAbout          = "info";
+/* entries the design's menus leave out (3.0 has more than the prototype) */
+static const char * const MenuOpenClipboard  = "content_paste";
+static const char * const MenuCloseToSystray = "minimize";
+static const char * const MenuProgram        = "live_tv";
+static const char * const MenuBookmarks      = "bookmark";
+static const char * const MenuBookmarksManage = "edit";
+static const char * const MenuPrevTitle      = "first_page";
+static const char * const MenuNextTitle      = "last_page";
+static const char * const MenuPrevChapter    = "chevron_left";
+static const char * const MenuNextChapter    = "chevron_right";
+static const char * const MenuNormalSpeed    = "1x_mobiledata";
+static const char * const MenuRenderer       = "cast";
+static const char * const MenuLeaveFullscreen = "fullscreen_exit";
+static const char * const MenuDeinterlaceMode = "blur_on";
+static const char * const MenuDockedPlaylist = "dock_to_right";
+static const char * const MenuPlaylistView   = "view_list";
+static const char * const MenuAlwaysOnTop    = "keep";
+static const char * const MenuImmersive      = "open_in_full";
+static const char * const MenuInterfaces     = "web";
+static const char * const MenuCustomize      = "dashboard_customize";
+static const char * const MenuClearRecent    = "delete";
+static const char * const MenuOpenMedia      = "file_open";
+/* the right-click menu's submenus */
+static const char * const MenuAudio          = "graphic_eq";
+static const char * const MenuVideo          = "movie";
+static const char * const MenuSubtitle       = "subtitles";
+static const char * const MenuPlayback       = "play_arrow";
+static const char * const MenuTools          = "build";
+static const char * const MenuView           = "visibility";
+
+/* Effects sheet, "More" menu */
+static const char * const EffectCompressor   = "compress";
+static const char * const EffectSpatializer  = "spatial_audio";
+static const char * const EffectWidener      = "width";
+static const char * const EffectCrop         = "crop";
+static const char * const EffectColors       = "palette";
+static const char * const EffectGeometry     = "transform";
+static const char * const EffectOverlay      = "layers";
+static const char * const EffectAdvanced     = "code";
 
 }
 
