@@ -200,7 +200,6 @@ class CaptureOpenPanel: public OpenPanel
     Q_OBJECT
 public:
     CaptureOpenPanel( QWidget *, intf_thread_t * );
-    virtual ~CaptureOpenPanel();
     void clear() Q_DECL_OVERRIDE;
 private:
     Ui::OpenCapture ui;
@@ -210,8 +209,9 @@ private:
     QStringList configList;
     QDialog *adv;
 #ifdef _WIN32
-    StringListConfigControl *vdevDshowW, *adevDshowW;
+    QComboBox *dshowDevs[2];   /* video, audio */
     QLineEdit *dshowVSizeLine;
+    void fillDshowDevices();
 #else
     QSpinBox  *pvrFreq;
     QComboBox *v4l2VideoDevice, *v4l2AudioDevice;

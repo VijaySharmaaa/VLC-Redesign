@@ -30,6 +30,9 @@
 # include "config.h"
 #endif
 
+/* before vlc_threads.h, which makes a macro of QThread::msleep's name */
+#include <QThread>
+
 #include "qt.hpp"
 #include "components/open_panels.hpp"
 #include "dialogs/open.hpp"
@@ -788,13 +791,52 @@ void NetOpenPanel::updateMRL()
 /**************************************************************************
  * Open Capture device ( DVB, PVR, V4L, and similar )                     *
  **************************************************************************/
+#ifdef _WIN32
+static const char * const dshowDevOptions[2] = { "dshow-vdev", "dshow-adev" };
+
+/* The DirectShow devices, listed once a session off the GUI thread: the
+ * list (dshow's FindDevices, through devenum) blocked the interface for
+ * good on some machines, waiting on a Windows camera service.
+ * shortcut: never deleted, so nothing waits on a stuck scan and one that
+ * returns late finds its memory; it runs on the libvlc object, which goes
+ * at exit: give it a cancel path if a stuck scan ever returns that late */
+class DshowScan : public QThread
+{
+public:
+    explicit DshowScan( vlc_object_t *_obj ) : obj( _obj ) {}
+    QList<QPair<QString, QString> > devices[2];   /* per option: text, value */
+
+protected:
+    void run() Q_DECL_OVERRIDE
+    {
+        for( int i = 0; i < 2; i++ )
+        {
+            char **values, **texts;
+            const ssize_t count = config_GetPszChoices( obj, dshowDevOptions[i], &values, &texts );
+            for( ssize_t j = 0; j < count; j++ )
+            {
+                if( texts[j] && values[j] )
+                    devices[i].append( qMakePair( qfu( texts[j] ), qfu( values[j] ) ) );
+                free( texts[j] );
+                free( values[j] );
+            }
+            free( texts );
+            free( values );
+        }
+    }
+
+private:
+    vlc_object_t *obj;
+};
+static DshowScan *dshowScan = NULL;
+#endif
+
 CaptureOpenPanel::CaptureOpenPanel( QWidget *_parent, intf_thread_t *_p_intf ) :
                                 OpenPanel( _parent, _p_intf )
 {
     isInitialized = false;
 #ifdef _WIN32
-    vdevDshowW = NULL;
-    adevDshowW = NULL;
+    dshowDevs[0] = dshowDevs[1] = NULL;
 #endif
 }
 
@@ -837,19 +879,33 @@ void CaptureOpenPanel::initialize()
     if( module_exists( "dshow" ) ){
     addModuleAndLayouts( DSHOW_DEVICE, dshow, "DirectShow", QGridLayout );
 
-    /* dshow Main */
-    int line = 0;
-    module_config_t *p_config = config_FindConfig( "dshow-vdev" );
-    vdevDshowW = new StringListConfigControl(
-        VLC_OBJECT(p_intf), p_config, this );
-    vdevDshowW->insertIntoExistingGrid( dshowDevLayout, line );
-    line++;
-
-    p_config = config_FindConfig( "dshow-adev" );
-    adevDshowW = new StringListConfigControl(
-        VLC_OBJECT(p_intf), p_config, this );
-    adevDshowW->insertIntoExistingGrid( dshowDevLayout, line );
-    line++;
+    /* dshow Main: the video and audio devices, "Default" until listed */
+    for( int i = 0; i < 2; i++ )
+    {
+        module_config_t *p_config = config_FindConfig( dshowDevOptions[i] );
+        QLabel *label = new QLabel( qtr( p_config->psz_text ) );
+        QComboBox *combo = dshowDevs[i] = new QComboBox;
+        combo->setSizePolicy( QSizePolicy::MinimumExpanding, QSizePolicy::Preferred );
+        if( p_config->psz_longtext )
+        {
+            combo->setToolTip( qtr( p_config->psz_longtext ) );
+            label->setToolTip( combo->toolTip() );
+        }
+        label->setBuddy( combo );
+        combo->addItem( qtr( "Searching for devices..." ), QString() );
+        combo->setEnabled( false );
+        dshowDevLayout->addWidget( label, i, 0 );
+        dshowDevLayout->addWidget( combo, i, 1 );
+    }
+    if( !dshowScan )
+    {
+        dshowScan = new DshowScan( VLC_OBJECT( p_intf->obj.libvlc ) );
+        dshowScan->start();
+    }
+    /* connected first: a scan that ends meanwhile still fills them */
+    connect( dshowScan, &QThread::finished, this, &CaptureOpenPanel::fillDshowDevices );
+    if( dshowScan->isFinished() )
+        fillDshowDevices();
 
     /* dshow Properties */
     QLabel *dshowVSizeLabel = new QLabel( qtr( "Video size" ) );
@@ -861,8 +917,8 @@ void CaptureOpenPanel::initialize()
             1, 0, 3, 1 );
 
     /* dshow CONNECTs */
-    CuMRL( vdevDshowW, &StringListConfigControl::changed );
-    CuMRL( adevDshowW, &StringListConfigControl::changed );
+    CuMRL( dshowDevs[0], QOverload<int>::of(&QComboBox::currentIndexChanged) );
+    CuMRL( dshowDevs[1], QOverload<int>::of(&QComboBox::currentIndexChanged) );
     CuMRL( dshowVSizeLine, &QLineEdit::textChanged );
     configList << "dshow-vdev" << "dshow-adev" << "dshow-size";
     }
@@ -1189,13 +1245,34 @@ void CaptureOpenPanel::initialize()
 #undef addModuleAndLayouts
 }
 
-CaptureOpenPanel::~CaptureOpenPanel()
-{
 #ifdef _WIN32
-    delete vdevDshowW;
-    delete adevDshowW;
-#endif
+/* the scan's lists, the configured device selected */
+void CaptureOpenPanel::fillDshowDevices()
+{
+    for( int i = 0; i < 2; i++ )
+    {
+        QComboBox *combo = dshowDevs[i];
+        const QSignalBlocker blocker( combo );
+        combo->clear();
+        char *current = config_GetPsz( p_intf, dshowDevOptions[i] );
+        const QString value = qfu( current ? current : "" );
+        free( current );
+        const QList<QPair<QString, QString> > &devices = dshowScan->devices[i];
+        for( const auto &device : devices )
+        {
+            combo->addItem( device.first, device.second );
+            if( device.second == value )
+                combo->setCurrentIndex( combo->count() - 1 );
+        }
+        if( combo->count() == 0 )   /* the module failed to load */
+            combo->addItem( qtr( "Default" ), QString() );
+        combo->setEnabled( true );
+    }
+    /* the dialog's MRL is this panel's only while it shows */
+    if( isVisible() )
+        updateMRL();
 }
+#endif
 
 void CaptureOpenPanel::clear()
 {
@@ -1214,9 +1291,9 @@ void CaptureOpenPanel::updateMRL()
     case DSHOW_DEVICE:
         fileList << "dshow://";
         mrl+= " :dshow-vdev=" +
-            colon_escape( QString("%1").arg( vdevDshowW->getValue() ) );
+            colon_escape( dshowDevs[0]->currentData().toString() );
         mrl+= " :dshow-adev=" +
-            colon_escape( QString("%1").arg( adevDshowW->getValue() ) )+" ";
+            colon_escape( dshowDevs[1]->currentData().toString() )+" ";
         if( dshowVSizeLine->isModified() )
             mrl += ":dshow-size=" + dshowVSizeLine->text();
         break;
