@@ -452,3 +452,18 @@ Evidence: `D:\Projects\VLC\spike-results\p6-edge\` (runtime sessions), `p6-va\`,
 | Closing during playback, 50× open/close | **pass** | Final build, 50 cycles each (Preferences, Effects docked and XS, Open media, playlist, Media info, Go to time, About): handles, GDI and USER flat. The docked Effects sheet's private bytes rise 1.5 MB by cycle 25 then level off over 150 cycles (heap churn from resizing the video area; stock's separate Effects window doesn't resize the video). Exit code 0 in 0.2–0.6 s with each surface open; with a modal dialog (Open media, About) the main window ignores close, as in stock. |
 | Overlays over the video after the native-window change | **pass** | Docked and XS panels, fullscreen controller, minimal view, mini player, audio mode, resize, dark and light. |
 | Mouse wheel over panels | **fixed** | The wheel over the Effects sheet or playlist no longer changes the volume. |
+
+### Performance on the final build
+Evidence: `D:\Projects\VLC\spike-results\p6-perf-final\` (not committed). CPU is % of one core; A/B interleaved 6 rounds with stock.
+
+| Metric | Redesign | Stock |
+|---|---|---|
+| Startup to painted window | 0.376 s | 0.381 s |
+| Home idle | 0.7 % | 0.55 % |
+| 720p, docked deck | 5.9 % | 7.2 % |
+| Audio, spectrum visible (single pass) | 3.1 % | 1.6 % (cone) |
+| Audio, covered / minimised (single pass, machine 26–39 % busy) | 2.3 % / 2.3 % | 2.2 % / 1.2 % |
+| Header cursor check, cursor resting on the video | no measurable cost | — |
+| Resize settle (median / worst) | 7 / 11 ms | — |
+
+The spectrum costs about 1.5 % of a core more than stock's cone while visible. Minimised audio is one noisy sample; re-run interleaved before treating it as a regression.
