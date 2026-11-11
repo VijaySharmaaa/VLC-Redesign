@@ -163,6 +163,15 @@ ArtView::ArtView( int _stripe, int _radius, QWidget *parent, bool _onVideo )
 {
 }
 
+/* a video arriving or leaving (VideoWidget::setHost) changes what is
+ * painted under the controls */
+void ArtView::childEvent( QChildEvent *e )
+{
+    if( e->added() || e->removed() )
+        update();
+    QWidget::childEvent( e );
+}
+
 void ArtView::setArt( const QString &url )
 {
     art = url.isEmpty() ? QPixmap() : QPixmap( url );
@@ -191,6 +200,20 @@ void ArtView::paintEvent( QPaintEvent * )
         const QSizeF s = QSizeF( scaled.size() ) / dpr;
         p.drawPixmap( QPointF( ( width() - s.width() ) / 2, ( height() - s.height() ) / 2 ),
                       scaled );
+    }
+    if( onVideo )
+    {
+        /* a video in here is a native window cut around the other children
+         * (VideoWidget::fitHost): under them, the video's black, so they
+         * sit on the picture's bars and not on a patch of placeholder */
+        const QList<QWidget *> kids = findChildren<QWidget *>( QString(), Qt::FindDirectChildrenOnly );
+        bool video = false;
+        foreach( QWidget *c, kids )
+            video |= c->isVisible() && c->internalWinId();
+        if( video )
+            foreach( QWidget *c, kids )
+                if( !c->internalWinId() )
+                    p.fillRect( c->geometry(), t->color( Theme::VideoSurface ) );
     }
     p.setClipping( false );
     p.setPen( QPen( t->ink( InkAlpha::Border ), Size::Hairline ) );
@@ -859,12 +882,13 @@ MiniPlayer::MiniPlayer( intf_thread_t *_p_i, NowPlayingInfo *_info, QWidget *par
     /* the video's place: dark in both themes */
     art = new ArtView( ThumbStripe, 0, this, true );
     QGridLayout *overlay = new QGridLayout( art );
-    const int inset = t->px( MiniRestoreInset );
+    const int inset = t->px( MiniRestoreEdge );
     overlay->setContentsMargins( inset, inset, inset, inset );
     QToolButton *restore = makeIconButton( p_intf, RedesignIcons::IconExpand, qtr( "Restore" ),
-                                           "Esc", MiniRestore, art );
-    /* white on the dark scrim, in both themes */
-    restore->setIcon( Theme::themedIcon( RedesignIcons::IconExpand, Theme::WindowCloseGlyph ) );
+                                           "Esc", MiniRestoreChip, art );
+    /* a round chip, white glyph, in both themes (like the player header's back) */
+    restore->setIcon( Theme::themedIcon( RedesignIcons::IconExpand, Theme::OnVideo ) );
+    restore->setIconSize( QSize( t->px( MiniRestoreGlyph ), t->px( MiniRestoreGlyph ) ) );
     restore->setProperty( "np", "overlay" );
     connect( restore, &QToolButton::clicked, this, &MiniPlayer::restoreRequested );
     overlay->addWidget( restore, 0, 0, Qt::AlignTop | Qt::AlignRight );

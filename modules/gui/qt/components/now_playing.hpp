@@ -60,6 +60,7 @@ public:
     void setArt( const QString &url );  /* empty: placeholder */
 protected:
     void paintEvent( QPaintEvent * ) Q_DECL_OVERRIDE;
+    void childEvent( QChildEvent * ) Q_DECL_OVERRIDE;
 private:
     QPixmap art;
     int stripe, radius;

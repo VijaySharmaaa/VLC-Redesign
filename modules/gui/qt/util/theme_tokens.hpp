@@ -238,7 +238,7 @@ namespace RedesignTokens
 
         /* mini player */
         static const int MiniW = 360, MiniH = 200, MiniPadX = 12, MiniPadY = 10, MiniGap = 6;
-        static const int MiniRestore = 30, MiniRestoreInset = 8, MiniMargin = 24;
+        static const int MiniMargin = 24;
         static const int MiniRestoreBgAlpha = 140; /* black 0.55 behind the restore glyph */
 
         /* audio mode, per breakpoint L / M / S / XS */
@@ -430,6 +430,17 @@ namespace RedesignTokens
         static const int ThumbTimeoutMs = 15000;    /* then the process is killed */
         static const int ThumbKillWaitMs = 1000;
         static const int ThumbQueueMax = 24;        /* about the cards on screen */
+    }
+}
+
+/* issues2 lane C */
+namespace RedesignTokens
+{
+    namespace NowPlaying
+    {
+        /* not in tokens.json: the mini player's Restore, a round chip like the
+         * player header's back (VideoOverlay::HeaderBack*), clear of the corner */
+        static const int MiniRestoreChip = 32, MiniRestoreGlyph = 20, MiniRestoreEdge = 10;
     }
 }
 
