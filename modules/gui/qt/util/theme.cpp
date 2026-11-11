@@ -1060,7 +1060,9 @@ QTabBar::tab:hover { color: @tx@; }
 QTabBar::tab:selected { color: @tx@; border-bottom-color: @fill@; }
 QTabBar::tab:focus { color: @tx@; background: @hoverFill@; border-color: @focusRing@; border-radius: @radiusSm@px; }
 
-QGroupBox { border: 1px solid @divider@; border-radius: @radiusLg@px; margin-top: @groupTitleH@px; padding-top: @menuPad@px; }
+/* the title's box starts at the top (origin margin), the frame half a line
+   lower: the title sits centred on the frame's top line, the content below it */
+QGroupBox { border: 1px solid @divider@; border-radius: @radiusLg@px; margin-top: @groupTitleHalf@px; padding-top: @groupPadTop@px; }
 QGroupBox::title { subcontrol-origin: margin; subcontrol-position: top left; left: @menuTitlePadX@px; padding: 0 @menuPad@px; color: @mute@; }
 
 /* the focus ring's second px comes from the padding: the content stays put */
@@ -1245,7 +1247,6 @@ PrefsPage QComboBox { min-height: @prefsSelectInner@px; }
     const bool dwmRounds = false;
 #endif
     const int lineH = QFontMetrics(font(Body)).height();
-    const int metaH = QFontMetrics(font(Meta)).height();
     /* the tab's ring takes 2 px at the top and the bottom: the padding
      * shares the rest evenly, the tab keeps its height */
     const int tabPadY = qMax(0, 2 * qMax(0, (px(Size::MenuItemH) - lineH) / 2) - Size::FocusRing);
@@ -1299,7 +1300,9 @@ PrefsPage QComboBox { min-height: @prefsSelectInner@px; }
         { "moreLift", QString::number(2 * Size::Hairline) },
         { "buttonPadX", QString::number(px(Size::ButtonPadX)) },
         { "buttonPadXFocus", QString::number(px(Size::ButtonPadX) - 1) },
-        { "groupTitleH", QString::number(metaH) },
+        /* a group box's title is in the application font, Body */
+        { "groupTitleHalf", QString::number(lineH / 2) },
+        { "groupPadTop", QString::number(lineH - lineH / 2 - 1 + px(Size::MenuPanelPadding)) },
         { "scrollW", QString::number(px(Size::ScrollBarW)) },
         { "iconGlyph", QString::number(px(Size::IconGlyph)) },
         { "halfGlyph", QString::number(px(Size::IconGlyph) / 2) },
