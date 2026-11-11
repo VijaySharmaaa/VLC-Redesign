@@ -365,3 +365,84 @@ Accessibility audit, design review and code review of the change above. Evidence
 Results (`after.log`): Space flips a switch (1→0) and presses Back; keyboard-only round trip writes `qt-fs-controller=0` and Esc returns with the focus on the window; Alt+S opens Tools; Tab from Save → Back → sections, Shift+Tab from Save walks the content to the sections with no window stop; audio start keeps Preferences, Esc → Home; Ctrl+H leaves Preferences into minimal view; audio stopped in Preferences relabels to "Back to library" and Esc → Home; drawer closes on the first Esc, Preferences on the second; End/Home → Advanced/Interface; spinner named "Number of days between two update checks"; Phase 3: Space on the deck's Mute and Next and the bar's Mute pauses, on Open media opens the dialog; light bar pixel (154, 72, 0), dark (255, 138, 31).
 
 **Deferred (pre-existing, not Preferences):** when the video view goes away (Ctrl+P from a playing video, or just `stop`), Qt loses keyboard focus for good: for an instant Windows activates the next app's window (seen: VS Code), and the focus widget stays empty though VLC is foreground again (throwaway `focusChanged`/`GetGUIThreadInfo` log, `focusdbg*.py`, `focusdbg*-vlc.log`). So from the player, the section is focused and then loses it; keys still reach the window. Needs a trace of the video widget / vout window activation in Phase 6.
+
+## Phase 6: polish (2026-11-10 to 2026-11-11)
+Branch `redesign/phase-6` from `redesign/phase-5` (c36cf50573). Six survey lanes (playback screens, library/settings screens, accessibility, code sweep, translations/RTL, performance) produced the fix list; fix lanes a–h, wave 2, r1–r9 and two alignment passes followed, each reproduced first and re-verified after. Evidence: `D:\Projects\VLC\spike-results\p6-*` (not committed).
+
+### Owner decisions
+- P6-1 Player and audio mode hide the sidebar; a header row (back arrow, title, meta) sits over the video, as in the renders.
+- P6-2 Light theme: progress, switch and boost fills use the darker accent; control outlines darker (≥ 3:1). Dark fills unchanged.
+- P6-3 Our drawn caption buttons are hidden from screen readers; Windows' own set is read.
+- P6-4 The 14 new source files are listed in `po/POTFILES.in`.
+- P6-5 In the normal layout the header hides with the mouse cursor during video playback.
+- P6-6 When the window moves to a monitor with another scale, the theme is re-applied at that scale.
+- P6-7 `qt-video-autoresize` is off by default (the window keeps its size when a video starts).
+- P6-8 Dark immersive glass 0.88 (no-blur fallback, like light).
+- P6-9 The stock on-video text is suppressed only for messages a toast already shows (snapshot, subtitle added).
+- Go to time keeps the stock Reset button; Media information stays editable (stock features).
+
+### What changed (by area)
+- Focus: only the video widget is a native window (`WA_DontCreateNativeAncestors`, `AA_DontCreateNativeWidgetSiblings`), so Tab and screen readers work after media opens.
+- Window: library pages and Preferences never resize the window; docked panels never push it past the work area; the XS minimum is reachable with video (expert row hides first); the resume panel grows the window once and gives back exactly that; Ctrl+H restores the pre-minimal width.
+- Player: header over the video (P6-1, P6-5); subtitles lift above the immersive bar and the toast follows; buffering ring for slow streams over the video's black; aspect badge shows the picture's ratio; tracks popover one tick per column.
+- Keyboard and screen readers: accessible activation (toggled) for sidebar, sections, tracks button, Open media tiles (tab list, arrows, only the checked tile is a Tab stop); deck buttons describe their shortcut; seek bars read as "x of y"; Effects sliders are real sliders (checkable group box accessible cache); no unnamed controls on any surface.
+- Theme: per-theme AccentFill / ControlLine; destructive and dim text contrast; tab focus ring; round opaque knobs; text centred on the capital height (`Theme::textNudge`); rail items keep a fixed square; menu shortcuts on the label's baseline; per-monitor scale with pixel fonts and rescaled pages; focus-ring width from a token.
+- Dialogs: close-only frames; Go to time and About restyled; error dialog read-only details, focus on Retry; Effects tabs fit (narrow drawer moves More beside close), EQ scrolls; Open media Tab order tiles → panel → buttons.
+- Library: Home updates the playing row in place (no rebuild); recent lengths and paths; no invisible Tab stops.
+- Performance: spectrum idles while covered or minimised; reduced motion honoured by the seek loading bounce, art fade and snow.
+- Translations: new sources in `po/POTFILES.in`; tooltips "%1 (%2)" translatable with localized key names; locale decimal separators.
+
+### Deviations
+- Effects tab and Preferences section UIA "Select" does nothing (Qt 5.6 `accSelect` is a stub); Invoke works.
+- Moving the window to another monitor during playback can leave it taller (pre-existing; resizing to Windows' suggested rect would change behaviour).
+- High contrast keeps system point fonts, so text may clip after a monitor move (`shortcut:` in `Theme::setScreen`).
+- Focus ring and painted line widths are not scaled per monitor (token says unscaled).
+- The mouse wheel sets the volume only over the player, the deck and the now-playing bar (not over library pages, the sidebar, Preferences or the docked Effects/playlist panels).
+- "Display preview" for snapshots (`snapshot-preview`) is shown but ignored: the toast replaces it (P6-9).
+- The fullscreen controller is now reachable with Tab (stock: not a Tab stop); the first Esc gives the keys back, the second leaves fullscreen.
+- 100 % and monitor-move results come from the two-monitor runs before the owner's second screen was disconnected; later fixes were checked at 125 %, 150 % (QT_SCALE_FACTOR) and with a scale-change test hook.
+- RTL layout could not be run (needs a Windows setting); mirrored by code reading only.
+
+### Deferred (pre-existing, stock)
+- Open media Capture: the DirectShow device scan blocks forever on this machine (dump: dshow → devenum → FrameServerMonitorClient RPC wait).
+- Alt+D shared by Disc and Capture Device (a translated string).
+- 10,000-item playlist load (~45 s, stock ~40 s).
+- Translations: this build has no NLS (`build.sh -l` needed).
+
+### Manual test steps
+1. Play a video, press Tab: focus moves through the deck; Shift+Tab from Pause reaches "Back to library", then wraps to the deck's end.
+2. Leave the mouse on the video for 10 s: the header stays hidden; a 1-px move brings it back; pause shows it.
+3. Ctrl+Shift+O, Shift+Tab to the File tile, Right: Disc is selected (no hang); Capture is never reached by Shift+Tab.
+4. Home → Videos → Music → Network → Ctrl+P → Back at 1280×800: the window size never changes.
+5. Move the window to a monitor with another scale and back: text, icons and rows grow together and come back identical; paused time stays.
+6. Effects at 800×600: tabs show full labels, all 10 bands reachable by scrolling.
+
+### Edge cases (`redesign/docs/EDGE_CASES.md`), Phase 6
+Evidence: `D:\Projects\VLC\spike-results\p6-edge\` (runtime sessions), `p6-va\`, `p6-vb\`, `p6-vc\`, `p6-v2a\`, `p6-v3a\`, `p6-v3b\`, `p6-design\`, `p6-final\` and each fix lane's folder. Not committed.
+
+| Row | Result | Evidence or reason |
+|---|---|---|
+| 800×600 minimum, maximised, snaps | **fixed** | With video the window reached only 882 logical px; the expert row hides first and the extra 80 px are gone. |
+| DPI change while running, monitors with different scales | **fixed** | P6-6: the theme is re-applied at the new scale (pixel fonts, rescaled pages, caption cut per monitor dpi, column widths and dialog minimums kept). Two-monitor runs before the second screen was disconnected; later fixes with a test hook. |
+| Light/dark switch, high contrast | **pass** / **deferred** | Theme switch with Help, About and pop-ups open passes. High contrast is still read at start only (`shortcut:`). |
+| Animation effects off | **pass by code** / **not tested** | Every animation reads the setting (seek bounce, art fade, snow, spectrum, header). Running it needs a Windows setting. |
+| Menu bar / minimal view / fullscreen ± controller | **fixed** | Ctrl+H restores width and sidebar; no header in fullscreen or minimal view; no invisible Tab stops in fullscreen; the controller is reachable with Tab. |
+| Playlist docked / detached / XS drawer; no width drift | **fixed** | Docked panels never push the window past the work area; a small video keeps the panel docked; the resume panel no longer grows the window on every replay. |
+| Toolbar strings, editor round-trip | **pass** | `fitWidth` only shows or hides; strings untouched; rebuilt toolbars get the current position. |
+| `-I skins2`, `--qt-minimal-view` | **pass** | Effects window close-only; no header in minimal view; reopening the Qt interface is not possible in stock. |
+| Long strings, RTL, CJK | **deferred** | RTL needs a Windows setting; mirrored by code only. Effects tabs elide with tooltips. |
+| Keyboard only | **fixed** | Tab works after media opens (native-window fix); Open media tiles are a tab list; Shift+Tab wraps through the header back button without loops in every layout. |
+| Space on a focusable button = play/pause | **pass** | Including the header back button (earlier failures were a test tool dropping spaces). |
+| Narrator names and states | **fixed** | 0 unnamed controls on every surface; sliders, tiles, tracks button, seek bars ("x of y") and deck shortcuts exposed; duplicate caption buttons hidden (P6-3). UIA Select stays a Qt 5.6 stub. |
+| Toast must not cover the subtitle it announces | **fixed** | The toast follows the immersive lift. |
+| Subtitle position hotkeys while lifted; vout reuse | **pass** | Offset kept after the bar sleeps; no creep across items. |
+| Two video outputs (clone) | **deferred** | No embedded vout in that mode, so the lift does not apply. |
+| Buffering forever / unreachable URL | **fixed** | The ring shows for slow streams over the video's black; unreachable URLs show the error dialog with focus on Retry. |
+| Aspect ratios | **fixed** | The badge shows the picture's ratio (16:9, also for 640×360). |
+| Home → Videos → Home, Preferences: no size change | **fixed** | Library pages and Preferences never resize the window. |
+| Recents length while playing | **fixed** | Updated in place, no page rebuild (focus kept). |
+| Prefs Save/Cancel/Reset; stop after Preferences | **pass** / **fixed** | Stopping a video after Preferences now goes Home; the docked playlist hides while Preferences shows. |
+| Open media: arrow keys, Capture | **fixed** / **deferred** | Arrow keys no longer reach Capture by accident; Capture itself still blocks in the DirectShow scan (stock). |
+| Closing during playback, 50× open/close | **pass** | No leaks in the survey (20–60 cycles). |
+| Overlays over the video after the native-window change | **pass** | Docked and XS panels, fullscreen controller, minimal view, mini player, audio mode, resize, dark and light. |
+| Mouse wheel over panels | **fixed** | The wheel over the Effects sheet or playlist no longer changes the volume. |
