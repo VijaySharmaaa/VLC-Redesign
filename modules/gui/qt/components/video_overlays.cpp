@@ -697,13 +697,17 @@ QRect ImmersiveBar::restingRect() const
  * DWM acrylic, Windows 10+ only), upgrade with the Phase 6 Mica/acrylic work */
 void ImmersiveBar::paintEvent( QPaintEvent * )
 {
+    paintDeckGlass( this, Theme::instance()->metric( Theme::RadiusTile ) );
+}
+
+void paintDeckGlass( QWidget *w, int radius )
+{
     Theme *t = Theme::instance();
-    const int radius = t->metric( Theme::RadiusTile );
-    QPainter p( this );
+    QPainter p( w );
     p.setRenderHint( QPainter::Antialiasing );
     p.setPen( t->ink( V::ImmersiveBorderAlpha ) );
     p.setBrush( t->color( Theme::Glass ) );
-    p.drawRoundedRect( QRectF( rect() ).adjusted( .5, .5, -.5, -.5 ), radius, radius );
+    p.drawRoundedRect( QRectF( w->rect() ).adjusted( .5, .5, -.5, -.5 ), radius, radius );
 }
 
 /**********************************************************************
