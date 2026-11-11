@@ -324,7 +324,7 @@ protected:
 private slots:
     void showFSC();
     void planHideFSC();
-    void hideFSC() { hide(); }
+    void hideFSC() { b_keysTaken = false; hide(); }
     void slowHideFSC();
     void restoreFSC();
     void centerFSC( int );
@@ -357,6 +357,7 @@ private:
 
     bool isWideFSC;
     int i_sensitivity;
+    bool b_keysTaken;   /* takeFocus() gave it the keys, until it hides */
 };
 
 #endif
