@@ -2396,6 +2396,19 @@ void MainInterface::handleKeyPress( QKeyEvent *e )
 
 void MainInterface::wheelEvent( QWheelEvent *e )
 {
+    /* the volume follows the wheel over the player and the deck, as over
+     * stock's window; a page or a docked panel (Effects, playlist) passes
+     * on a wheel it can't use (a list at its end), which it keeps */
+    QWidget *w = childAt( e->pos() );
+    const bool over = w && ( ( onPlayerPage() && stackCentralW->isAncestorOf( w ) )
+        || ( controls && ( w == controls || controls->isAncestorOf( w ) ) )
+        || ( inputC && ( w == inputC || inputC->isAncestorOf( w ) ) )
+        || ( nowPlayingBar && ( w == nowPlayingBar || nowPlayingBar->isAncestorOf( w ) ) ) );
+    if( !over )
+    {
+        e->accept();
+        return;
+    }
     int i_vlckey = qtWheelEventToVLCKey( e );
     var_SetInteger( p_intf->obj.libvlc, "key-pressed", i_vlckey );
     e->accept();
