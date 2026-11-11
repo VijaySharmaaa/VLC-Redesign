@@ -1,0 +1,115 @@
+/*****************************************************************************
+ * thumbnailer.hpp : video frames and watch state for the library cards
+ *****************************************************************************
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
+ *****************************************************************************/
+
+#ifndef VLC_QT_THUMBNAILER_HPP_
+#define VLC_QT_THUMBNAILER_HPP_
+
+#include "qt.hpp"
+
+#include <QHash>
+#include <QObject>
+#include <QRunnable>
+#include <QSet>
+#include <QStringList>
+
+class QProcess;
+class QTimer;
+
+/* Frames of local videos for the library cards (issue I1-3). VLC 3 has no
+ * thumbnailer API: the package's own vlc.exe grabs one frame, headless,
+ * with the scene filter, into the cache directory, keyed by path, size and
+ * modification time. One process at a time, killed after a timeout, when
+ * the page is left (cancel) and when VLC quits; the user's media are only
+ * read. Also lists local folders (the videos in them) and tells, from the
+ * recents (RecentsMRL), where a file resumes and whether it was watched. */
+class Thumbnailer : public QObject
+{
+    Q_OBJECT
+public:
+    Thumbnailer( intf_thread_t *, QObject *parent );
+    ~Thumbnailer();
+
+    /* The frame (a PNG file) of a local video, empty while it is made or
+     * when there is none: changed() follows a new one. lengthMs <= 0 when
+     * unknown. Paths are native or Qt paths. */
+    QString frame( const QString &path, int64_t lengthMs );
+    /* The videos of a local folder, by name; NULL while it is listed */
+    const QStringList *videos( const QString &dir );
+    /* Where a file resumes, 0..1, or -1 when it does not */
+    qreal resume( const QString &path ) const;
+    /* How many videos of a listed folder were played to their end (or
+     * stopped too soon to resume, as RecentsMRL keeps no other state) */
+    int watchedIn( const QString &dir );
+    /* Drops the queue and the listings: the page was left */
+    void cancel();
+
+    static bool isVideo( const QString &path );
+
+signals:
+    void changed();
+
+private slots:
+    void probed( const QString &path, const QString &file, bool cached );
+    void listed( const QString &dir, const QStringList &videos );
+    void loadRecents();
+
+private:
+    struct Request
+    {
+        QString path, file;
+        int atSec;
+    };
+    void startNext();
+    void finish( bool ok );
+    void stopProcess();
+
+    intf_thread_t *p_intf;
+    QString cacheDir, tmpFile;
+    QHash<QString, QString> frames;          /* key: its PNG file */
+    QSet<QString> pendingFrames, failedFrames, pendingDirs;
+    QHash<QString, QStringList> dirs;
+    QHash<QString, int> watchedCounts;       /* key: of dirs, as painted */
+    QHash<QString, int64_t> lengths;         /* key: length asked with */
+    QHash<QString, qreal> played;            /* key: resume point, 1 when watched */
+    QList<Request> queue;                    /* the latest asked first */
+    Request current;
+    QProcess *process;
+    QTimer *timeout;
+};
+
+/* The probe (size and date, the cached frame) of a file, or the listing of
+ * a folder, on LibraryData::workerPool(): an offline share can block */
+class ThumbJob : public QObject, public QRunnable
+{
+    Q_OBJECT
+public:
+    ThumbJob( const QString &_path, const QString &_cacheDir, bool _listing )
+        : path( _path ), cacheDir( _cacheDir ), listing( _listing ) {}
+    void run() Q_DECL_OVERRIDE;
+
+signals:
+    /* file empty: no such file */
+    void probed( const QString &path, const QString &file, bool cached );
+    void listed( const QString &dir, const QStringList &videos );
+
+private:
+    QString path, cacheDir;
+    bool listing;
+};
+
+#endif

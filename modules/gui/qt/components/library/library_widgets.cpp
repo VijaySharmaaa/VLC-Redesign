@@ -24,6 +24,7 @@
 #include <QThreadPool>
 
 #include "components/library/library_widgets.hpp"
+#include "components/library/thumbnailer.hpp"
 #include "components/now_playing.hpp"         /* paintStripes, fontAt, codecName */
 #include "components/playlist/playlist_model.hpp"
 #include "components/playlist/selector.hpp"   /* PLSelector::loadSD, sdNode */
@@ -37,6 +38,7 @@
 
 #include <vlc_input_item.h>
 #include <vlc_services_discovery.h>
+#include <vlc_url.h>
 
 #include <QAction>
 #include <QHBoxLayout>
@@ -307,11 +309,14 @@ void ArtLoader::loaded( const QString &key, const QImage &image )
 /**********************************************************************
  * CardDelegate
  **********************************************************************/
-CardDelegate::CardDelegate( Kind _kind, LibraryFilter *_filter, QObject *parent )
+CardDelegate::CardDelegate( Kind _kind, LibraryFilter *_filter, QObject *parent,
+                            Thumbnailer *_thumbs )
     : QStyledItemDelegate( parent ), kind( _kind ), filter( _filter ),
-      art( new ArtLoader( this ) ), cols( 1 ), cellW( 0 )
+      art( new ArtLoader( this ) ), thumbs( _thumbs ), cols( 1 ), cellW( 0 )
 {
     connect( art, &ArtLoader::ready, this, &CardDelegate::repaint );
+    if( thumbs )
+        connect( thumbs, &Thumbnailer::changed, this, &CardDelegate::repaint );
 }
 
 void CardDelegate::setColumns( int _cols, int _cellW )
@@ -414,6 +419,9 @@ void CardDelegate::paintCard( QPainter *p, const QStyleOptionViewItem &option,
         p->drawPixmap( QPointF( thumb.center().x() - s.width() / 2,
                                 thumb.center().y() - s.height() / 2 ), pixmap );
     }
+    const qreal watched = progress( input, source );
+    if( watched > 0 )
+        paintProgress( p, thumb, watched, option.direction );
     p->setClipping( false );
 
     /* DESIGN_SPEC 4: hover is a 1 px accent border */
@@ -517,7 +525,32 @@ QString CardDelegate::artPath( input_item_t *input, const QModelIndex &source ) 
     const PLModel *model = static_cast<PLModel *>( filter->sourceModel() );
     for( int i = 0; path.isEmpty() && i < qMin<int>( ArtProbe, model->rowCount( source ) ); i++ )
         path = InputManager::decodeArtURL( model->getInputItem( model->index( i, 0, source ) ) );
-    return path;
+    if( !path.isEmpty() || !thumbs )
+        return path;
+
+    /* no art: a frame of the video, or of a folder's first video */
+    const QString local = localPath( input );
+    if( local.isEmpty() )
+        return path;
+    if( !LibraryData::isFolder( model, source ) )
+        return thumbs->frame( local, input_item_GetDuration( input ) / 1000 );
+    const QStringList *videos = thumbs->videos( local );
+    return videos && !videos->isEmpty() ? thumbs->frame( videos->first(), 0 ) : path;
+}
+
+qreal CardDelegate::progress( input_item_t *input, const QModelIndex &source ) const
+{
+    const QString local = thumbs ? localPath( input ) : QString();
+    if( local.isEmpty() )
+        return -1;
+    const PLModel *model = static_cast<PLModel *>( filter->sourceModel() );
+    if( !LibraryData::isFolder( model, source ) )
+        return thumbs->resume( local );
+    /* a folder: how many of its videos were watched */
+    const QStringList *videos = thumbs->videos( local );
+    if( !videos || videos->isEmpty() )
+        return -1;
+    return qreal( thumbs->watchedIn( local ) ) / videos->count();
 }
 
 QString CardDelegate::metaLine( input_item_t *input, const QModelIndex &source ) const
@@ -525,6 +558,11 @@ QString CardDelegate::metaLine( input_item_t *input, const QModelIndex &source )
     const PLModel *model = static_cast<PLModel *>( filter->sourceModel() );
     if( LibraryData::isFolder( model, source ) )
     {
+        const QString local = thumbs ? localPath( input ) : QString();
+        const QStringList *videos = local.isEmpty() ? NULL : thumbs->videos( local );
+        if( videos && !videos->isEmpty() )
+            return QString::fromUtf8( vlc_ngettext( "%1 video", "%1 videos", videos->count() ) )
+                   .arg( videos->count() );
         if( source.data( VLCModelSubInterface::LEAF_NODE_ROLE ).toBool() )
             return qtr( "Folder" );     /* not expanded yet */
         const int n = model->rowCount( source );
@@ -534,6 +572,28 @@ QString CardDelegate::metaLine( input_item_t *input, const QModelIndex &source )
     const QString line = kind == AlbumCard ? takeString( input_item_GetArtist( input ) )
                                            : mediaMetaLine( input );
     return line.isEmpty() ? QString::fromUtf8( "—" ) : line;
+}
+
+QString localPath( input_item_t *input )
+{
+    char *uri = input_item_GetURI( input );
+    char *path = uri ? vlc_uri2path( uri ) : NULL;
+    const QString local = qfu( path );
+    free( uri );
+    free( path );
+    return local;
+}
+
+void paintProgress( QPainter *p, const QRectF &thumb, qreal fraction, Qt::LayoutDirection dir )
+{
+    const Theme *t = Theme::instance();
+    const qreal h = t->px( Home::Progress );
+    const QRectF track( thumb.left(), thumb.bottom() - h, thumb.width(), h );
+    p->fillRect( track, t->ink( InkAlpha::ProgressTrack ) );
+    QRectF done( track.left(), track.top(), track.width() * qBound<qreal>( 0, fraction, 1 ), h );
+    if( dir == Qt::RightToLeft )
+        done.moveRight( track.right() );
+    p->fillRect( done, t->color( Theme::Accent ) );
 }
 
 QString mediaMetaLine( input_item_t *input )
