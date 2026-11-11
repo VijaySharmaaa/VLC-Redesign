@@ -165,7 +165,11 @@ void TitleBar::updateIcons()
     foreach( QToolButton *b, QList<QToolButton *>() << minButton << maxButton << closeButton )
         b->setFixedWidth( t->metric( Theme::CaptionButtonW ) );
     cone->setIconSize( coneSize );
-    cone->setIcon( t->icon( RedesignIcons::IconCone, Theme::Text, coneSize ) );
+    /* the original VLC cone, as the app icon (owner's choice over cone.svg) */
+    QIcon logo;
+    foreach( const char *size, QList<const char *>() << "16" << "48" << "128" << "256" )
+        logo.addFile( QString( ":/logo/vlc%1.png" ).arg( size ) );
+    cone->setIcon( logo );
     minButton->setIconSize( glyph );
     minButton->setIcon( t->icon( RedesignIcons::IconMinimize, Theme::Text2, glyph ) );
     QIcon close = t->icon( RedesignIcons::IconClose, Theme::Text2, glyph );
