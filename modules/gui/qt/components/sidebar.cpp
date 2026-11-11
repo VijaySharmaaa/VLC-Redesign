@@ -27,6 +27,7 @@
 #include "components/library/network_page.hpp"
 #include "components/prefs_page.hpp"
 #include "dialogs_provider.hpp"
+#include "menus.hpp"                    /* MENU_KEY_* */
 #include "util/theme.hpp"
 #include "util/customwidgets.hpp"     /* hotkeyText */
 #include "util/redesign_icons.hpp"
@@ -38,6 +39,7 @@
 #include <QLabel>
 #include <QPainter>
 #include <QSignalBlocker>
+#include <QSpacerItem>
 #include <QStackedWidget>
 #include <QStyle>
 #include <QVBoxLayout>
@@ -240,6 +242,17 @@ static void padNav( QLayout *layout, int spacing )
     layout->setContentsMargins( t->px( Size::SidebarPadX ), t->px( Size::SidebarPadY ),
                                 t->px( Size::SidebarPadX ), t->px( Size::SidebarPadY ) );
     layout->setSpacing( t->px( spacing ) );
+    layout->invalidate();   /* also for a resized gap (gapBelow) */
+}
+
+/* A gap of the token's height, resized with gapBelow() again when the scale changes */
+static QSpacerItem *gapBelow( QSpacerItem *gap, int token )
+{
+    const int h = Theme::instance()->px( token );
+    if( !gap )
+        return new QSpacerItem( 0, h, QSizePolicy::Minimum, QSizePolicy::Fixed );
+    gap->changeSize( 0, h, QSizePolicy::Minimum, QSizePolicy::Fixed );
+    return gap;
 }
 
 /* A page of the sidebar's stack, with the sidebar's padding */
@@ -263,14 +276,13 @@ Sidebar::Sidebar( intf_thread_t *p_intf, QWidget *parent )
     QVBoxLayout *layout = navLayout( navs, Size::SidebarItemGap );
     const Theme *t = Theme::instance();
 
-    /* shortcut: the keys are copied from menus.cpp (Open Multiple Files,
-     * Preferences), read them from the menu actions once lane A exposes them */
     SidebarButton *open = new SidebarButton( qtr( "Open media" ), RedesignIcons::IconOpenMedia,
                                              SidebarButton::Open, this );
-    open->setToolTip( tip( qtr( "Open media" ), hotkeyText( p_intf, "Ctrl+Shift+O" ) ) );
+    open->setToolTip( tip( qtr( "Open media" ), hotkeyText( p_intf, MENU_KEY_OPEN_MEDIA ) ) );
     connect( open, &QAbstractButton::clicked, this, []() { THEDP->openDialog(); } );
     layout->addWidget( open );
-    layout->addSpacing( t->px( Size::SidebarOpenBelow ) );
+    openGap = gapBelow( NULL, Size::SidebarOpenBelow );
+    layout->addSpacerItem( openGap );
     buttons.append( open );
 
     static const struct { const char *label; const char *icon; } nav[Preferences] = {
@@ -306,7 +318,7 @@ Sidebar::Sidebar( intf_thread_t *p_intf, QWidget *parent )
     layout->addStretch( 1 );
     SidebarButton *prefs = new SidebarButton( qtr( "Preferences" ), RedesignIcons::IconSettings,
                                               SidebarButton::Nav, this );
-    prefs->setToolTip( tip( qtr( "Preferences" ), hotkeyText( p_intf, "Ctrl+P" ) ) );
+    prefs->setToolTip( tip( qtr( "Preferences" ), hotkeyText( p_intf, MENU_KEY_PREFERENCES ) ) );
     prefs->setCheckable( true );
     prefs->setAutoExclusive( true );
     group->addButton( prefs, Preferences );
@@ -329,7 +341,8 @@ Sidebar::Sidebar( intf_thread_t *p_intf, QWidget *parent )
     setBackLabel( true );
     connect( back, &QAbstractButton::clicked, this, &Sidebar::goBack );
     prefsNav->addWidget( back );
-    prefsNav->addSpacing( t->px( Size::SidebarBackBelow ) );
+    backGap = gapBelow( NULL, Size::SidebarBackBelow );
+    prefsNav->addSpacerItem( backGap );
     buttons.append( back );
     heading = new QLabel( qtr( "Preferences" ) );
     QFont font = t->font( Theme::NavTitle );
@@ -421,9 +434,9 @@ int Sidebar::widthAt( BreakpointWatcher::Size bp )
 
 void Sidebar::setBreakpoint( BreakpointWatcher::Size bp )
 {
-    /* also after a change of scale (BreakpointWatcher); shortcut: the
-     * spacings after Open and Back keep the start scale, rebuild them when
-     * a few px there matter */
+    /* also after a change of scale (BreakpointWatcher) */
+    gapBelow( openGap, Size::SidebarOpenBelow );
+    gapBelow( backGap, Size::SidebarBackBelow );
     padNav( navs->widget( 0 )->layout(), Size::SidebarItemGap );
     padNav( navs->widget( 1 )->layout(), Size::SidebarSectionGap );
     setFixedWidth( widthAt( bp ) );

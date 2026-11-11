@@ -31,6 +31,12 @@
 #include <QMenu>
 #include <QVector>
 
+/* Keys of the menu entries that other widgets name in their tooltips */
+#define MENU_KEY_OPEN_MEDIA  "Ctrl+Shift+O"
+#define MENU_KEY_OPEN_FOLDER "Ctrl+F"
+#define MENU_KEY_PREFERENCES "Ctrl+P"
+#define MENU_KEY_PLAYLIST    N_( "Ctrl+L" )  /* translated: qtr() it */
+
 class MenuItemData : public QObject
 {
     Q_OBJECT

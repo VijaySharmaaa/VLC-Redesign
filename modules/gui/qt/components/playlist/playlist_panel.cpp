@@ -28,6 +28,7 @@
 #include "components/overlay_host.hpp"
 #include "input_manager.hpp"
 #include "dialogs_provider.hpp"
+#include "menus.hpp"                    /* MENU_KEY_* */
 #include "util/customwidgets.hpp"                   /* timeString */
 #include "util/theme.hpp"
 #include "util/redesign_icons.hpp"
@@ -215,10 +216,8 @@ PlaylistPanel::PlaylistPanel( intf_thread_t *_p_intf, QBoxLayout *_dock, QWidget
     const int glyphPx = t->px( Playlist::HeadButtonGlyph );
     QToolButton *add = new QToolButton( content );
     QToolButton *close = new QToolButton( content );
-    /* shortcut: Ctrl+L is copied from menus.cpp (View > Playlist), read it
-     * from that action once the menus expose it */
     const QString closeTip = QString( "%1 (%2)" ).arg( qtr( "Close playlist" ),
-        QKeySequence( QLatin1String( "Ctrl+L" ) ).toString( QKeySequence::NativeText ) );
+        QKeySequence( qtr( MENU_KEY_PLAYLIST ) ).toString( QKeySequence::NativeText ) );
     const struct { QToolButton *button; const char *icon; QString name, tip; } buttons[] = {
         { add, RedesignIcons::IconAdd, qtr( I_PL_ADDF ), qtr( I_PL_ADDF ) },
         { close, RedesignIcons::IconClose, qtr( "Close playlist" ), closeTip },

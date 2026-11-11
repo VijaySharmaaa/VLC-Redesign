@@ -315,6 +315,7 @@ public:
 
     void init() Q_DECL_OVERRIDE;
     void paint() Q_DECL_OVERRIDE;
+    void clearCache() { qDeleteAll( cache ); cache.clear(); }
 
 private:
     QSize size;

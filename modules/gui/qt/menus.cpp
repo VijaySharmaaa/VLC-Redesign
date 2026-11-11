@@ -384,9 +384,9 @@ QMenu *VLCMenuBar::FileMenu( intf_thread_t *p_intf, QWidget *parent, MainInterfa
     addDPStaticEntry( menu, qtr( "Open &File..." ),
         RedesignIcons::MenuOpenFile, SLOT( simpleOpenDialog() ), "Ctrl+O" );
     addDPStaticEntry( menu, qtr( "&Open Multiple Files..." ),
-        RedesignIcons::MenuOpenFiles, SLOT( openFileDialog() ), "Ctrl+Shift+O" );
+        RedesignIcons::MenuOpenFiles, SLOT( openFileDialog() ), MENU_KEY_OPEN_MEDIA );
     addDPStaticEntry( menu, qtr( I_OP_OPDIR ),
-        RedesignIcons::MenuOpenFolder, SLOT( PLOpenDir() ), "Ctrl+F" );
+        RedesignIcons::MenuOpenFolder, SLOT( PLOpenDir() ), MENU_KEY_OPEN_FOLDER );
     addDPStaticEntry( menu, qtr( "Open &Disc..." ),
         RedesignIcons::MenuOpenDisc, SLOT( openDiscDialog() ), "Ctrl+D" );
     addDPStaticEntry( menu, qtr( "Open &Network Stream..." ),
@@ -470,7 +470,7 @@ QMenu *VLCMenuBar::ToolsMenu( intf_thread_t *p_intf, QMenu *menu )
             RedesignIcons::MenuPreferences, SLOT( toolbarDialog() ) );
 
     addDPStaticEntry( menu, qtr( "&Preferences" ),
-        RedesignIcons::MenuPreferences, SLOT( prefsDialog() ), "Ctrl+P", QAction::PreferencesRole );
+        RedesignIcons::MenuPreferences, SLOT( prefsDialog() ), MENU_KEY_PREFERENCES, QAction::PreferencesRole );
 
     return menu;
 }
@@ -512,7 +512,7 @@ QMenu *VLCMenuBar::ViewMenu( intf_thread_t *p_intf, QMenu *current, MainInterfac
             menuIcon( RedesignIcons::MenuPlaylist ),
 #endif
             qtr( "Play&list" ), mi,
-            SLOT( togglePlaylist() ), qtr( "Ctrl+L" ) );
+            SLOT( togglePlaylist() ), qtr( MENU_KEY_PLAYLIST ) );
 
     /* Docked Playlist */
     action = menu->addAction( qtr( "Docked Playlist" ) );

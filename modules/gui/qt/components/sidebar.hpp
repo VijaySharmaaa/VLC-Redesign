@@ -27,6 +27,7 @@
 class QAbstractButton;
 class QButtonGroup;
 class QLabel;
+class QSpacerItem;
 class QStackedWidget;
 class PrefsPage;
 class SidebarButton;
@@ -80,6 +81,7 @@ private:
     QList<SidebarButton *> buttons;
     SidebarButton *back;
     QLabel *heading;
+    QSpacerItem *openGap, *backGap;   /* below Open and Back */
     QWidget *pages[PageCount];
     PrefsPage *prefsPage;
     QWidget *currentPage;   /* the stack's, from setCurrentWidget() */

@@ -455,8 +455,8 @@ static QImage* prepareSurface(const QImage* slideImage, int w, int h, QRgb bgcol
     imagePainter.setTransform( rotation );
     imagePainter.drawImage( (w-img.width())/2, (h-img.height())/2, img );
     imagePainter.setBrush( QColor(bg));//QBrush( Qt::lightGray ) );
-    /* text over a shadow in the window colour; shortcut: slides already
-     * cached keep the old colours after a theme change, until they reload */
+    /* text over a shadow in the window colour (the cache is dropped when
+     * the theme changes) */
     const Theme *theme = Theme::instance();
     const QColor text = theme->color( Theme::Text ), shadow = theme->color( Theme::Bg );
     QFontMetrics fm = imagePainter.fontMetrics();
@@ -650,10 +650,16 @@ PictureFlow::PictureFlow(QWidget* parent, QAbstractItemModel* _p_model): QWidget
     d->state->reset();
     d->state->reposition();
 
-    d->renderer = new PictureFlowSoftwareRenderer;
+    PictureFlowSoftwareRenderer *renderer = new PictureFlowSoftwareRenderer;
+    d->renderer = renderer;
     d->renderer->state = d->state;
     d->renderer->widget = this;
     d->renderer->init();
+    /* cached slides carry the title colours of the theme they were drawn in */
+    connect( Theme::instance(), &Theme::changed, this, [this, renderer]() {
+        renderer->clearCache();
+        triggerRender();
+    } );
 
     d->animator = new PictureFlowAnimator;
     d->animator->state = d->state;

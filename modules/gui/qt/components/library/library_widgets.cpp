@@ -28,6 +28,7 @@
 #include "components/playlist/playlist_model.hpp"
 #include "components/playlist/selector.hpp"   /* PLSelector::loadSD, sdNode */
 #include "dialogs_provider.hpp"
+#include "menus.hpp"                    /* MENU_KEY_* */
 #include "input_manager.hpp"
 #include "main_interface.hpp"
 #include "util/customwidgets.hpp"             /* QElidingLabel */
@@ -800,13 +801,11 @@ LibraryEmptyState::LibraryEmptyState( const QString &text, const QString &note, 
     QPushButton *add = new QPushButton( qtr( "Add a folder" ), this );
     add->setProperty( "role", "primary" );
     add->setIcon( t->icon( RedesignIcons::IconAddFolder, Theme::OnAccent ) );
-    /* shortcut: the keys are copied from menus.cpp (Open Folder, Open
-     * Multiple Files) like the sidebar's, read them from the actions later */
-    add->setToolTip( withShortcut( qtr( "Add a folder to the playlist and play it" ), "Ctrl+F" ) );
+    add->setToolTip( withShortcut( qtr( "Add a folder to the playlist and play it" ), MENU_KEY_OPEN_FOLDER ) );
     connect( add, &QPushButton::clicked, []() { THEDP->PLOpenDir(); } );
     QPushButton *open = new QPushButton( qtr( "Open media..." ), this );
     open->setProperty( "role", "outline" );
-    open->setToolTip( withShortcut( qtr( "Open media" ), "Ctrl+Shift+O" ) );
+    open->setToolTip( withShortcut( qtr( "Open media" ), MENU_KEY_OPEN_MEDIA ) );
     connect( open, &QPushButton::clicked, []() { THEDP->openDialog(); } );
     const int iconPx = t->px( Library::EmptyButtonIcon );
     foreach( QPushButton *b, QList<QPushButton *>() << add << open )
