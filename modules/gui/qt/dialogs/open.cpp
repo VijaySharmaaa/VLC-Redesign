@@ -201,8 +201,7 @@ OpenDialog::OpenDialog( QWidget *parent,
     setWindowRole( "vlc-open-media" );
     setWindowModality( Qt::WindowModal );
     /* a modal sheet in the design (1.7): Close only, no min/max */
-    setWindowFlags( Qt::Dialog | Qt::WindowTitleHint | Qt::WindowSystemMenuHint |
-                    Qt::WindowCloseButtonHint );
+    setWindowFlags( sheetWindowFlags() );
 
     /* Tab definition and creation */
     fileOpenPanel    = new FileOpenPanel( this, p_intf );
