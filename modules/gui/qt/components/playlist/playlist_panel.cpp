@@ -147,7 +147,7 @@ void RowDelegate::paint( QPainter *p, const QStyleOptionViewItem &option,
         if( !part.isEmpty() )
             metaParts << part;
     }
-    const QString meta = metaParts.join( QString::fromUtf8( " \xC2\xB7 " ) );
+    const QString meta = metaParts.join( metaSeparator() );
     const int metaGap = t->px( Playlist::RowMetaGap );
     const int blockH = titleFm.height() + ( meta.isEmpty() ? 0 : metaGap + metaFm.height() );
     const int top = r.y() + ( r.height() - blockH ) / 2;
@@ -182,7 +182,12 @@ PlaylistPanel::PlaylistPanel( intf_thread_t *_p_intf, QBoxLayout *_dock, QWidget
     dock->addWidget( this );
 
     Theme *t = Theme::instance();
-    model = PLModel::getPLModel( p_intf );
+    /* not the shared model: the playlist window's sources (My Videos...)
+     * rebuild that one on their own node */
+    playlist_Lock( THEPL );
+    playlist_item_t *root = THEPL->p_playing;
+    playlist_Unlock( THEPL );
+    model = new PLModel( THEPL, p_intf, root, this );
 
     content = new QWidget( this );
     QVBoxLayout *layout = new QVBoxLayout( content );
@@ -228,16 +233,28 @@ PlaylistPanel::PlaylistPanel( intf_thread_t *_p_intf, QBoxLayout *_dock, QWidget
     connect( close, &QToolButton::clicked, this, &PlaylistPanel::closeRequested );
     layout->addLayout( head );
 
-    /* Filter: filters the shared model, so the separate window's views too */
-    /* as the library's search field */
+    /* Filter, as the library's search field. It marks the playlist's items
+     * (PLModel::filter), so the playlist window shows the same search. */
     QLineEdit *filter = new QLineEdit( content );
     filter->setAccessibleName( qtr( "Filter playlist" ) );
     filter->setPlaceholderText( qtr( "Filter playlist" ) );
     filter->setToolTip( qtr( "Filter playlist" ) );
     setupSearchField( filter, qtr( "Filter" ), qtr( "Clear filter" ) );
     filter->setFixedHeight( t->metric( Theme::SelectH ) );
-    connect( filter, &QLineEdit::textChanged, this,
-             [this]( const QString &text ) { model->filter( text, QModelIndex(), true ); } );
+    PLModel *shared = PLModel::getPLModel( p_intf );
+    connect( filter, &QLineEdit::textChanged, this, [this, shared]( const QString &text ) {
+        /* not when the shared model's own search set this text */
+        const bool fromHere = PLModel::mainSearch() != text;
+        model->filter( text, QModelIndex(), true );
+        /* the shared model (the playlist window, audio mode's tracks)
+         * shows the same, while it shows the main playlist */
+        if( fromHere && shared->itemId( QModelIndex() ) == THEPL->p_playing->i_id )
+            shared->filter( text, QModelIndex(), true );
+    } );
+    connect( shared, &PLModel::searchChanged, filter, [filter]( const QString &text ) {
+        if( filter->text() != text )
+            filter->setText( text );
+    } );
     QHBoxLayout *filterRow = new QHBoxLayout;
     filterRow->setContentsMargins( t->px( Playlist::FilterMarginX ), 0,
                                    t->px( Playlist::FilterMarginX ), t->px( Playlist::FilterMarginBottom ) );
@@ -271,32 +288,19 @@ PlaylistPanel::PlaylistPanel( intf_thread_t *_p_intf, QBoxLayout *_dock, QWidget
     connect( THEMIM->getIM(), &InputManager::playingStatusChanged,
              view->viewport(), static_cast<void (QWidget::*)()>( &QWidget::update ) );
 
-    /* one count per burst of model changes (a 10,000 item load) */
+    /* one count per burst of model changes (a 10,000 item load, each
+     * item's preparse), and none while closed: setOpen() counts */
     countTimer.setSingleShot( true );
-    countTimer.setInterval( 0 );
+    countTimer.setInterval( Playlist::CountDebounceMs );
     connect( &countTimer, &QTimer::timeout, this, [this]() {
-        const int n = model->rowCount();
-        QString text = QString::fromUtf8( vlc_ngettext( "%1 item", "%1 items", n ) ).arg( n );
-        /* the known durations' sum; unknown ones (streams) count nothing */
-        mtime_t total = 0;
-        for( int i = 0; i < n; i++ )
-        {
-            input_item_t *item = model->getInputItem( model->index( i, 0, QModelIndex() ) );
-            const mtime_t duration = item ? input_item_GetDuration( item ) : 0;
-            if( duration > 0 )
-                total += duration;
-        }
-        if( total > 0 )
-            text += QString::fromUtf8( " · " ) + timeString( total / CLOCK_FREQ );
-        count->setText( text );
+        if( isVisible() )
+            updateCount();
     } );
     connect( model, &QAbstractItemModel::rowsInserted, this, [this]() { countTimer.start(); } );
     connect( model, &QAbstractItemModel::rowsRemoved, this, [this]() { countTimer.start(); } );
     connect( model, &QAbstractItemModel::modelReset, this, [this]() { countTimer.start(); } );
     /* durations arrive with preparsing */
     connect( model, &QAbstractItemModel::dataChanged, this, [this]() { countTimer.start(); } );
-    countTimer.start();
-
     host = new OverlayHost( over, this );
     connect( host, &OverlayHost::changed, this, &PlaylistPanel::place );
 
@@ -306,6 +310,24 @@ PlaylistPanel::PlaylistPanel( intf_thread_t *_p_intf, QBoxLayout *_dock, QWidget
              [this]( const QVariant &v ) { setShownWidth( v.toInt() ); } );
 
     connect( t, &Theme::changed, this, [this]() { update(); view->viewport()->update(); } );
+}
+
+void PlaylistPanel::updateCount()
+{
+    const int n = model->rowCount();
+    QString text = QString::fromUtf8( vlc_ngettext( "%1 item", "%1 items", n ) ).arg( n );
+    /* the known durations' sum; unknown ones (streams) count nothing */
+    mtime_t total = 0;
+    for( int i = 0; i < n; i++ )
+    {
+        input_item_t *item = model->getInputItem( model->index( i, 0, QModelIndex() ) );
+        const mtime_t duration = item ? input_item_GetDuration( item ) : 0;
+        if( duration > 0 )
+            total += duration;
+    }
+    if( total > 0 )
+        text += metaSeparator() + timeString( total / CLOCK_FREQ );
+    count->setText( text );
 }
 
 void PlaylistPanel::setOpen( bool open )
@@ -318,6 +340,7 @@ void PlaylistPanel::setOpen( bool open )
         hide();   /* exit is instant */
         return;
     }
+    updateCount();
     const int ms = Theme::instance()->duration( Theme::PanelSlide );
     setShownWidth( ms ? 0 : fullWidth );
     show();

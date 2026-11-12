@@ -49,6 +49,8 @@
  * Playlist model implementation
  *************************************************************************/
 
+QString PLModel::mainSearchText;
+
 PLModel::PLModel( playlist_t *_p_playlist,  /* THEPL */
                   intf_thread_t *_p_intf,   /* main Qt p_intf */
                   playlist_item_t * p_root,
@@ -884,6 +886,7 @@ void PLModel::sortInternal( QModelIndex rootIndex, int mode, int type )
 void PLModel::filter( const QString& search_text, const QModelIndex & idx, bool b_recursive )
 {
     latestSearch = search_text;
+    bool main;
 
     /** \todo Fire the search with a small delay ? */
     {
@@ -892,6 +895,7 @@ void PLModel::filter( const QString& search_text, const QModelIndex & idx, bool 
         playlist_item_t *p_root = playlist_ItemGetById( p_playlist,
                                                         itemId( idx ) );
         assert( p_root );
+        main = p_root == p_playlist->p_playing;
         playlist_LiveSearchUpdate( p_playlist, p_root, qtu( search_text ),
                                    b_recursive );
         if( idx.isValid() )
@@ -905,12 +909,16 @@ void PLModel::filter( const QString& search_text, const QModelIndex & idx, bool 
             beginInsertRows( idx, 0, searchRoot->childCount() - 1 );
             updateChildren( searchRoot ); // The PL_LOCK is needed here
             endInsertRows();
-
-            return;
         }
     }
 
-    rebuild();
+    if( !idx.isValid() )
+        rebuild();
+    if( main )
+    {
+        mainSearchText = search_text;
+        emit searchChanged( search_text );
+    }
 }
 
 void PLModel::removeAll()

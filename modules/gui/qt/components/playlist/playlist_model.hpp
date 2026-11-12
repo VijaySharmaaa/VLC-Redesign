@@ -162,6 +162,18 @@ private:
 public slots:
     virtual void activateItem( const QModelIndex &index ) Q_DECL_OVERRIDE;
 
+signals:
+    /* filter() ran on the main playlist (THEPL->p_playing), whose items
+     * keep the result: its other views show the same search */
+    void searchChanged( const QString & );
+
+public:
+    /* the main playlist's latest filter() text */
+    static QString mainSearch() { return mainSearchText; }
+
+private:
+    static QString mainSearchText;
+
 private slots:
     void processInputItemUpdate( input_item_t *);
     void processInputItemUpdate();

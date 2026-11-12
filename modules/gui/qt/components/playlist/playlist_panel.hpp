@@ -38,8 +38,8 @@ class PLModel;
 class PlListView;
 
 /* DESIGN_SPEC 6: the playlist docked at the right of the content area, on
- * the shared PLModel (so a filter here also filters the separate playlist
- * window). From S up it is the last widget of the dock layout; at XS it
+ * its own PLModel of the main playlist; its filter and the separate
+ * playlist window's search show the same text. From S up it is the last widget of the dock layout; at XS it
  * becomes a drawer: a tool window over the right of `over`, which may be
  * the native video, with a shadow. Exit is instant, enter slides. */
 class PlaylistPanel : public QWidget
@@ -64,6 +64,7 @@ protected:
 
 private:
     void popup( const QPoint & );
+    void updateCount();
     void setShownWidth( int );
     void place();
     int shadowWidth() const;
