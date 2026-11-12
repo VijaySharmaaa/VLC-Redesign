@@ -68,10 +68,64 @@ namespace LibraryData
     /* Once `item` (held; this takes the reference) plays, leave the library
      * for the video, or audio mode; `video` waits for the video output */
     void revealWhenPlaying( intf_thread_t *, input_item_t *, bool video );
-    /* Background reads (art, file checks): never waited for, so a read
-     * stuck on an offline share cannot hold up quitting */
+    /* Background reads (art, Home's file checks): never waited for, so a
+     * read stuck on an offline share cannot hold up quitting */
     QThreadPool *workerPool();
+    /* The same for the video frames' file checks and folder listings, on
+     * a few threads of their own: a share that hangs blocks only these */
+    QThreadPool *filePool();
 }
+
+class CardView;
+class LibraryHeader;
+class LibraryNotice;
+class LibraryFilter;
+
+/* Browsing a PLModel's folders in a CardView, shared by the Videos, Music
+ * and Network pages: into a folder (listing it first when it is not yet),
+ * back up to the page's top, the search cleared per folder, and the
+ * listing's loading and failed states. The page keeps its own states. */
+class LibraryBrowser : public QObject
+{
+    Q_OBJECT
+public:
+    LibraryBrowser( intf_thread_t *, LibraryFilter *, CardView *, LibraryHeader *, QObject *parent );
+    /* where back stops (backFromTop then); invalid: the model's root */
+    void setTop( const QModelIndex &source ) { top = source; }
+    void browse( const QModelIndex &source );
+    /* lists a folder not expanded yet, then browses into it */
+    void expand( const QModelIndex &source );
+    void cancelExpand();
+    bool expanding() const;
+    bool failed() const { return expandFailed; }
+    /* the loading or failed notice while a folder is listed; false when
+     * none is. `cannotList` has %1 for the folder's name, else `name`. */
+    bool showExpandState( LibraryNotice *, const QString &cannotList, const QString &name ) const;
+
+public slots:
+    void goBack();
+    /* the notice's buttons: try again, back, clear the search */
+    void noticeAction( bool primary );
+
+signals:
+    void aboutToBrowse();
+    void changed();     /* the page updates its state */
+    void backFromTop();
+
+private:
+    PLModel *model() const;
+
+    intf_thread_t *p_intf;
+    LibraryFilter *filter;
+    CardView *view;
+    LibraryHeader *header;
+    QPersistentModelIndex top;
+    QTimer *expandTimer;    /* then the folder is reported as not opened */
+    int expandingId;        /* a folder being expanded, to browse into */
+    QPersistentModelIndex expandingIndex;
+    QSet<int> expandRequested;
+    bool expandFailed;
+};
 
 /* Search for the library grids: filters the rows directly under the browsed
  * folder by title, artist and album. Never PLModel::filter, which changes
@@ -262,6 +316,8 @@ class LibraryNotice : public QWidget
 public:
     explicit LibraryNotice( QWidget *parent );
     void showLoading( const QString &caption );
+    /* a search that matches nothing: `text` says so; Clear search */
+    void showNoResults( const QString &text );
     /* an empty button text hides that button */
     void showMessage( const char *icon, Theme::ColorRole, const QString &title, const QString &text,
                       const QString &primary, const QString &secondary );
@@ -282,8 +338,15 @@ private:
  * year, picture height, video codec and surround channels; empty if none */
 QString mediaMetaLine( input_item_t * );
 
-/* The item's local file or folder, empty when it is not one */
+/* The item's or MRL's local file or folder, empty when it is not one */
 QString localPath( input_item_t * );
+QString localPath( const QString &mrl );
+
+/* Whether the path's extension is in `filters` ("*.mkv"...: EXTENSIONS_*) */
+bool hasExtension( const QString &path, const QStringList &filters );
+
+/* " · ": between the parts of a meta line */
+QString metaSeparator();
 
 /* The library's and the playlist's search field: a small search glyph
  * ahead, a themed X that clears it while it has text, Esc clears too */
@@ -291,5 +354,14 @@ void setupSearchField( QLineEdit *, const QString &searchName, const QString &cl
 
 /* A card's progress (0..1) along the bottom of its picture */
 void paintProgress( QPainter *, const QRectF &thumb, qreal fraction, Qt::LayoutDirection );
+
+/* A card's picture, cropped to fill the rounded `thumb`, or the striped
+ * placeholder with its glyph; leaves the painter clipped to `thumb` */
+void paintCardThumb( QPainter *, const QRectF &thumb, qreal radius, QPixmap,
+                     const char *glyph, int stripePx, int glyphPx );
+
+/* A time pill in the thumb's bottom end corner (left in right-to-left) */
+void paintTimeBadge( QPainter *, const QRectF &thumb, const QString &, const QFont &,
+                     Qt::LayoutDirection, int insetX, int insetY, int padX, int padY );
 
 #endif

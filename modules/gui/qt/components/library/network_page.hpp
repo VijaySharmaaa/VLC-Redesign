@@ -77,12 +77,8 @@ private:
     void openSd( const LibraryData::Sd &, const QString &title );
     void open( PLModel *, const QModelIndex &source, const QString &title );
     void activate( const QModelIndex & );
-    void expand( const QModelIndex &source );
-    void browse( const QModelIndex &source );
-    void goBack();
     void showTiles();
     void updateState();
-    void noticeAction( bool primary );
     bool listing() const;   /* a list (or its state), not the tiles */
 
     intf_thread_t *p_intf;
@@ -95,18 +91,15 @@ private:
     QLabel *lanHint;
     QList<NetworkTile *> lanTiles, streamTiles;
     QTimer *rebuild, *settle, *loading;
-    QTimer *expandTimer;    /* then the server or folder is reported as not opened */
     CardView *list;
     LibraryNotice *notice;  /* the list's loading, empty and failed states */
     LibraryFilter *filter;
+    LibraryBrowser *browser;
     PLModel *browsed;
     QPersistentModelIndex top;   /* the opened tile; invalid: a whole discovery */
     QString topTitle;
     bool topIsItem;              /* a server or share, which can go away */
-    int expandingId;
-    QPersistentModelIndex expanding;
-    QSet<int> expandRequested;
-    bool loaded, expandFailed;
+    bool loaded;
 };
 
 #endif

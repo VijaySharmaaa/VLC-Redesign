@@ -27,7 +27,7 @@
 #include "components/library/home_page.hpp"
 #include "components/library/library_widgets.hpp"
 #include "components/library/thumbnailer.hpp"
-#include "components/now_playing.hpp"   /* paintStripes, fontAt */
+#include "components/now_playing.hpp"   /* fontAt */
 #include "input_manager.hpp"
 #include "recents.hpp"
 #include "util/breakpoints.hpp"
@@ -52,7 +52,6 @@
 #include <QLocale>
 #include <QMenu>
 #include <QPainter>
-#include <QPainterPath>
 #include <QScrollBar>
 #include <QStyle>
 #include <QStyledItemDelegate>
@@ -85,7 +84,7 @@ struct Entry
 bool isAudio( const QString &path )
 {
     static const QStringList exts = QString( EXTENSIONS_AUDIO ).split( ';' );
-    return exts.contains( QLatin1String( "*." ) + QFileInfo( path ).suffix().toLower() );
+    return hasExtension( path, exts );
 }
 
 /* String work only: nothing here may touch the disk (offline shares) */
@@ -97,11 +96,7 @@ Entry describe( const QString &mrl )
     if( scheme == "file" || scheme == "directory" || disc )
     {
         /* directory:// (Open Folder) and the discs hold a file path too */
-        const QString fileUri = QLatin1String( "file" ) + mrl.mid( scheme.length() );
-        char *psz = vlc_uri2path( qtu( fileUri ) );
-        if( psz )
-            e.localPath = qfu( psz );
-        free( psz );
+        e.localPath = localPath( QLatin1String( "file" ) + mrl.mid( scheme.length() ) );
     }
     if( !e.localPath.isEmpty() )
     {
@@ -256,12 +251,12 @@ public:
             description << badge;
         if( b )
             description << missingText();
-        setAccessibleDescription( description.join( ", " ) );
+        setAccessibleDescription( description.join( qtr( ", " ) ) );
         setToolTip( b ? path + "\n" + missingText() : path );
         update();
     }
 
-    static int thumbHeight( int w ) { return w * 9 / 16; }
+    static int thumbHeight( int w ) { return w * Library::ThumbAspectH / Library::ThumbAspectW; }
     static QFont titleFont() { return fontAt( Theme::Body, Home::CardTitle, true ); }
     static int heightFor( int w )
     {
@@ -305,50 +300,17 @@ void ResumeCard::paintEvent( QPaintEvent * )
     const int thumbH = thumbHeight( width() );
     const QRectF thumb( 0, 0, width(), thumbH );
     const qreal radius = t->metric( Theme::RadiusLg );
-    QPainterPath clip;
-    clip.addRoundedRect( thumb, radius, radius );
     p.save();
-    p.setClipPath( clip );
-    const qreal dpr = devicePixelRatioF();
     QPixmap frame;
     if( !localVideo.isEmpty() && !missing )
-        frame = art->get( thumbs->frame( localVideo, lengthMs ), ( thumb.size() * dpr ).toSize() );
-    if( frame.isNull() )
-    {
-        paintStripes( p, thumb, t->px( Home::CardStripe ) );
-        const int glyph = t->px( Home::CardGlyph );
-        const int devicePx = qRound( glyph * dpr );
-        t->icon( QLatin1String( icon ), Theme::Dim, QSize( devicePx, devicePx ) )
-            .paint( &p, QRect( ( width() - glyph ) / 2, ( thumbH - glyph ) / 2, glyph, glyph ) );
-    }
-    else
-    {
-        /* cropped to fill, as the library cards */
-        frame.setDevicePixelRatio( dpr );
-        const QSizeF s = QSizeF( frame.size() ) / dpr;
-        p.drawPixmap( QPointF( thumb.center().x() - s.width() / 2,
-                               thumb.center().y() - s.height() / 2 ), frame );
-    }
-
+        frame = art->get( thumbs->frame( localVideo, lengthMs ), ( thumb.size() * devicePixelRatioF() ).toSize() );
+    paintCardThumb( &p, thumb, radius, frame, icon, t->px( Home::CardStripe ), t->px( Home::CardGlyph ) );
     if( progress >= 0 )
         paintProgress( &p, thumb, progress, layoutDirection() );
     if( !badge.isEmpty() )
-    {
-        const QFont f = fontAt( Theme::Overline, Type::Overline, false );
-        const QFontMetrics fm( f );
-        const int padX = t->px( Home::BadgePadX ), padY = t->px( Home::BadgePadY );
-        const QSize s( fm.width( badge ) + 2 * padX, fm.height() + 2 * padY );
-        const QRect r( width() - t->px( Home::BadgeInsetX ) - s.width(),
-                       thumbH - t->px( Home::BadgeInsetY ) - s.height(), s.width(), s.height() );
-        const int badgeRadius = t->px( Library::BadgeRadius );   /* as the library cards' */
-        p.setPen( Qt::NoPen );
-        p.setBrush( QColor::fromRgba( CardBadgeBg ) );
-        const QRect at = QStyle::visualRect( layoutDirection(), rect(), r );
-        p.drawRoundedRect( at, badgeRadius, badgeRadius );
-        p.setFont( f );
-        p.setPen( t->color( Theme::OnVideo ) );
-        p.drawText( at, Qt::AlignCenter, badge );
-    }
+        paintTimeBadge( &p, thumb, badge, fontAt( Theme::Overline, Type::Overline, false ), layoutDirection(),
+                        t->px( Home::BadgeInsetX ), t->px( Home::BadgeInsetY ),
+                        t->px( Home::BadgePadX ), t->px( Home::BadgePadY ) );
     p.restore();
 
     /* the outline: accent on hover, the focus ring from the keyboard; the
@@ -399,7 +361,7 @@ void ExistsCheck::run()
  **********************************************************************/
 HomePage::HomePage( intf_thread_t *_p_intf, QWidget *parent )
     : QScrollArea( parent ), p_intf( _p_intf ), art( new ArtLoader( this ) ),
-      thumbs( new Thumbnailer( _p_intf, this ) ), checking( false ), recheck( false )
+      thumbs( Thumbnailer::instance( _p_intf ) ), checking( false ), recheck( false )
 {
     Theme *t = Theme::instance();
     connect( art, &ArtLoader::ready, this, &HomePage::updateCards );
@@ -619,9 +581,7 @@ void HomePage::rebuild()
     empty->setVisible( mrls.isEmpty() );
     empty->setNoteVisible( !enabled );
     if( !mrls.isEmpty() && count == 0 )
-        noResults->showMessage( RedesignIcons::IconSearch, Theme::Dim, qtr( "No results" ),
-                                qtr( "Nothing in your recent media matches \"%1\"." ).arg( search ),
-                                qtr( "Clear search" ), QString() );
+        noResults->showNoResults( qtr( "Nothing in your recent media matches \"%1\"." ).arg( search ) );
     noResults->setVisible( !mrls.isEmpty() && count == 0 );
 
     applyMissing();

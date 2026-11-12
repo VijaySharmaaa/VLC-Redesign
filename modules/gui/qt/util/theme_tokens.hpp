@@ -476,4 +476,40 @@ namespace RedesignTokens
     }
 }
 
+/* fullpass lane L */
+namespace RedesignTokens
+{
+    namespace Library
+    {
+        /* not in tokens.json: covers are decoded at sizes rounded up to
+         * this step (device px), so resizing the window does not decode
+         * every cover again at each pixel; the paint crops the rest */
+        static const int ArtSizeStep = 64;
+        /* QPixmapCache is raised to this (the default 10 MB holds about
+         * thirty album covers); covers that failed to load are forgotten
+         * past this many */
+        static const int ArtCacheKB = 64 * 1024, ArtFailedMax = 1024;
+        /* a folder without art shows that of its first few items */
+        static const int ArtProbe = 4;
+        /* more inserted rows than this within the window detach the grid
+         * until the scan settles (MediaPage) */
+        static const int BurstRows = 200, BurstWindowMs = 250;
+        /* threads that stat and list files (an offline share blocks them),
+         * apart from the cover decodes */
+        static const int FileWorkers = 2;
+        /* frames known in memory, forgotten past this when a page is left */
+        static const int ThumbFramesMax = 2048;
+        /* the frame cache is trimmed, oldest first, to this size when VLC
+         * starts; a grab's leftover part file older than ThumbTimeoutMs is
+         * removed then too */
+        static const int ThumbCacheMaxMB = 256;
+    }
+    namespace Playlist
+    {
+        /* not in tokens.json: the docked playlist's count and total time
+         * are summed once per this, while it is open */
+        static const int CountDebounceMs = 250;
+    }
+}
+
 #endif
