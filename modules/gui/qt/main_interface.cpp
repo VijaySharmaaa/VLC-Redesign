@@ -605,7 +605,7 @@ void MainInterface::createResumePanel( QWidget *w )
     QLabel *continuePixmapLabel = new QLabel();
     auto tint = [this, continuePixmapLabel]() {
         const int h = fontMetrics().height();
-        continuePixmapLabel->setPixmap( Theme::instance()->icon( RedesignIcons::IconHistory,
+        continuePixmapLabel->setPixmap( Theme::instance()->icon( RedesignIcons::MenuOpenRecent,
                                             Theme::Text2, QSize( h, h ) ).pixmap( h, h ) );
         const int pad = Theme::instance()->px( RedesignTokens::Resume::PadX );
         continuePixmapLabel->setContentsMargins( pad, 0, pad, 0 );
