@@ -32,6 +32,7 @@
 #include "util/input_slider.hpp"     /* SoundSlider */
 #include "components/overlay_host.hpp"   /* enterCurve */
 #include "util/theme.hpp"
+#include "util/customwidgets.hpp"   /* setStyleProperty */
 
 #include <vlc_input_item.h>
 
@@ -311,14 +312,10 @@ AspectRatioBadge::AspectRatioBadge( intf_thread_t *_p_intf )
      * open while it shows */
     connect( this, &QToolButton::clicked, this, [this]() {
         setChecked( property( "on" ).toBool() );
-        setProperty( "open", true );
-        style()->unpolish( this );
-        style()->polish( this );
+        setStyleProperty( this, "open", true );
         const QSize size = menu->sizeHint();
         menu->exec( mapToGlobal( QPoint( 0, -size.height() ) ) );
-        setProperty( "open", false );
-        style()->unpolish( this );
-        style()->polish( this );
+        setStyleProperty( this, "open", false );
     } );
     connect( THEMIM->getIM(), &InputManager::voutChanged, this, &AspectRatioBadge::setVout );
     setVout();

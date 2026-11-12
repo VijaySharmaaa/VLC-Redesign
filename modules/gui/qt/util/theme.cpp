@@ -21,6 +21,7 @@
 #endif
 
 #include "util/theme.hpp"
+#include "util/customwidgets.hpp"   /* setStyleProperty */
 #include "util/imagehelper.hpp"
 #include "util/redesign_icons.hpp"
 
@@ -1461,16 +1462,13 @@ bool Theme::eventFilter(QObject *o, QEvent *e)
             key = was.isValid() ? was.toBool() : keyboardInput; break;
         }
         key = key || isTextEntry(w);
-        if (!was.isValid() || was.toBool() != key)
+        if (was.toBool() != key)
         {
-            w->setProperty(keyFocusProperty, key);
-            if (was.toBool() != key)
-            {
-                w->style()->unpolish(w);
-                w->style()->polish(w);
-                w->update();
-            }
+            setStyleProperty(w, keyFocusProperty, key);
+            w->update();
         }
+        else if (!was.isValid())
+            w->setProperty(keyFocusProperty, key);  /* remembered, the look is the same */
     }
     /* a list that is a window of its own (QCompleter's popup) is styled
      * as a popup, without the focus ring of the lists in a window */
@@ -1478,10 +1476,7 @@ bool Theme::eventFilter(QObject *o, QEvent *e)
      && static_cast<QWidget *>(o)->isWindow() && o->inherits("QAbstractItemView")
      && !o->property("popup").toBool())
     {
-        QWidget *w = static_cast<QWidget *>(o);
-        w->setProperty("popup", true);
-        w->style()->unpolish(w);
-        w->style()->polish(w);
+        setStyleProperty(static_cast<QWidget *>(o), "popup", true);
     }
 #ifdef _WIN32
     if (e->type() == QEvent::Show && o->isWidgetType() && !highContrast)

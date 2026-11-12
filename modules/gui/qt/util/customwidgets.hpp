@@ -159,6 +159,9 @@ QString withHotkey( intf_thread_t *, const QString &label, const char *id );
  * tooltip shows, and its accessible description on focus and hover, so a
  * rebound key shows without a restart */
 void watchHotkey( intf_thread_t *, QWidget *w );
+/* Sets a dynamic property that the stylesheet selects on and repolishes
+ * w, as selectors are only re-read on polish; nothing when unchanged */
+void setStyleProperty( QWidget *w, const char *name, const QVariant &value );
 /* "9:36" under an hour, "1:02:03" above: no leading zero (DESIGN_SPEC 3) */
 QString timeString( int64_t secs );
 /* Call once the widgets under root are built: see customwidgets.cpp */

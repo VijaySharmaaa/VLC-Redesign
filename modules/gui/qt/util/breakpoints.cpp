@@ -22,6 +22,7 @@
 
 #include "util/breakpoints.hpp"
 #include "util/theme.hpp"
+#include "util/customwidgets.hpp"   /* setStyleProperty */
 
 #include <QEvent>
 #include <QStyle>
@@ -53,12 +54,9 @@ void BreakpointWatcher::addTarget( QWidget *w )
     apply( w );
 }
 
-/* Dynamic-property selectors are not re-evaluated on their own */
 void BreakpointWatcher::apply( QWidget *w ) const
 {
-    w->setProperty( "breakpoint", QLatin1String( names[size] ) );
-    w->style()->unpolish( w );
-    w->style()->polish( w );
+    setStyleProperty( w, "breakpoint", QString::fromLatin1( names[size] ) );
 }
 
 bool BreakpointWatcher::eventFilter( QObject *obj, QEvent *event )

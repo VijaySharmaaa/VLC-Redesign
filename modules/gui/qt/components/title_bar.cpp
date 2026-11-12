@@ -22,6 +22,7 @@
 
 #include "components/title_bar.hpp"
 #include "util/theme.hpp"
+#include "util/customwidgets.hpp"   /* setStyleProperty */
 #include "util/redesign_icons.hpp"
 #include "util/breakpoints.hpp"
 
@@ -248,12 +249,7 @@ void TitleBar::toggleMaximized()
 
 void TitleBar::setMaximizeHovered( bool hovered )
 {
-    if( maxButton->property( "nchover" ).toBool() == hovered )
-        return;
-    maxButton->setProperty( "nchover", hovered );
-    /* dynamic-property selectors are only re-read on polish */
-    maxButton->style()->unpolish( maxButton );
-    maxButton->style()->polish( maxButton );
+    setStyleProperty( maxButton, "nchover", hovered );
 }
 
 bool TitleBar::eventFilter( QObject *o, QEvent *e )

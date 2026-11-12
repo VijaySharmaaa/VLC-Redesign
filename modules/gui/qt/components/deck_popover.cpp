@@ -28,6 +28,7 @@
 #include "menus.hpp"
 #include "util/redesign_icons.hpp"
 #include "util/theme.hpp"
+#include "util/customwidgets.hpp"   /* setStyleProperty */
 
 #include <vlc_input_item.h>
 
@@ -177,11 +178,8 @@ namespace
     private:
         void setOpen( bool open )
         {
-            if( !anchor )
-                return;
-            anchor->setProperty( "open", open );
-            anchor->style()->unpolish( anchor );
-            anchor->style()->polish( anchor );
+            if( anchor )
+                setStyleProperty( anchor, "open", open );
         }
 
         QPointer<QAbstractButton> anchor;

@@ -160,12 +160,7 @@ static void followPanel( QAbstractButton *button, int action )
     auto sync = [button, action]() {
         const bool shown = THEDP->isPanelShown( action );
         button->setChecked( shown );
-        if( button->property( "open" ).toBool() != shown )
-        {
-            button->setProperty( "open", shown );
-            button->style()->unpolish( button );
-            button->style()->polish( button );
-        }
+        setStyleProperty( button, "open", shown );
     };
     QObject::connect( THEDP, &DialogsProvider::panelShown, button, sync );
     QObject::connect( button, &QAbstractButton::clicked, button, sync );

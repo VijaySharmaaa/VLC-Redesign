@@ -40,6 +40,7 @@
 #include <QKeySequence>
 #include <QHelpEvent>
 #include <QToolTip>
+#include <QStyle>
 #include <vlc_actions.h>
 
 #define SPINNER_SIZE 32
@@ -424,6 +425,15 @@ private:
 void watchHotkey( intf_thread_t *p_intf, QWidget *w )
 {
     w->installEventFilter( new HotkeyFilter( p_intf, w ) );
+}
+
+void setStyleProperty( QWidget *w, const char *name, const QVariant &value )
+{
+    if( w->property( name ) == value )
+        return;
+    w->setProperty( name, value );
+    w->style()->unpolish( w );
+    w->style()->polish( w );
 }
 
 /* Animated Icon implementation */
