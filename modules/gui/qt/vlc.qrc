@@ -91,7 +91,6 @@
         <file alias="go-next.svg">pixmaps/go-next.svg</file>
         <file alias="new.svg">pixmaps/profile_new.svg</file>
         <file alias="lock.svg">pixmaps/lock.svg</file>
-        <file alias="search_clear.svg">pixmaps/search_clear.svg</file>
         <file alias="dropzone.svg">pixmaps/playlist/dropzone.svg</file>
         <file alias="valid.svg">pixmaps/valid.svg</file>
     </qresource>

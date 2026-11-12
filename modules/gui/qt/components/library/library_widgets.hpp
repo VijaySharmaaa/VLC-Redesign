@@ -22,6 +22,7 @@
 #include "qt.hpp"
 #include "util/breakpoints.hpp"
 #include "util/theme.hpp"                       /* Theme::ColorRole */
+#include "util/searchlineedit.hpp"              /* setupSearchField */
 
 #include <QListView>
 #include <QPersistentModelIndex>
@@ -284,10 +285,6 @@ QString mediaMetaLine( input_item_t * );
 
 /* The item's local file or folder, empty when it is not one */
 QString localPath( input_item_t * );
-
-/* The library's and the playlist's search field: a small search glyph
- * ahead, a themed X that clears it while it has text, Esc clears too */
-void setupSearchField( QLineEdit *, const QString &searchName, const QString &clearName );
 
 /* A card's progress (0..1) along the bottom of its picture */
 void paintProgress( QPainter *, const QRectF &thumb, qreal fraction, Qt::LayoutDirection );

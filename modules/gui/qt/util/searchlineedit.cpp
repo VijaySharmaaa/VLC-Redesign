@@ -29,125 +29,69 @@
 #endif
 
 #include "searchlineedit.hpp"
-#include "customwidgets.hpp"
-
-#include "qt.hpp" /*needed for qtr but not necessary */
+#include "customwidgets.hpp"   /* withHotkey */
 #include "util/theme.hpp"
+#include "util/redesign_icons.hpp"
 
-#include <QPainter>
-#include <QRect>
-#include <QStyle>
-#include <QStyleOption>
-#include <QApplication>
+#include <QAction>
+#include <QKeyEvent>
 
 #include <vlc_intf_strings.h>
 
-SearchLineEdit::SearchLineEdit( QWidget *parent ) : QLineEdit( parent ),
-    messageText( qtr( I_PL_SEARCH ) )
+namespace {
+/* Esc empties the field when it has text, else goes on (a page's back,
+ * a panel's close) */
+class EscClears : public QObject
 {
-    clearButton = new QFramelessButton( this );
-    clearButton->setIcon( QIcon( ":/search_clear.svg" ) );
-    clearButton->setIconSize( QSize( 16, 16 ) );
-    clearButton->setCursor( Qt::ArrowCursor );
-    clearButton->setToolTip( qfu(vlc_pgettext("Tooltip|Clear", "Clear")) );
-    clearButton->hide();
+public:
+    explicit EscClears( QLineEdit *edit ) : QObject( edit ) { edit->installEventFilter( this ); }
 
-    connect( clearButton, &QFramelessButton::clicked, this, &SearchLineEdit::clear );
-
-    auto updateStyle = [=]() {
-        int frameWidth = style()->pixelMetric( QStyle::PM_DefaultFrameWidth, 0, this );
-        QFontMetrics metrics( font() );
-        QString styleSheet = QString( "min-height: %1px; "
-                                     "padding-top: 1px; "
-                                     "padding-bottom: 1px; "
-                                     "padding-right: %2px;" )
-                                 .arg( metrics.height() + ( 2 * frameWidth ) )
-                                 .arg( clearButton->sizeHint().width() + 6 );
-        setStyleSheet( styleSheet );
-    };
-    updateStyle();
-//same as Qt::AA_UseStyleSheetPropagationInWidgetStyles
-#if !HAS_QT57
-    connect(qApp, &QApplication::paletteChanged, this, [updateStyle](){
-        updateStyle();
-    });
-#endif
-
-    setMessageVisible( true );
-
-    connect( this, &SearchLineEdit::textEdited,
-             this, &SearchLineEdit::updateText );
-
-    connect( this, &SearchLineEdit::editingFinished,
-             this, &SearchLineEdit::searchEditingFinished );
-
-}
-
-void SearchLineEdit::clear()
-{
-    setText( QString() );
-    clearButton->hide();
-    setMessageVisible( true );
-}
-
-void SearchLineEdit::setMessageVisible( bool on )
-{
-    message = on;
-    repaint();
-    return;
-}
-
-void SearchLineEdit::updateText( const QString& text )
-{
-    /* if reset() won't be focused out */
-    if ( !text.isEmpty() ) setMessageVisible( false );
-    clearButton->setVisible( !text.isEmpty() );
-}
-
-void SearchLineEdit::resizeEvent ( QResizeEvent * event )
-{
-    QLineEdit::resizeEvent( event );
-    int frameWidth = style()->pixelMetric(QStyle::PM_DefaultFrameWidth,0,this);
-    clearButton->resize( clearButton->sizeHint().width(), height() );
-    clearButton->move( width() - clearButton->width() - frameWidth - 3,
-                      ( height() - clearButton->height() + 2 ) / 2 );
-}
-
-void SearchLineEdit::focusInEvent( QFocusEvent *event )
-{
-    if( message )
+protected:
+    bool eventFilter( QObject *o, QEvent *e ) Q_DECL_OVERRIDE
     {
-        setMessageVisible( false );
+        QLineEdit *edit = static_cast<QLineEdit *>( o );
+        if( ( e->type() != QEvent::KeyPress && e->type() != QEvent::ShortcutOverride )
+         || static_cast<QKeyEvent *>( e )->key() != Qt::Key_Escape
+         || static_cast<QKeyEvent *>( e )->modifiers() != Qt::NoModifier || edit->text().isEmpty() )
+            return false;
+        /* before an Esc shortcut of the window can take it */
+        if( e->type() == QEvent::KeyPress )
+            edit->clear();
+        e->accept();
+        return true;
     }
-    QLineEdit::focusInEvent( event );
+};
 }
 
-void SearchLineEdit::focusOutEvent( QFocusEvent *event )
+void setupSearchField( QLineEdit *edit, const QString &searchName, const QString &clearName )
 {
-    if( text().isEmpty() )
-    {
-        setMessageVisible( true );
-    }
-    QLineEdit::focusOutEvent( event );
+    using RedesignTokens::Library::FieldGlyph;
+    edit->setClearButtonEnabled( false );   /* Qt's own X is not themed */
+    edit->addAction( Theme::themedIcon( RedesignIcons::IconSearch, Theme::Dim, FieldGlyph ),
+                     QLineEdit::LeadingPosition )->setText( searchName );
+    QAction *clear = new QAction( Theme::themedIcon( RedesignIcons::IconClose, Theme::Text2, FieldGlyph ),
+                                  clearName, edit );
+    clear->setToolTip( withHotkey( NULL, clearName, "Esc" ) );
+    QObject::connect( clear, &QAction::triggered, edit, &QLineEdit::clear );
+    /* shown only with text: added and taken away, as Qt 5.6 keeps the
+     * button of a hidden action */
+    QObject::connect( edit, &QLineEdit::textChanged, clear, [edit, clear]( const QString &text ) {
+        if( text.isEmpty() )
+            edit->removeAction( clear );
+        else if( !edit->actions().contains( clear ) )
+            edit->addAction( clear, QLineEdit::TrailingPosition );
+    } );
+    new EscClears( edit );
 }
 
-void SearchLineEdit::paintEvent( QPaintEvent *event )
+SearchLineEdit::SearchLineEdit( QWidget *parent ) : QLineEdit( parent )
 {
-    QLineEdit::paintEvent( event );
-    if( !message ) return;
-    QStyleOption option;
-    option.initFrom( this );
-    QRect rect = style()->subElementRect( QStyle::SE_LineEditContents, &option, this )
-        .adjusted( 3, 0, clearButton->width() + 1, 0 );
-    QPainter painter( this );
-    painter.setPen( palette().color( QPalette::Disabled, QPalette::Text ) );
-    /* where the typed text goes (ThemeStyle nudges a line edit's margins) */
-    if( Theme::instance() )
-        rect.translate( 0, -Theme::instance()->textNudge( painter.font() ) );
-    painter.drawText( rect, Qt::AlignLeft | Qt::AlignVCenter, messageText );
-}
+    setPlaceholderText( qtr( I_PL_SEARCH ) );
+    setAccessibleName( qtr( I_PL_SEARCH ) );
+    setupSearchField( this, qtr( I_PL_SEARCH ), qtr( "Clear search" ) );
+    setMinimumHeight( Theme::instance()->metric( Theme::SelectH ) );
 
-void SearchLineEdit::searchEditingFinished()
-{
-    emit searchDelayedChanged( text() );
+    connect( this, &QLineEdit::editingFinished, this, [this]() {
+        emit searchDelayedChanged( text() );
+    } );
 }

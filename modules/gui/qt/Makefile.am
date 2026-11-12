@@ -485,7 +485,6 @@ libqt_plugin_la_RES = \
 	gui/qt/pixmaps/win7/win7thumbnail_play.svg \
 	gui/qt/pixmaps/update.svg \
 	gui/qt/pixmaps/valid.svg \
-	gui/qt/pixmaps/search_clear.svg \
 	gui/qt/pixmaps/lock.svg \
 	gui/qt/pixmaps/redesign/1x_mobiledata.svg \
 	gui/qt/pixmaps/redesign/add.svg \
