@@ -44,6 +44,23 @@ namespace
  * selects a section, to type over */
 class TimeEdit : public QTimeEdit
 {
+public:
+    TimeEdit()
+    {
+        /* the style sheet's padding does not reach a spin box's edit */
+        inset();
+        connect( Theme::instance(), &Theme::changed, this, &TimeEdit::inset );
+    }
+
+private:
+    void inset()
+    {
+        /* top and bottom are the theme's text nudge (theme.cpp) */
+        const int pad = Theme::instance()->px( RedesignTokens::Dialogs::JumpPadX );
+        const QMargins m = lineEdit()->textMargins();
+        lineEdit()->setTextMargins( pad, m.top(), pad, m.bottom() );
+    }
+
 protected:
     void focusInEvent( QFocusEvent *e ) Q_DECL_OVERRIDE
     {
