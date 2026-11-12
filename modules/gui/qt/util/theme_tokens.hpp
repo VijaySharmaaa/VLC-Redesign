@@ -476,4 +476,35 @@ namespace RedesignTokens
     }
 }
 
+/* fullpass lane P */
+namespace RedesignTokens
+{
+    namespace Motion
+    {
+        /* the enter easing, cubic-bezier(0.2,0.8,0.2,1), in percent */
+        static const int EnterX1 = 20, EnterY1 = 80, EnterX2 = 20, EnterY2 = 100;
+    }
+    namespace VideoOverlay
+    {
+        /* a poll rate (ms), not a motion: about a frame after the cursor moves */
+        static const int MoveCheck = 50;
+    }
+    namespace Deck
+    {
+        /* the volume glyph: "down" below this many percent, "up" from it */
+        static const int VolumeDownBelow = 50;
+    }
+    namespace Resume
+    {
+        /* not in tokens.json: the "continue where left off" row keeps its
+         * stock padding (px) and hold (ms); the hold is not motion */
+        static const int PadX = 5, Hold = 6000;
+    }
+    namespace StatusBar
+    {
+        /* not in tokens.json: the media name's padding, as before */
+        static const int LabelPadX = 5;
+    }
+}
+
 #endif

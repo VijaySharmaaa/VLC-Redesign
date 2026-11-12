@@ -22,6 +22,7 @@
 
 #include "components/now_playing.hpp"
 #include "components/spectrum.hpp"
+#include "components/overlay_host.hpp"         /* enterCurve */
 #include "components/controller_widget.hpp"      /* SoundWidget */
 #include "components/playlist/playlist_model.hpp"
 #include "components/playlist/sorting.h"
@@ -164,9 +165,14 @@ void ArtView::childEvent( QChildEvent *e )
     QWidget::childEvent( e );
 }
 
+/* every info update calls this: decode the file only when it changes */
 void ArtView::setArt( const QString &url )
 {
+    if( url == artUrl )
+        return;
+    artUrl = url;
     art = url.isEmpty() ? QPixmap() : QPixmap( url );
+    scaled = QPixmap();
     QWidget::update();
 }
 
@@ -186,9 +192,12 @@ void ArtView::paintEvent( QPaintEvent * )
     {
         /* fill and crop, like CSS object-fit: cover */
         const qreal dpr = devicePixelRatioF();
-        QPixmap scaled = art.scaled( size() * dpr, Qt::KeepAspectRatioByExpanding,
-                                     Qt::SmoothTransformation );
-        scaled.setDevicePixelRatio( dpr );
+        const QSize want = art.size().scaled( size() * dpr, Qt::KeepAspectRatioByExpanding );
+        if( scaled.size() != want )
+        {
+            scaled = art.scaled( want, Qt::IgnoreAspectRatio, Qt::SmoothTransformation );
+            scaled.setDevicePixelRatio( dpr );
+        }
         const QSizeF s = QSizeF( scaled.size() ) / dpr;
         p.drawPixmap( QPointF( ( width() - s.width() ) / 2, ( height() - s.height() ) / 2 ),
                       scaled );
@@ -530,12 +539,14 @@ NowPlayingBar::NowPlayingBar( intf_thread_t *_p_i, NowPlayingInfo *_info, QWidge
              } );
 
     /* right: volume and expand */
-    QWidget *right = new QWidget( this );
+    right = new QWidget( this );
+    right->installEventFilter( this );  /* its width: fitWidth() */
     QHBoxLayout *rl = new QHBoxLayout( right );
     rl->setContentsMargins( 0, 0, 0, 0 );
     rl->addStretch();
-    rl->addWidget( new SoundWidget( right, p_intf, true ) );
-    QToolButton *expand = makeIconButton( p_intf, RedesignIcons::IconExpand, qtr( "Open player" ),
+    volume = new SoundWidget( right, p_intf, true );
+    rl->addWidget( volume );
+    expand = makeIconButton( p_intf, RedesignIcons::IconExpand, qtr( "Open player" ),
                                           NULL, NowPlaying::SmallButton, right );
     connect( expand, &QToolButton::clicked, this, &NowPlayingBar::expandRequested );
     rl->addWidget( expand );
@@ -564,6 +575,9 @@ bool NowPlayingBar::eventFilter( QObject *o, QEvent *e )
     if( o == left && e->type() == QEvent::MouseButtonRelease
      && static_cast<QMouseEvent *>( e )->button() == Qt::LeftButton )
         emit expandRequested();
+    /* the right column gets a third of the bar, whatever its content */
+    if( o == right && e->type() == QEvent::Resize )
+        volume->fitWidth( right->width() - expand->width() - right->layout()->spacing() );
     return QWidget::eventFilter( o, e );
 }
 
@@ -899,7 +913,7 @@ MiniPlayer::MiniPlayer( intf_thread_t *_p_i, NowPlayingInfo *_info, QWidget *par
     fade = new QPropertyAnimation( this, "windowOpacity", this );
     fade->setStartValue( 0.0 );
     fade->setEndValue( 1.0 );
-    fade->setEasingCurve( QEasingCurve::OutCubic );
+    fade->setEasingCurve( OverlayWindow::enterCurve() );
 
     /* where it was last time, or the bottom-right corner of the work area */
     if( !restoreGeometry( getSettings()->value( "MiniPlayer/geometry" ).toByteArray() ) )

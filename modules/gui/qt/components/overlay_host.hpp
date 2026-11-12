@@ -52,6 +52,10 @@ protected:
     bool nativeEvent( const QByteArray &, void *, long * ) Q_DECL_OVERRIDE;
 };
 
+/* The first enabled control inside root that Tab reaches (focus chain
+ * order), also while root is hidden; NULL without one */
+QWidget *firstTabStop( QWidget *root );
+
 /* Follows a widget of the main window: emits changed() once per burst of
  * moves, resizes, shows, hides and window state changes of the widget or
  * any of its ancestors. Overlays place themselves on targetRect(). */

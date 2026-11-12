@@ -25,6 +25,7 @@
 
 #include "components/overlay_host.hpp"
 
+#include <QAtomicInt>
 #include <QPointer>
 
 class QPropertyAnimation;
@@ -66,6 +67,7 @@ private:
     QPropertyAnimation *fade, *rise;
     QTimer hold;
     bool overVideo;
+    QAtomicInt canShow;     /* host->targetShown(), for SnapshotCB's thread */
 };
 
 #endif

@@ -205,23 +205,6 @@ void SidebarButton::paintEvent( QPaintEvent * )
                 fm.elidedText( text(), Qt::ElideRight, textRect.width() ) );
 }
 
-/* Phase 4 replaces this with the Home page */
-static QWidget *createPage( const QString &title )
-{
-    QWidget *page = new QWidget;
-    page->setAccessibleName( title );
-    QVBoxLayout *layout = new QVBoxLayout( page );
-    const Theme *t = Theme::instance();
-    layout->setContentsMargins( t->px( Size::PagePadX ), t->px( Size::PagePadTop ),
-                                t->px( Size::PagePadX ), t->px( Size::PagePadX ) );
-    QLabel *label = new QLabel( title, page );
-    label->setFont( t->font( Theme::PageTitle ) );
-    layout->addWidget( label );
-    layout->addStretch( 1 );
-    return page;
-}
-
-
 /* The sidebar's padding and gap, again when the scale changes */
 static void padNav( QLayout *layout, int spacing )
 {
@@ -288,7 +271,6 @@ Sidebar::Sidebar( intf_thread_t *p_intf, QWidget *parent )
         case Videos:  pages[i] = new MediaPage( p_intf, MediaPage::Videos ); break;
         case Music:   pages[i] = new MediaPage( p_intf, MediaPage::Music ); break;
         case Network: pages[i] = new NetworkPage( p_intf ); break;
-        default:      pages[i] = createPage( label ); break;
         }
         SidebarButton *b = new SidebarButton( label, nav[i].icon, SidebarButton::Nav, this );
         b->setCheckable( true );
@@ -334,9 +316,7 @@ Sidebar::Sidebar( intf_thread_t *p_intf, QWidget *parent )
     heading = new QLabel( qtr( "Preferences" ) );
     QFont font = t->font( Theme::NavTitle );
     font.setLetterSpacing( QFont::PercentageSpacing, Type::TitleTracking );
-    heading->setFont( font );
-    heading->setContentsMargins( t->px( Size::SidebarItemPadX ), t->px( Size::SidebarTitlePadTop ),
-                                 t->px( Size::SidebarItemPadX ), t->px( Size::SidebarTitlePadBottom ) );
+    heading->setFont( font );   /* its padding: setBreakpoint() */
     prefsNav->addWidget( heading );
     sections = new QButtonGroup( this );
     SidebarButton *section = NULL;
@@ -429,6 +409,9 @@ void Sidebar::setBreakpoint( BreakpointWatcher::Size bp )
     setFixedWidth( widthAt( bp ) );
     for( SidebarButton *b : buttons )
         b->setRail( bp < BreakpointWatcher::M );
+    const Theme *t = Theme::instance();
+    heading->setContentsMargins( t->px( Size::SidebarItemPadX ), t->px( Size::SidebarTitlePadTop ),
+                                 t->px( Size::SidebarItemPadX ), t->px( Size::SidebarTitlePadBottom ) );
     heading->setVisible( bp >= BreakpointWatcher::M );
     prefsPage->setNarrow( bp == BreakpointWatcher::XS );
 }

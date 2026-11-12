@@ -34,6 +34,7 @@
 #include "util/theme.hpp"
 #include "util/customwidgets.hpp"   /* setStyleProperty */
 #include "components/deck_popover.hpp"   /* popupPos */
+#include "components/video_overlays.hpp" /* currentVideoFormat */
 
 #include <vlc_input_item.h>
 
@@ -57,9 +58,10 @@ SoundWidget::SoundWidget( QWidget *_parent, intf_thread_t * _p_intf,
     layout->setSpacing( Theme::instance()->px( RedesignTokens::Deck::Gap ) );
     layout->setContentsMargins( 0, 0, 0, 0 );
 
-    /* The mute button; a controller makes it a deck button (setupButton) */
+    /* The mute button, a deck button also in the now-playing bar */
     volMuteButton = new QToolButton;
     volMuteButton->setProperty( "hotkey", QByteArray( "key-vol-mute" ) );
+    setupDeckButton( p_intf, volMuteButton );
     connect( volMuteButton, &QToolButton::clicked, this, &SoundWidget::muteClicked );
 
     /* We might need a subLayout too */
@@ -136,13 +138,23 @@ void SoundWidget::refreshLabels()
     /* DESIGN_SPEC 3: volume_off / volume_down / volume_up, as the prototype */
     const int i_sliderVolume = volumeSlider->value();
     const char *icon = b_is_muted || i_sliderVolume == 0 ? RedesignIcons::IconVolumeOff
-                     : i_sliderVolume < 50 ? RedesignIcons::IconVolumeDown
+                     : i_sliderVolume < RedesignTokens::Deck::VolumeDownBelow ? RedesignIcons::IconVolumeDown
                      : RedesignIcons::IconVolumeUp;
     const QString name = b_is_muted ? qfu( vlc_pgettext( "Tooltip|Unmute", "Unmute" ) )
                                     : qfu( vlc_pgettext( "Tooltip|Mute", "Mute" ) );
     volMuteButton->setIcon( deckIcon( icon ) );
     volMuteButton->setToolTip( name );
     volMuteButton->setAccessibleName( name );
+}
+
+void SoundWidget::fitWidth( int room )
+{
+    const Theme *t = Theme::instance();
+    const int track = t->metric( Theme::VolumeW );
+    const int label = t->px( RedesignTokens::Deck::VolumeLabelW );
+    room -= volMuteButton->width() + layout()->spacing();
+    volumeSlider->setFixedWidth( room >= track + label ? track + label : track );
+    volumeSlider->setVisible( room >= track );
 }
 
 /* volumeSlider changed value event slot */
@@ -194,6 +206,9 @@ void SoundWidget::muteClicked()
         setMuted( !b_is_muted );
         return;
     }
+    /* as narrow as its slider, not the theme's minimum for text menus */
+    volumeMenu->ensurePolished();
+    volumeMenu->setMinimumWidth( 0 );
     volumeMenu->setFixedHeight( volumeMenu->sizeHint().height() );
     volumeMenu->exec( popupPos( this, volumeMenu->sizeHint() ) );
 }
@@ -370,28 +385,15 @@ void AspectRatioBadge::setVout()
  * exposes it to the interface. */
 static QString pictureRatio( intf_thread_t *p_intf, const vlc_value_t &val_list )
 {
-    input_thread_t *p_input = THEMIM->getInput();
-    if( !p_input )
+    video_format_t v;
+    if( !currentVideoFormat( p_intf, &v ) )
         return QString();
-    const int64_t id = var_GetInteger( p_input, "video-es" );
-    input_item_t *item = input_GetItem( p_input );
+    const unsigned w = v.i_visible_width ? v.i_visible_width : v.i_width;
+    const unsigned h = v.i_visible_height ? v.i_visible_height : v.i_height;
     double ratio = 0.;
-    vlc_mutex_lock( &item->lock );
-    for( int i = 0; i < item->i_es; i++ )
-    {
-        const es_format_t *es = item->es[i];
-        if( es->i_cat != VIDEO_ES || ( ratio > 0. && es->i_id != id ) )
-            continue;
-        const video_format_t &v = es->video;
-        const unsigned w = v.i_visible_width ? v.i_visible_width : v.i_width;
-        const unsigned h = v.i_visible_height ? v.i_visible_height : v.i_height;
-        if( w && h )
-            ratio = (double)w * ( v.i_sar_num ? v.i_sar_num : 1 )
-                  / ( (double)h * ( v.i_sar_den ? v.i_sar_den : 1 ) );
-        if( es->i_id == id )
-            break;
-    }
-    vlc_mutex_unlock( &item->lock );
+    if( w && h )
+        ratio = (double)w * ( v.i_sar_num ? v.i_sar_num : 1 )
+              / ( (double)h * ( v.i_sar_den ? v.i_sar_den : 1 ) );
     if( ratio <= 0. )
         return QString();
 

@@ -95,8 +95,19 @@ void OverlayWindow::giveFocusBack()
 QEasingCurve OverlayWindow::enterCurve()
 {
     QEasingCurve c( QEasingCurve::BezierSpline );
-    c.addCubicBezierSegment( QPointF( .2, .8 ), QPointF( .2, 1. ), QPointF( 1., 1. ) );
+    using namespace RedesignTokens::Motion;
+    c.addCubicBezierSegment( QPointF( EnterX1, EnterY1 ) / 100., QPointF( EnterX2, EnterY2 ) / 100.,
+                             QPointF( 1., 1. ) );
     return c;
+}
+
+QWidget *firstTabStop( QWidget *root )
+{
+    for( QWidget *w = root->nextInFocusChain(); w != root; w = w->nextInFocusChain() )
+        if( root->isAncestorOf( w ) && w->isEnabled() && w->isVisibleTo( root )
+         && ( w->focusPolicy() & Qt::TabFocus ) )
+            return w;
+    return NULL;
 }
 
 OverlayHost::OverlayHost( QWidget *_target, QObject *parent )

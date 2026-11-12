@@ -40,6 +40,7 @@ namespace WinTheme
         ATTR_CAPTION_COLOR  = 35,   /* DWMWA_CAPTION_COLOR, 22000+ */
         ATTR_TEXT_COLOR     = 36,   /* DWMWA_TEXT_COLOR, 22000+ */
         CORNER_ROUND        = 2,    /* DWMWCP_ROUND: 8 px */
+        BUILD_WINDOWS_11    = 22000,
     };
 
     inline DWORD build()
@@ -85,15 +86,15 @@ namespace WinTheme
     /* Overrides an accent-coloured caption so it matches the window chrome. */
     inline HRESULT setCaptionColors(HWND hwnd, QRgb caption, QRgb text)
     {
-        const HRESULT hr = setDword(hwnd, ATTR_CAPTION_COLOR, colorRef(caption), 22000);
+        const HRESULT hr = setDword(hwnd, ATTR_CAPTION_COLOR, colorRef(caption), BUILD_WINDOWS_11);
         if (SUCCEEDED(hr))
-            setDword(hwnd, ATTR_TEXT_COLOR, colorRef(text), 22000);
+            setDword(hwnd, ATTR_TEXT_COLOR, colorRef(text), BUILD_WINDOWS_11);
         return hr;
     }
 
     inline HRESULT setRoundCorners(HWND hwnd)
     {
-        return setDword(hwnd, ATTR_CORNER, CORNER_ROUND, 22000);
+        return setDword(hwnd, ATTR_CORNER, CORNER_ROUND, BUILD_WINDOWS_11);
     }
 
     /* A visible caption keeps its old colours until the frame is recalculated. */

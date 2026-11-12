@@ -119,7 +119,6 @@ public:
     bool showPreferences();
     StandardPLPanel* getPlaylistView();
     void showToast( const QString & );
-    Sidebar *getSidebar() { return sidebar; }
     BreakpointWatcher *getBreakpoints() { return breakpoints; }
     /* where side sheets dock: the stack, in the content row (ExtendedDialog) */
     QWidget *getCentralStack() { return stackCentralW; }
@@ -147,6 +146,9 @@ protected:
 protected:
     /* Main Widgets Creation */
     void createMainWidget( QSettings* );
+    void createDecks( bool adv );
+    void createFSC();
+    void createImmersiveBar();
     void createStatusBar();
     void createPlaylist();
     void showPlaylistPanel( bool );
@@ -237,6 +239,7 @@ protected:
     unsigned             i_notificationSetting; /// Systray Notifications
     bool                 b_autoresize;          ///< persistent resizable window
     bool                 b_videoFullScreen;     ///< --fullscreen
+    bool                 b_miniAfterFullScreen; ///< the mini player, once full screen is left
     bool                 b_hideAfterCreation;
     bool                 b_minimalView;         ///< Minimal video
     int                  i_minimalSidebarW;     ///< the sidebar width minimal view took

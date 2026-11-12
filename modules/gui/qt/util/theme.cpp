@@ -1122,6 +1122,8 @@ QScrollBar::add-page, QScrollBar::sub-page { background: transparent; }
 QSplitter::handle { background: @divider@; }
 QStatusBar { background: @chrome@; color: @mute@; border-top: 1px solid @divider@; }
 QStatusBar::item { border: none; }
+QStatusBar TimeLabel:hover { color: @tx@; background: @hoverFill@; }
+QStatusBar .ClickableQLabel { padding: 0 @statusPadX@px; }
 
 QLabel[role="hint"] { color: @mute@; }
 /* selectable hints (the error dialog's details) take focus */
@@ -1279,7 +1281,7 @@ PrefsPage QComboBox { min-height: @prefsSelectInner@px; }
 #ifdef _WIN32
     /* DWM rounds and outlines pop-ups from Windows 11 (applyWindowFrame):
      * a square border would be clipped at the corners there */
-    const bool dwmRounds = WinTheme::build() >= 22000;
+    const bool dwmRounds = WinTheme::build() >= WinTheme::BUILD_WINDOWS_11;
 #else
     const bool dwmRounds = false;
 #endif
@@ -1328,6 +1330,7 @@ PrefsPage QComboBox { min-height: @prefsSelectInner@px; }
         { "radiusMd", QString::number(px(Size::RadiusMd)) },
         { "radiusLg", QString::number(px(Size::RadiusLg)) },
         { "menuPad", QString::number(px(Size::MenuPanelPadding)) },
+        { "statusPadX", QString::number(px(StatusBar::LabelPadX)) },
         { "menuPadFocus", QString::number(px(Size::MenuPanelPadding) - 1) },
         { "menuSepX", QString::number(2 * px(Size::MenuPanelPadding)) },
         { "menuTitlePadX", QString::number(px(Size::MenuTitlePadX)) },

@@ -31,6 +31,7 @@
 #include <vlc_vout.h>
 
 #include <QPainter>
+#include <QStyle>
 #include <QPropertyAnimation>
 #include <QParallelAnimationGroup>
 #include <QAccessible>
@@ -41,14 +42,17 @@ namespace O = RedesignTokens::Overlay;
 
 /* In the thread that took the snapshot (never a vout's own): the core has
  * just put the file name (OSD channel) and the preview (channel 0, only it
- * uses that one) on the video; the toast says it instead (P6-9).
+ * uses that one) on the video; the toast says it instead (P6-9), when it
+ * can show.
  * shortcut: the vouts drop them on their next control pass, so they may
  * show for a frame; upgrade with a core option to skip the snapshot OSD */
 int Toast::SnapshotCB( vlc_object_t *, const char *,
                        vlc_value_t, vlc_value_t newval, void *data )
 {
     Toast *toast = static_cast<Toast *>( data );
-    input_thread_t *input = playlist_CurrentInput( pl_Get( toast->p_intf ) );
+    /* hidden content (the mini player, minimised): the OSD is all there is */
+    input_thread_t *input = toast->canShow.load()
+                          ? playlist_CurrentInput( pl_Get( toast->p_intf ) ) : NULL;
     if( input )
     {
         vout_thread_t **pp_vout;
@@ -74,6 +78,8 @@ Toast::Toast( intf_thread_t *_p_intf, QWidget *owner, QWidget *_content )
 {
     setFont( Theme::instance()->font( Theme::Body ) );
     host = new OverlayHost( _content, this );
+    canShow = host->targetShown();
+    connect( host, &OverlayHost::changed, this, [this]() { canShow = host->targetShown(); } );
     connect( host, &OverlayHost::changed, this, &Toast::place );
     _content->installEventFilter( this );   /* its subtitleLift */
 
@@ -213,12 +219,16 @@ void Toast::paintEvent( QPaintEvent * )
 
     const int iconPx = theme->px( O::ToastIcon ), padX = theme->px( O::ToastPadX );
     const QSize icon( iconPx, iconPx );
+    /* the icon leads: on the right in a right-to-left language */
+    const Qt::LayoutDirection dir = layoutDirection();
     theme->icon( RedesignIcons::IconInfo, Theme::Accent, icon )
-        .paint( &p, QRect( QPoint( padX, ( height() - iconPx ) / 2 ), icon ) );
+        .paint( &p, QStyle::visualRect( dir, rect(),
+                                        QRect( QPoint( padX, ( height() - iconPx ) / 2 ), icon ) ) );
 
     const QRect textRect = rect().adjusted( padX + iconPx + theme->px( O::ToastGap ), 0,
                                             -padX, 0 );
     p.setPen( theme->color( Theme::Text ) );
-    p.drawText( textRect.translated( 0, -theme->textNudge( p.font() ) ), Qt::AlignVCenter | Qt::AlignLeft,
+    p.drawText( QStyle::visualRect( dir, rect(), textRect ).translated( 0, -theme->textNudge( p.font() ) ),
+                QStyle::visualAlignment( dir, Qt::AlignVCenter | Qt::AlignLeft ),
                 fontMetrics().elidedText( text, Qt::ElideMiddle, textRect.width() ) );
 }

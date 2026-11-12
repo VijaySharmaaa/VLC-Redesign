@@ -218,7 +218,11 @@ void SpectrumWidget::tick()
     /* reduced motion (read live): static flat bars. Covered: no work. Both
      * check back at the slow rate, for the setting or the window to return */
     const bool still = Theme::instance()->duration( Theme::Spectrum ) == 0;
-    if( still || hidden() )
+    const bool idle = still || hidden();
+    /* and the decoder thread skips the FFT: the ring refills about a
+     * second after the bars return */
+    setCounted( !idle );
+    if( idle )
     {
         timer->setInterval( NowPlaying::SpectrumMotion );
         /* stopping while covered: flat, or the bars stay up when it returns */

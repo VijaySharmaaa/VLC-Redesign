@@ -35,6 +35,7 @@ class QToolButton;
 class QBoxLayout;
 class QGridLayout;
 class QElidingLabel;
+class SoundWidget;
 class QPropertyAnimation;
 
 /* Shared with the library pages (components/library); timeString() is in
@@ -62,7 +63,8 @@ protected:
     void paintEvent( QPaintEvent * ) Q_DECL_OVERRIDE;
     void childEvent( QChildEvent * ) Q_DECL_OVERRIDE;
 private:
-    QPixmap art;
+    QString artUrl;
+    QPixmap art, scaled;    /* scaled: art cropped to the last paint's size */
     int stripe, radius;
     bool onVideo;
 };
@@ -129,7 +131,9 @@ private:
     void refresh();
     intf_thread_t *p_intf;
     NowPlayingInfo *info;
-    QWidget *left;
+    QWidget *left, *right;
+    SoundWidget *volume;
+    QToolButton *expand;
     ArtView *thumb;
     QElidingLabel *title, *meta;
     QLabel *elapsed, *length;
