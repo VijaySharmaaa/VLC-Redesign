@@ -117,7 +117,9 @@ StandardPLPanel::StandardPLPanel( PlaylistWidget *_parent,
     /* Saved Settings */
     int i_savedViewMode = getSettings()->value( "Playlist/view-mode", TREE_VIEW ).toInt();
 
-    zoom = getSettings()->value( "Playlist/zoom", 0 ).toInt();
+    zoom = 0;
+    /* within updateZoom's bounds: stock VLC 3 saved it with weaker ones */
+    updateZoom( getSettings()->value( "Playlist/zoom", 0 ).toInt() );
     applyZoom();
     connect( Theme::instance(), &Theme::changed, this, &StandardPLPanel::applyZoom );
 
@@ -226,7 +228,7 @@ void StandardPLPanel::addModelActions( QMenu *menu, VLCModel *model, const QMode
     ADD_MENU_ENTRY( icon( RedesignIcons::MenuStream ), qtr(I_POP_STREAM),
                     VLCModelSubInterface::ACTION_STREAM )
 
-    ADD_MENU_ENTRY( icon( RedesignIcons::MenuConvert ), qtr("Save/Convert…"),
+    ADD_MENU_ENTRY( icon( RedesignIcons::MenuConvert ), qtr(I_POP_SAVE),
                     VLCModelSubInterface::ACTION_SAVE );
 
     ADD_MENU_ENTRY( icon( RedesignIcons::MenuMediaInfo ), qtr(I_POP_INFO),
@@ -272,8 +274,9 @@ void StandardPLPanel::addModelActions( QMenu *menu, VLCModel *model, const QMode
 
     if ( model->isSupportedAction( VLCModelSubInterface::ACTION_REMOVE, index ) )
     {
-        ADD_MENU_ENTRY( icon( RedesignIcons::IconDelete ), qtr(I_POP_DEL),
-                        VLCModelSubInterface::ACTION_REMOVE );
+        action = menu->addAction( icon( RedesignIcons::IconDelete ), qtr(I_POP_DEL) );
+        container.action = VLCModelSubInterface::ACTION_REMOVE;
+        action->setData( QVariant::fromValue( container ) );
         Theme::setDestructive( action );
     }
 

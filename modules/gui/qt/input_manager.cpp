@@ -173,8 +173,9 @@ void InputManager::delInput()
         int64_t i_time = -1;
         const int64_t i_length = var_GetInteger( p_input, "length" );
 
-        if( f_pos >= 0.05f && f_pos <= 0.95f
-         && i_length >= 60 * CLOCK_FREQ )
+        if( f_pos > 0.95f )
+            i_time = RecentsMRL::Ended;   /* watched */
+        else if( f_pos >= 0.05f && i_length >= 60 * CLOCK_FREQ )
             i_time = var_GetInteger( p_input, "time");
 
         RecentsMRL::getInstance( p_intf )->setTime( qfu(uri), i_time, i_length );

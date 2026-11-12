@@ -42,6 +42,7 @@
 
 #include <QAction>
 #include <QApplication>
+#include <QFileInfo>
 #include <QHBoxLayout>
 #include <QImageReader>
 #include <QKeyEvent>
@@ -56,6 +57,7 @@
 #include <QRunnable>
 #include <QScrollBar>
 #include <QStyle>
+#include <QTimer>
 #include <QToolButton>
 #include <QVariantAnimation>
 #include <QVBoxLayout>
@@ -259,6 +261,17 @@ QThreadPool *LibraryData::workerPool()
     return pool;
 }
 
+QThreadPool *LibraryData::filePool()
+{
+    /* shortcut: never deleted, as workerPool() */
+    static QThreadPool *pool = []() {
+        QThreadPool *p = new QThreadPool;
+        p->setMaxThreadCount( Library::FileWorkers );
+        return p;
+    }();
+    return pool;
+}
+
 /**********************************************************************
  * ArtLoader
  **********************************************************************/
@@ -274,10 +287,8 @@ void ArtJob::run()
 
 ArtLoader::ArtLoader( QObject *parent ) : QObject( parent )
 {
-    /* the default 10 MB holds about thirty album covers */
-    enum { CacheKB = 64 * 1024 };
-    if( QPixmapCache::cacheLimit() < CacheKB )
-        QPixmapCache::setCacheLimit( CacheKB );
+    if( QPixmapCache::cacheLimit() < Library::ArtCacheKB )
+        QPixmapCache::setCacheLimit( Library::ArtCacheKB );
 }
 
 QPixmap ArtLoader::get( const QString &path, const QSize &size )
@@ -285,11 +296,16 @@ QPixmap ArtLoader::get( const QString &path, const QSize &size )
     QPixmap pixmap;
     if( path.isEmpty() )
         return pixmap;
-    const QString key = QString( "library:%1:%2x%3" ).arg( path ).arg( size.width() ).arg( size.height() );
+    /* a step up from the size asked, so a resize does not decode it again
+     * at each pixel: paintCardThumb scales it down to the card */
+    const int step = Library::ArtSizeStep;
+    const QSize at( ( size.width() + step - 1 ) / step * step,
+                    ( size.height() + step - 1 ) / step * step );
+    const QString key = QString( "library:%1:%2x%3" ).arg( path ).arg( at.width() ).arg( at.height() );
     if( failed.contains( key ) || QPixmapCache::find( key, &pixmap ) || pending.contains( key ) )
         return pixmap;
     pending.insert( key );
-    ArtJob *job = new ArtJob( path, size, key );
+    ArtJob *job = new ArtJob( path, at, key );
     /* queued: a result that comes after this loader is gone is dropped */
     connect( job, &ArtJob::loaded, this, &ArtLoader::loaded, Qt::QueuedConnection );
     LibraryData::workerPool()->start( job );
@@ -301,6 +317,8 @@ void ArtLoader::loaded( const QString &key, const QImage &image )
     pending.remove( key );
     if( image.isNull() )
     {
+        if( failed.count() >= Library::ArtFailedMax )
+            failed.clear();
         failed.insert( key );
         return;
     }
@@ -392,26 +410,11 @@ void CardDelegate::paintCard( QPainter *p, const QStyleOptionViewItem &option,
     const QRectF thumb = QRectF( x, option.rect.y(), cardW, thumbH ).adjusted( .5, .5, -.5, -.5 );
     const qreal radius = t->px( Library::CardRadius );
 
-    /* art, cropped to fill, or the placeholder */
-    QPainterPath clip;
-    clip.addRoundedRect( thumb, radius, radius );
-    p->setClipPath( clip );
     const qreal dpr = p->device()->devicePixelRatioF();
-    QPixmap pixmap = art->get( artPath( input, source ), ( thumb.size() * dpr ).toSize() );
-    if( pixmap.isNull() )
-    {
-        paintStripes( *p, thumb, t->px( Library::CardStripe ) );
-        paintGlyph( p, folder ? RedesignIcons::IconFolder
+    paintCardThumb( p, thumb, radius, art->get( artPath( input, source ), ( thumb.size() * dpr ).toSize() ),
+                    folder ? RedesignIcons::IconFolder
                     : kind == AlbumCard ? RedesignIcons::IconMusic : RedesignIcons::IconVideo,
-                    Theme::Dim, t->px( Library::CardGlyph ), thumb );
-    }
-    else
-    {
-        pixmap.setDevicePixelRatio( dpr );
-        const QSizeF s = QSizeF( pixmap.size() ) / dpr;
-        p->drawPixmap( QPointF( thumb.center().x() - s.width() / 2,
-                                thumb.center().y() - s.height() / 2 ), pixmap );
-    }
+                    t->px( Library::CardStripe ), t->px( Library::CardGlyph ) );
     const qreal watched = progress( input, source );
     if( watched > 0 )
         paintProgress( p, thumb, watched, option.direction );
@@ -428,24 +431,9 @@ void CardDelegate::paintCard( QPainter *p, const QStyleOptionViewItem &option,
     /* duration badge */
     const int64_t duration = folder ? -1 : input_item_GetDuration( input );
     if( duration > 0 )
-    {
-        const QString text = timeString( duration / CLOCK_FREQ );
-        const QFont font = t->font( Theme::Overline );
-        const QFontMetrics fm( font );
-        const QSizeF size( fm.width( text ) + 2 * t->px( Library::BadgePadX ),
-                           fm.height() + 2 * t->px( Library::BadgePadY ) );
-        QRectF badge( thumb.right() - t->px( Library::BadgeInset ) - size.width(),
-                      thumb.bottom() - t->px( Library::BadgeInset ) - size.height(),
-                      size.width(), size.height() );
-        if( option.direction == Qt::RightToLeft )
-            badge.moveLeft( thumb.left() + thumb.right() - badge.right() );
-        p->setPen( Qt::NoPen );
-        p->setBrush( QColor::fromRgba( CardBadgeBg ) );
-        p->drawRoundedRect( badge, t->px( Library::BadgeRadius ), t->px( Library::BadgeRadius ) );
-        p->setFont( font );
-        p->setPen( t->color( Theme::OnVideo ) );
-        p->drawText( badge, Qt::AlignCenter, text );
-    }
+        paintTimeBadge( p, thumb, timeString( duration / CLOCK_FREQ ), t->font( Theme::Overline ),
+                        option.direction, t->px( Library::BadgeInset ), t->px( Library::BadgeInset ),
+                        t->px( Library::BadgePadX ), t->px( Library::BadgePadY ) );
 
     /* title and meta */
     const QFont titleFont = fontAt( Theme::Body, Library::CardTitle, true );
@@ -514,9 +502,8 @@ QString CardDelegate::artPath( input_item_t *input, const QModelIndex &source ) 
     QString path = InputManager::decodeArtURL( input );
     /* a folder shows the art of its first items, as PLModel's cover column;
      * shortcut: only the first few, so a big folder costs nothing per paint */
-    enum { ArtProbe = 4 };
     const PLModel *model = static_cast<PLModel *>( filter->sourceModel() );
-    for( int i = 0; path.isEmpty() && i < qMin<int>( ArtProbe, model->rowCount( source ) ); i++ )
+    for( int i = 0; path.isEmpty() && i < qMin<int>( Library::ArtProbe, model->rowCount( source ) ); i++ )
         path = InputManager::decodeArtURL( model->getInputItem( model->index( i, 0, source ) ) );
     if( !path.isEmpty() || !thumbs )
         return path;
@@ -566,14 +553,68 @@ QString CardDelegate::metaLine( input_item_t *input, const QModelIndex &source )
     return line.isEmpty() ? QString::fromUtf8( "—" ) : line;
 }
 
+QString localPath( const QString &mrl )
+{
+    char *path = vlc_uri2path( qtu( mrl ) );
+    const QString local = qfu( path );
+    free( path );
+    return local;
+}
+
 QString localPath( input_item_t *input )
 {
     char *uri = input_item_GetURI( input );
-    char *path = uri ? vlc_uri2path( uri ) : NULL;
-    const QString local = qfu( path );
+    const QString local = uri ? localPath( qfu( uri ) ) : QString();
     free( uri );
-    free( path );
     return local;
+}
+
+bool hasExtension( const QString &path, const QStringList &filters )
+{
+    return filters.contains( QLatin1String( "*." ) + QFileInfo( path ).suffix().toLower() );
+}
+
+QString metaSeparator()
+{
+    return QString::fromUtf8( " \xC2\xB7 " );
+}
+
+void paintCardThumb( QPainter *p, const QRectF &thumb, qreal radius, QPixmap pixmap,
+                     const char *glyph, int stripePx, int glyphPx )
+{
+    QPainterPath clip;
+    clip.addRoundedRect( thumb, radius, radius );
+    p->setClipPath( clip );
+    if( pixmap.isNull() )
+    {
+        paintStripes( *p, thumb, stripePx );
+        paintGlyph( p, glyph, Theme::Dim, glyphPx, thumb );
+        return;
+    }
+    /* cropped to fill; a little bigger than the card (ArtLoader) */
+    const QSizeF s = QSizeF( pixmap.size() ).scaled( thumb.size(), Qt::KeepAspectRatioByExpanding );
+    p->setRenderHint( QPainter::SmoothPixmapTransform );
+    p->drawPixmap( QRectF( thumb.center().x() - s.width() / 2, thumb.center().y() - s.height() / 2,
+                           s.width(), s.height() ), pixmap, QRectF( pixmap.rect() ) );
+}
+
+void paintTimeBadge( QPainter *p, const QRectF &thumb, const QString &text, const QFont &font,
+                     Qt::LayoutDirection dir, int insetX, int insetY, int padX, int padY )
+{
+    Theme *t = Theme::instance();
+    const QFontMetrics fm( font );
+    const QSizeF size( fm.width( text ) + 2 * padX, fm.height() + 2 * padY );
+    QRectF badge( thumb.right() - insetX - size.width(), thumb.bottom() - insetY - size.height(),
+                  size.width(), size.height() );
+    if( dir == Qt::RightToLeft )
+        badge.moveLeft( thumb.left() + thumb.right() - badge.right() );
+    const qreal radius = t->px( Library::BadgeRadius );
+    p->setPen( Qt::NoPen );
+    p->setBrush( QColor::fromRgba( CardBadgeBg ) );
+    p->drawRoundedRect( badge, radius, radius );
+    p->setFont( font );
+    p->setPen( t->color( Theme::OnVideo ) );
+    p->drawText( badge, Qt::AlignCenter, text );
 }
 
 void paintProgress( QPainter *p, const QRectF &thumb, qreal fraction, Qt::LayoutDirection dir )
@@ -623,7 +664,7 @@ QString mediaMetaLine( input_item_t *input )
     else if( channels == 8 )
         parts << QString( "7.1" );
     parts.removeAll( QString() );
-    return parts.join( QString::fromUtf8( " · " ) );
+    return parts.join( metaSeparator() );
 }
 
 /**********************************************************************
@@ -721,6 +762,133 @@ void CardView::keyPressEvent( QKeyEvent *e )
 }
 
 /**********************************************************************
+ * LibraryBrowser
+ **********************************************************************/
+LibraryBrowser::LibraryBrowser( intf_thread_t *_p_intf, LibraryFilter *_filter, CardView *_view,
+                                LibraryHeader *_header, QObject *parent )
+    : QObject( parent ), p_intf( _p_intf ), filter( _filter ), view( _view ), header( _header ),
+      expandingId( -1 ), expandFailed( false )
+{
+    expandTimer = new QTimer( this );
+    expandTimer->setSingleShot( true );
+    expandTimer->setInterval( Library::ExpandTimeoutMs );
+    connect( expandTimer, &QTimer::timeout, this, [this]() {
+        expandFailed = true;   /* still browsed into if its items come later */
+        emit changed();
+    } );
+    /* a folder expanded by expand(): open it, as StandardPLPanel does */
+    connect( THEMIM, &MainInputManager::leafBecameParent, this, [this]( int id ) {
+        expandRequested.remove( id );   /* a node now: never expanded again */
+        if( id != expandingId || !model() )
+            return;
+        expandingId = -1;
+        expandTimer->stop();
+        expandFailed = false;
+        const QModelIndex source = model()->indexByPLID( id, 0 );
+        if( source.isValid() )
+            browse( source );
+    } );
+}
+
+PLModel *LibraryBrowser::model() const
+{
+    return static_cast<PLModel *>( filter->sourceModel() );
+}
+
+bool LibraryBrowser::expanding() const
+{
+    return expandTimer->isActive();
+}
+
+void LibraryBrowser::browse( const QModelIndex &source )
+{
+    emit aboutToBrowse();
+    expandTimer->stop();
+    expandFailed = false;
+    header->search()->clear();   /* a search is for the folder it was typed in */
+    filter->setBrowseRoot( source );
+    const QModelIndex root = filter->mapFromSource( source );
+    view->setRootIndex( root );
+    view->setCurrentIndex( filter->index( 0, 0, root ) );
+    view->scrollToTop();
+    emit changed();
+}
+
+void LibraryBrowser::expand( const QModelIndex &source )
+{
+    expandingIndex = source;
+    expandFailed = false;
+    expandTimer->start();   /* the loading state until it is listed */
+    LibraryData::expand( p_intf, model(), source, &expandingId, &expandRequested );
+    emit changed();
+}
+
+void LibraryBrowser::cancelExpand()
+{
+    expandTimer->stop();
+    expandFailed = false;
+    expandingId = -1;
+}
+
+void LibraryBrowser::goBack()
+{
+    emit aboutToBrowse();
+    if( ( expandTimer->isActive() || expandFailed ) && expandingIndex != top )
+    {
+        /* gives up on the folder being opened: back to its parent's cards */
+        cancelExpand();
+        emit changed();
+        view->setFocus();
+        return;
+    }
+    const QPersistentModelIndex from = filter->mapToSource( view->rootIndex() );
+    if( from == top )
+    {
+        emit backFromTop();
+        return;
+    }
+    header->search()->clear();
+    filter->setBrowseRoot( from.parent() );
+    view->setRootIndex( filter->mapFromSource( from.parent() ) );
+    view->setCurrentIndex( filter->mapFromSource( from ) );
+    view->scrollTo( view->currentIndex() );
+    view->setFocus();
+    emit changed();
+}
+
+void LibraryBrowser::noticeAction( bool primary )
+{
+    if( expandFailed && primary && expandingIndex.isValid() )
+    {
+        /* the first request is over (a preparse ends within the timeout):
+         * asking again cannot add the items twice */
+        expandRequested.remove( model()->itemId( expandingIndex ) );
+        expand( expandingIndex );
+    }
+    else if( !expandFailed && !header->search()->text().trimmed().isEmpty() )
+    {
+        header->search()->clear();
+        view->setFocus();
+    }
+    else
+        goBack();
+}
+
+bool LibraryBrowser::showExpandState( LibraryNotice *notice, const QString &cannotList,
+                                      const QString &name ) const
+{
+    if( expandTimer->isActive() )
+        notice->showLoading( qtr( "Loading..." ) );
+    else if( expandFailed )
+        notice->showMessage( RedesignIcons::IconError, Theme::Error, qtr( "This folder can't be opened" ),
+                             cannotList.arg( expandingIndex.isValid() ? model()->getTitle( expandingIndex ) : name ),
+                             qtr( "Try again" ), qtr( "Back" ) );
+    else
+        return false;
+    return true;
+}
+
+/**********************************************************************
  * LibraryHeader
  **********************************************************************/
 LibraryHeader::LibraryHeader( const QString &_title, QWidget *parent )
@@ -759,7 +927,9 @@ LibraryHeader::LibraryHeader( const QString &_title, QWidget *parent )
 void LibraryHeader::setFolder( const QString &name )
 {
     title->setText( name.isEmpty() ? pageTitle : name );
-    title->setAccessibleName( title->text() );
+    /* called for each row of a scan: Qt 5.6 tells screen readers of each set */
+    if( title->accessibleName() != title->text() )
+        title->setAccessibleName( title->text() );
     back->setVisible( !name.isEmpty() );
 }
 
@@ -785,18 +955,59 @@ public:
     FixedTextLabel( const QString &text, QWidget *parent ) : QLabel( text, parent ) {}
     bool hasHeightForWidth() const Q_DECL_OVERRIDE { return false; }
 };
+
+/* The column of the empty state and the notices */
+QVBoxLayout *noticeLayout( QWidget *w )
+{
+    const Theme *t = Theme::instance();
+    QVBoxLayout *layout = new QVBoxLayout( w );
+    const int pad = t->px( Library::EmptyPad );
+    layout->setContentsMargins( pad, 0, pad, 0 );
+    layout->setSpacing( t->px( Library::EmptyGap ) );
+    return layout;
+}
+
+/* Its wrapped hint text, plain (a search or a server's name goes in) */
+QLabel *noticeText( const QString &text, QWidget *parent )
+{
+    QLabel *l = new FixedTextLabel( text, parent );
+    l->setTextFormat( Qt::PlainText );
+    l->setProperty( "role", "hint" );
+    l->setWordWrap( true );
+    l->setAlignment( Qt::AlignCenter );
+    /* an aligned label gets its one-line size hint: give it its wrapped size */
+    l->setFixedWidth( Theme::instance()->px( Library::EmptyTextW ) );
+    l->setFixedHeight( l->heightForWidth( l->width() ) );
+    return l;
+}
+
+/* Its buttons, in a centred row */
+void addNoticeButtons( QVBoxLayout *layout, const QList<QPushButton *> &buttons )
+{
+    const Theme *t = Theme::instance();
+    QHBoxLayout *row = new QHBoxLayout;
+    row->setSpacing( t->px( Library::EmptyButtonGap ) );
+    foreach( QPushButton *b, buttons )
+    {
+        b->setFixedHeight( t->px( Library::EmptyButtonH ) );
+        b->setFocusPolicy( Qt::TabFocus );
+        b->setCursor( Qt::PointingHandCursor );
+        row->addWidget( b );
+    }
+    layout->addSpacing( t->px( Library::EmptyButtonsTop ) );
+    layout->addLayout( row );
+    layout->setAlignment( row, Qt::AlignHCenter );
+}
 }
 
 LibraryEmptyState::LibraryEmptyState( const QString &text, const QString &note, QWidget *parent )
     : QWidget( parent ), noteLabel( NULL )
 {
     Theme *t = Theme::instance();
-    QVBoxLayout *layout = new QVBoxLayout( this );
+    QVBoxLayout *layout = noticeLayout( this );
     const int pad = t->px( Library::EmptyPad );
     /* the top and bottom padding is a centring spacer each: `pad` tall
      * when there is room, down to nothing in a short window */
-    layout->setContentsMargins( pad, 0, pad, 0 );
-    layout->setSpacing( t->px( Library::EmptyGap ) );
     layout->addSpacerItem( new QSpacerItem( 0, pad, QSizePolicy::Minimum, QSizePolicy::Expanding ) );
 
     QLabel *cone = new QLabel( this );
@@ -813,23 +1024,10 @@ LibraryEmptyState::LibraryEmptyState( const QString &text, const QString &note, 
     title->setFont( fontAt( Theme::PanelTitle, Library::EmptyTitle, true ) );
     layout->addWidget( title, 0, Qt::AlignHCenter );
 
-    QList<QLabel *> texts;
-    texts << new FixedTextLabel( text, this );
+    layout->addWidget( noticeText( text, this ), 0, Qt::AlignHCenter );
     if( !note.isEmpty() )
-        texts << ( noteLabel = new FixedTextLabel( note, this ) );
-    foreach( QLabel *l, texts )
-    {
-        l->setProperty( "role", "hint" );
-        l->setWordWrap( true );
-        l->setAlignment( Qt::AlignCenter );
-        /* an aligned label gets its one-line size hint: give it its wrapped size */
-        l->setFixedWidth( t->px( Library::EmptyTextW ) );
-        l->setFixedHeight( l->heightForWidth( l->width() ) );
-        layout->addWidget( l, 0, Qt::AlignHCenter );
-    }
+        layout->addWidget( noteLabel = noticeText( note, this ), 0, Qt::AlignHCenter );
 
-    QHBoxLayout *buttons = new QHBoxLayout;
-    buttons->setSpacing( t->px( Library::EmptyButtonGap ) );
     /* P4-2: the folder goes to the playlist; the scanned folders are the
      * system's Videos and Music folders */
     QPushButton *add = new QPushButton( qtr( "Add a folder" ), this );
@@ -843,17 +1041,9 @@ LibraryEmptyState::LibraryEmptyState( const QString &text, const QString &note, 
     open->setToolTip( withHotkey( NULL, qtr( "Open media" ), MENU_KEY_OPEN_MEDIA ) );
     connect( open, &QPushButton::clicked, []() { THEDP->openDialog(); } );
     const int iconPx = t->px( Library::EmptyButtonIcon );
-    foreach( QPushButton *b, QList<QPushButton *>() << add << open )
-    {
-        b->setIconSize( QSize( iconPx, iconPx ) );
-        b->setFixedHeight( t->px( Library::EmptyButtonH ) );
-        b->setFocusPolicy( Qt::TabFocus );
-        b->setCursor( Qt::PointingHandCursor );
-        buttons->addWidget( b );
-    }
-    layout->addSpacing( t->px( Library::EmptyButtonsTop ) );
-    layout->addLayout( buttons );
-    layout->setAlignment( buttons, Qt::AlignHCenter );
+    add->setIconSize( QSize( iconPx, iconPx ) );
+    open->setIconSize( QSize( iconPx, iconPx ) );
+    addNoticeButtons( layout, QList<QPushButton *>() << add << open );
 
     QLabel *hint = new QLabel( qtr( "or drop files anywhere in this window" ), this );
     hint->setFont( t->font( Theme::Mono ) );
@@ -950,11 +1140,7 @@ void LoadingRing::paintEvent( QPaintEvent * )
  **********************************************************************/
 LibraryNotice::LibraryNotice( QWidget *parent ) : QWidget( parent )
 {
-    Theme *t = Theme::instance();
-    QVBoxLayout *layout = new QVBoxLayout( this );
-    const int pad = t->px( Library::EmptyPad );
-    layout->setContentsMargins( pad, 0, pad, 0 );
-    layout->setSpacing( t->px( Library::EmptyGap ) );
+    QVBoxLayout *layout = noticeLayout( this );
     layout->addStretch( 1 );
 
     ring = new LoadingRing( this );
@@ -962,33 +1148,19 @@ LibraryNotice::LibraryNotice( QWidget *parent ) : QWidget( parent )
     glyph = new QLabel( this );
     layout->addWidget( glyph, 0, Qt::AlignHCenter );
     title = new QLabel( this );
+    title->setTextFormat( Qt::PlainText );
     title->setFont( fontAt( Theme::PanelTitle, Library::EmptyTitle, true ) );
     layout->addWidget( title, 0, Qt::AlignHCenter );
-    text = new FixedTextLabel( QString(), this );
-    text->setProperty( "role", "hint" );
-    text->setWordWrap( true );
-    text->setAlignment( Qt::AlignCenter );
-    text->setFixedWidth( t->px( Library::EmptyTextW ) );
+    text = noticeText( QString(), this );
     layout->addWidget( text, 0, Qt::AlignHCenter );
 
-    QHBoxLayout *buttons = new QHBoxLayout;
-    buttons->setSpacing( t->px( Library::EmptyButtonGap ) );
     primary = new QPushButton( this );
     primary->setProperty( "role", "primary" );
     connect( primary, &QPushButton::clicked, this, &LibraryNotice::primaryClicked );
     secondary = new QPushButton( this );
     secondary->setProperty( "role", "outline" );
     connect( secondary, &QPushButton::clicked, this, &LibraryNotice::secondaryClicked );
-    foreach( QPushButton *b, QList<QPushButton *>() << primary << secondary )
-    {
-        b->setFixedHeight( t->px( Library::EmptyButtonH ) );
-        b->setFocusPolicy( Qt::TabFocus );
-        b->setCursor( Qt::PointingHandCursor );
-        buttons->addWidget( b );
-    }
-    layout->addSpacing( t->px( Library::EmptyButtonsTop ) );
-    layout->addLayout( buttons );
-    layout->setAlignment( buttons, Qt::AlignHCenter );
+    addNoticeButtons( layout, QList<QPushButton *>() << primary << secondary );
     layout->addStretch( 1 );
     /* a page moving the focus here from its grid lands on the action */
     setFocusProxy( primary );
@@ -1013,7 +1185,15 @@ void LibraryNotice::showLoading( const QString &caption )
     primary->hide();
     secondary->hide();
     ring->show();
-    setAccessibleName( caption );
+    /* called for each row of a scan: Qt 5.6 tells screen readers of each set */
+    if( accessibleName() != caption )
+        setAccessibleName( caption );
+}
+
+void LibraryNotice::showNoResults( const QString &_text )
+{
+    showMessage( RedesignIcons::IconSearch, Theme::Dim, qtr( "No results" ), _text,
+                 qtr( "Clear search" ), QString() );
 }
 
 void LibraryNotice::showMessage( const char *icon, Theme::ColorRole role, const QString &_title,
@@ -1031,5 +1211,6 @@ void LibraryNotice::showMessage( const char *icon, Theme::ColorRole role, const 
     primary->setVisible( !primaryText.isEmpty() );
     secondary->setText( secondaryText );
     secondary->setVisible( !secondaryText.isEmpty() );
-    setAccessibleName( _title );
+    if( accessibleName() != _title )
+        setAccessibleName( _title );
 }

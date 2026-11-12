@@ -35,8 +35,9 @@ class PLModel;
 class PlListView;
 
 /* DESIGN_SPEC 6: the playlist docked at the right of the content area, on
- * the shared PLModel (so a filter here also filters the separate playlist
- * window); a drawer at XS (SidePanel). Exit is instant, enter slides. */
+ * its own PLModel of the main playlist; its filter and the separate
+ * playlist window's search show the same text. A drawer at XS (SidePanel).
+ * Exit is instant, enter slides. */
 class PlaylistPanel : public SidePanel
 {
     Q_OBJECT
@@ -57,6 +58,7 @@ protected:
 
 private:
     void popup( const QPoint & );
+    void updateCount();
 
     intf_thread_t *p_intf;
     PLModel *model;

@@ -24,13 +24,13 @@
 #include <QThreadPool>
 
 #include "components/library/thumbnailer.hpp"
-#include "components/library/library_widgets.hpp"   /* LibraryData::workerPool */
+#include "components/library/library_widgets.hpp"   /* LibraryData::filePool */
+#include "input_manager.hpp"                        /* THEMIM */
 #include "recents.hpp"
 #include "util/theme.hpp"
 
 #include <vlc_configuration.h>          /* config_GetUserDir */
 #include <vlc_interface.h>              /* EXTENSIONS_VIDEO */
-#include <vlc_url.h>
 
 #include <climits>                       /* INT_MAX */
 
@@ -40,6 +40,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QPointer>
 #include <QProcess>
 #include <QThread>
 #include <QTimer>
@@ -65,7 +66,47 @@ static const QStringList &videoFilters()
 
 bool Thumbnailer::isVideo( const QString &path )
 {
-    return videoFilters().contains( QLatin1String( "*." ) + QFileInfo( path ).suffix().toLower() );
+    return hasExtension( path, videoFilters() );
+}
+
+namespace {
+/* Trims the frame cache when VLC starts: the part files of grabs cut short
+ * (VLC killed; no grab runs longer than ThumbTimeoutMs), then the oldest
+ * frames past ThumbCacheMaxMB.
+ * shortcut: oldest by when the frame was made, not last shown; keep a
+ * last-use date if often shown frames get made again */
+class ThumbPrune : public QRunnable
+{
+public:
+    explicit ThumbPrune( const QString &_dir ) : dir( _dir ) {}
+    void run() Q_DECL_OVERRIDE
+    {
+        const QDateTime now = QDateTime::currentDateTime();
+        QFileInfoList frames;
+        qint64 total = 0;
+        /* oldest first */
+        foreach( const QFileInfo &info, QDir( dir ).entryInfoList(
+                     QStringList() << "*.png" << "*.swp", QDir::Files, QDir::Time | QDir::Reversed ) )
+        {
+            if( info.suffix() == QLatin1String( "swp" )
+             || info.completeBaseName().endsWith( QLatin1String( ".part" ) ) )
+            {
+                if( info.lastModified().msecsTo( now ) > Library::ThumbTimeoutMs )
+                    QFile::remove( info.filePath() );
+                continue;
+            }
+            frames << info;
+            total += info.size();
+        }
+        const qint64 max = qint64( Library::ThumbCacheMaxMB ) << 20;
+        for( int i = 0; i < frames.count() && total > max; i++ )
+            if( QFile::remove( frames.at( i ).filePath() ) )
+                total -= frames.at( i ).size();
+    }
+
+private:
+    QString dir;
+};
 }
 
 /**********************************************************************
@@ -117,8 +158,7 @@ void ThumbJob::run()
     const QByteArray id = ( keyOf( path ) + QLatin1Char( '|' ) + QString::number( info.size() )
                           + QLatin1Char( '|' )
                           + QString::number( info.lastModified().toMSecsSinceEpoch() ) ).toUtf8();
-    /* shortcut: never pruned (a PNG of some 50 KB per video); remove the
-     * frames of gone files if the folder grows past what users accept */
+    /* a PNG of some 50 KB per video, trimmed by ThumbPrune */
     const QString file = cacheDir + QLatin1Char( '/' )
                        + QString::fromLatin1( QCryptographicHash::hash( id, QCryptographicHash::Sha1 ).toHex() )
                        + QLatin1String( ".png" );
@@ -128,15 +168,27 @@ void ThumbJob::run()
 /**********************************************************************
  * Thumbnailer
  **********************************************************************/
+Thumbnailer *Thumbnailer::instance( intf_thread_t *p_intf )
+{
+    /* kept by the input manager, which outlives the pages */
+    static QPointer<Thumbnailer> shared;
+    if( !shared )
+        shared = new Thumbnailer( p_intf, THEMIM );
+    return shared;
+}
+
 Thumbnailer::Thumbnailer( intf_thread_t *_p_intf, QObject *parent )
-    : QObject( parent ), p_intf( _p_intf ),
+    : QObject( parent ), p_intf( _p_intf ), active( false ), serial( 0 ),
       /* each one decodes on all cores: half of them keeps VLC responsive */
       maxJobs( qBound( 1, QThread::idealThreadCount() / 2, int( Library::ThumbWorkersMax ) ) )
 {
     /* portable mode: the dir functions already point next to vlc.exe */
     char *psz = config_GetUserDir( VLC_CACHE_DIR );
     if( psz )
+    {
         cacheDir = QDir::fromNativeSeparators( qfu( psz ) ) + QLatin1String( "/thumbnails" );
+        LibraryData::filePool()->start( new ThumbPrune( cacheDir ) );
+    }
     free( psz );
 
     poll = new QTimer( this );
@@ -150,16 +202,23 @@ Thumbnailer::Thumbnailer( intf_thread_t *_p_intf, QObject *parent )
 
 Thumbnailer::~Thumbnailer()
 {
-    queue.clear();
+    /* VLC quits: all killed first, then waited for together, so their
+     * part files can go */
     foreach( const Job &j, jobs )
     {
-        stopProcess( j.process );
+        j.process->disconnect();
+        j.process->kill();
+    }
+    foreach( const Job &j, jobs )
+    {
+        j.process->waitForFinished( Library::ThumbKillWaitMs );
         QFile::remove( j.tmpFile );
     }
 }
 
 QString Thumbnailer::frame( const QString &path, int64_t lengthMs )
 {
+    active = true;
     const QString key = keyOf( path );
     if( cacheDir.isEmpty() || !isVideo( path ) || failedFrames.contains( key ) )
         return QString();
@@ -183,13 +242,14 @@ QString Thumbnailer::frame( const QString &path, int64_t lengthMs )
         ThumbJob *job = new ThumbJob( path, cacheDir, false );
         /* queued: a result that comes after this is gone is dropped */
         connect( job, &ThumbJob::probed, this, &Thumbnailer::probed, Qt::QueuedConnection );
-        LibraryData::workerPool()->start( job );
+        LibraryData::filePool()->start( job );
     }
     return QString();
 }
 
 const QStringList *Thumbnailer::videos( const QString &dir )
 {
+    active = true;
     const QString key = keyOf( dir );
     QHash<QString, QStringList>::const_iterator it = dirs.constFind( key );
     if( it != dirs.constEnd() )
@@ -199,7 +259,7 @@ const QStringList *Thumbnailer::videos( const QString &dir )
         pendingDirs.insert( key );
         ThumbJob *job = new ThumbJob( dir, cacheDir, true );
         connect( job, &ThumbJob::listed, this, &Thumbnailer::listed, Qt::QueuedConnection );
-        LibraryData::workerPool()->start( job );
+        LibraryData::filePool()->start( job );
     }
     return NULL;
 }
@@ -234,14 +294,15 @@ int Thumbnailer::watchedIn( const QString &dir )
 
 void Thumbnailer::cancel()
 {
+    /* probes still running are dropped as they come (probed) */
+    active = false;
     foreach( const Request &r, queue )
         pendingFrames.remove( r.key );
     queue.clear();
     foreach( const Job &j, jobs )
     {
         pendingFrames.remove( j.r.key );
-        stopProcess( j.process );
-        QFile::remove( j.tmpFile );
+        stopProcess( j.process, j.tmpFile );
     }
     jobs.clear();
     poll->stop();
@@ -249,11 +310,22 @@ void Thumbnailer::cancel()
     dirs.clear();
     covers.clear();
     watchedCounts.clear();
+    /* tried again when shown: a share may be back, a grab may have timed
+     * out while a film played */
+    failedFrames.clear();
+    if( frames.count() > Library::ThumbFramesMax )
+        frames.clear();
 }
 
 void Thumbnailer::probed( const QString &path, const QString &file, bool cached )
 {
     const QString key = keyOf( path );
+    const int64_t lengthMs = lengths.take( key );
+    if( !active )
+    {
+        pendingFrames.remove( key );
+        return;
+    }
     if( file.isEmpty() )
     {
         pendingFrames.remove( key );
@@ -268,7 +340,6 @@ void Thumbnailer::probed( const QString &path, const QString &file, bool cached 
         return;
     }
     /* the middle of a film opens on a scene, its start often on black */
-    const int64_t lengthMs = lengths.value( key );
     const Request r = { key, path, file,
                         lengthMs > 0 ? int( lengthMs / 1000 * Library::ThumbAtPercent / 100 )
                                      : Library::ThumbUnknownAtS };
@@ -295,16 +366,16 @@ void Thumbnailer::loadRecents()
     watchedCounts.clear();
     foreach( const QString &mrl, recents->recentList() )
     {
-        char *psz = vlc_uri2path( qtu( mrl ) );
-        if( !psz )
+        const QString path = localPath( mrl );
+        if( path.isEmpty() )
             continue;
         const int64_t timeMs = recents->time( mrl ), lengthMs = recents->length( mrl );
-        /* shortcut: RecentsMRL keeps no "finished" state, only no resume
-         * point (played past 95 %, or under 5 %, or shorter than a minute),
-         * and only its last 30 items; store a watched flag if that misleads */
-        played.insert( keyOf( qfu( psz ) ), timeMs > 0 && lengthMs > timeMs
-                                            ? qreal( timeMs ) / lengthMs : 1 );
-        free( psz );
+        /* shortcut: RecentsMRL keeps only its last 30 items; keep a watched
+         * flag per file if older ones showing unwatched misleads */
+        if( timeMs == RecentsMRL::Ended )
+            played.insert( keyOf( path ), 1 );
+        else if( timeMs > 0 && lengthMs > timeMs )
+            played.insert( keyOf( path ), qreal( timeMs ) / lengthMs );
     }
     emit changed();
 }
@@ -313,8 +384,10 @@ void Thumbnailer::startNext()
 {
     if( queue.isEmpty() )
         return;
+    /* shortcut: VLC's own program by the build's name; a fork that renames
+     * it must rename PACKAGE too (configure's AC_INIT) */
     if( QFileInfo( QCoreApplication::applicationFilePath() ).baseName()
-            .compare( QLatin1String( "vlc" ), Qt::CaseInsensitive ) )
+            .compare( QLatin1String( PACKAGE ), Qt::CaseInsensitive ) )
     {
         /* hosted by another program: no vlc.exe to ask */
         foreach( const Request &r, queue )
@@ -333,8 +406,10 @@ void Thumbnailer::start( const Request &r )
 {
     Job j;
     j.r = r;
+    /* one name per grab: a killed one's file goes only once it is let go */
     const QString prefix = QFileInfo( r.file ).completeBaseName()
-                         + QString( ".%1.part" ).arg( QCoreApplication::applicationPid() );
+                         + QString( ".%1.%2.part" ).arg( QCoreApplication::applicationPid() )
+                                                   .arg( ++serial );
     j.tmpFile = cacheDir + QLatin1Char( '/' ) + prefix + QLatin1String( ".png" );
 
     QStringList args;
@@ -409,7 +484,8 @@ void Thumbnailer::finish( QProcess *process, bool ok )
     Job j = jobs.takeAt( i );
     if( jobs.isEmpty() )
         poll->stop();
-    stopProcess( j.process );   /* also after a timeout: the file is whole only once renamed */
+    /* the picture is whole once renamed by the scene filter, even while
+     * the process still runs */
     if( ok && QFileInfo( j.tmpFile ).size() > 0
      && ( QFile::rename( j.tmpFile, j.r.file ) || QFileInfo( j.r.file ).size() > 0 ) )
     {
@@ -428,18 +504,25 @@ void Thumbnailer::finish( QProcess *process, bool ok )
         pendingFrames.remove( j.r.key );
         failedFrames.insert( j.r.key );
     }
-    QFile::remove( j.tmpFile );
+    stopProcess( j.process, j.tmpFile );   /* also after a timeout */
     startNext();
 }
 
-void Thumbnailer::stopProcess( QProcess *p )
+/* Killed without waiting on the GUI thread (an antivirus can hold a dying
+ * process): its part file goes once the process has let go of it */
+void Thumbnailer::stopProcess( QProcess *p, const QString &tmpFile )
 {
     p->disconnect();
-    if( p->state() != QProcess::NotRunning )
+    if( p->state() == QProcess::NotRunning )
     {
-        p->kill();
-        /* the picture file is let go of with the process */
-        p->waitForFinished( Library::ThumbKillWaitMs );
+        QFile::remove( tmpFile );
+        p->deleteLater();
+        return;
     }
-    p->deleteLater();
+    connect( p, static_cast<void (QProcess::*)( int, QProcess::ExitStatus )>( &QProcess::finished ),
+             p, [p, tmpFile]() {
+        QFile::remove( tmpFile );
+        p->deleteLater();
+    } );
+    p->kill();
 }

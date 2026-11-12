@@ -62,9 +62,13 @@ public:
     QStringList recentList();
     QSignalMapper *signalMapper;
 
-    /* resume position in ms, -1 or 0 when there is none */
+    /* time() of an item played to its end; stock VLC reads it as no
+     * resume point, as -1 (never closed) and 0 (stopped too soon) */
+    enum { Ended = -2 };
+    /* resume position in ms, -1 or 0 when there is none, or Ended */
     int time( const QString &mrl );
-    /* when the input closes: position and length in microseconds */
+    /* when the input closes: position (-1 for none, or Ended) and length
+     * in microseconds */
     void setTime( const QString &mrl, const int64_t time, const int64_t length );
     /* length in ms, 0 when unknown (entries from older configurations) */
     int64_t length( const QString &mrl );

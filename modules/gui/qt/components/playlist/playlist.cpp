@@ -127,6 +127,11 @@ PlaylistWidget::PlaylistWidget( intf_thread_t *_p_i, QWidget *_par )
              mainView, &StandardPLPanel::search );
     connect( searchEdit, &SearchLineEdit::searchDelayedChanged,
              mainView, &StandardPLPanel::searchDelayed );
+    /* the docked playlist's filter, while this shows the main playlist */
+    connect( model, &PLModel::searchChanged, searchEdit, [this, model]( const QString &text ) {
+        if( searchEdit->text() != text && model->itemId( QModelIndex() ) == THEPL->p_playing->i_id )
+            searchEdit->setText( text );
+    } );
 
     connect( mainView, &StandardPLPanel::viewChanged,
              this, &PlaylistWidget::changeView );
@@ -135,6 +140,8 @@ PlaylistWidget::PlaylistWidget( intf_thread_t *_p_i, QWidget *_par )
     connect( selector, &PLSelector::categoryActivated,
              mainView, QOverload<playlist_item_t *, bool>::of(&StandardPLPanel::setRootItem), Qt::DirectConnection );
     mainView->setRootItem( p_root, false );
+    /* a filter typed in the docked playlist before this opened */
+    searchEdit->setText( PLModel::mainSearch() );
     connect( selector, &PLSelector::SDCategorySelected, mainView, &StandardPLPanel::setWaiting );
 
     /* */

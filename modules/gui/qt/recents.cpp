@@ -217,7 +217,7 @@ void RecentsMRL::setTime( const QString &mrl, const int64_t time,
     int i_index = recents.indexOf( mrl );
     if( i_index != -1 )
     {
-        times[i_index] = QString::number( time / 1000 );
+        times[i_index] = QString::number( time == Ended ? int64_t( Ended ) : time / 1000 );
         lengths[i_index] = QString::number( qMax<int64_t>( length / 1000, 0 ) );
         dates[i_index] = QDateTime::currentDateTimeUtc().toString( Qt::ISODate );
         emit changed();

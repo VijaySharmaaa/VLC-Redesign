@@ -45,7 +45,7 @@ static const int albumColumns[] = { Library::AlbumColsXS, Library::AlbumColsS,
 
 MediaPage::MediaPage( intf_thread_t *_p_intf, Kind _kind, QWidget *parent )
     : QWidget( parent ), p_intf( _p_intf ), kind( _kind ), model( NULL ),
-      expandingId( -1 ), loaded( false ), loadFailed( false ), expandFailed( false ), burstRows( 0 )
+      loaded( false ), loadFailed( false ), burstRows( 0 )
 {
     const Theme *t = Theme::instance();
     const QString title = kind == Videos ? qtr( "Videos" ) : qtr( "Music" );
@@ -65,7 +65,7 @@ MediaPage::MediaPage( intf_thread_t *_p_intf, Kind _kind, QWidget *parent )
 
     body = new QStackedWidget( this );
     filter = new LibraryFilter( this );
-    thumbs = kind == Videos ? new Thumbnailer( p_intf, this ) : NULL;
+    thumbs = kind == Videos ? Thumbnailer::instance( p_intf ) : NULL;
     CardDelegate *delegate = new CardDelegate( kind == Videos ? CardDelegate::VideoCard
                                                               : CardDelegate::AlbumCard, filter, this,
                                                thumbs );
@@ -84,13 +84,9 @@ MediaPage::MediaPage( intf_thread_t *_p_intf, Kind _kind, QWidget *parent )
     connect( notice, &LibraryNotice::primaryClicked, this, [this]() { noticeAction( true ); } );
     connect( notice, &LibraryNotice::secondaryClicked, this, [this]() { noticeAction( false ); } );
 
-    expandTimer = new QTimer( this );
-    expandTimer->setSingleShot( true );
-    expandTimer->setInterval( Library::ExpandTimeoutMs );
-    connect( expandTimer, &QTimer::timeout, this, [this]() {
-        expandFailed = true;   /* still browsed into if its items come later */
-        updateState();
-    } );
+    browser = new LibraryBrowser( p_intf, filter, view, header, this );
+    connect( browser, &LibraryBrowser::aboutToBrowse, this, [this]() { setAttached( true ); } );
+    connect( browser, &LibraryBrowser::changed, this, &MediaPage::updateState );
 
     settle = new QTimer( this );
     settle->setSingleShot( true );
@@ -100,8 +96,8 @@ MediaPage::MediaPage( intf_thread_t *_p_intf, Kind _kind, QWidget *parent )
         updateState();
     } );
 
-    connect( header, &LibraryHeader::backRequested, this, &MediaPage::goBack );
-    connect( view, &CardView::backRequested, this, &MediaPage::goBack );
+    connect( header, &LibraryHeader::backRequested, browser, &LibraryBrowser::goBack );
+    connect( view, &CardView::backRequested, browser, &LibraryBrowser::goBack );
     connect( view, &CardView::cardActivated, this, &MediaPage::activate );
     connect( header->search(), &QLineEdit::textChanged, this, [this]( const QString &text ) {
         filter->setText( text );
@@ -149,32 +145,19 @@ void MediaPage::load()
          * a 10,000-file folder arrives as one burst of single rows and froze
          * the window for 10 s. During a burst the grid waits, detached, and
          * lays out once when the scan settles. */
-        enum { BurstRows = 200, BurstWindowMs = 250 };
-        if( !burstClock.isValid() || burstClock.elapsed() > BurstWindowMs )
+        if( !burstClock.isValid() || burstClock.elapsed() > Library::BurstWindowMs )
         {
             burstClock.start();
             burstRows = 0;
         }
         burstRows += last - first + 1;
-        if( burstRows > BurstRows && view->model() )
+        if( burstRows > Library::BurstRows && view->model() )
             setAttached( false );
         settle->start();   /* loading while items keep coming */
         updateState();
     } );
     connect( model, &QAbstractItemModel::rowsRemoved, this, &MediaPage::updateState );
     connect( model, &QAbstractItemModel::modelReset, this, &MediaPage::updateState );
-    /* a folder expanded by activate(): open it, as StandardPLPanel does */
-    connect( THEMIM, &MainInputManager::leafBecameParent, this, [this]( int id ) {
-        expandRequested.remove( id );   /* a node now: never expanded again */
-        if( id != expandingId )
-            return;
-        expandingId = -1;
-        expandTimer->stop();
-        expandFailed = false;
-        const QModelIndex source = model->indexByPLID( id, 0 );
-        if( source.isValid() )
-            browse( source );
-    } );
     settle->start();
     updateState();
 }
@@ -193,16 +176,12 @@ void MediaPage::activate( const QModelIndex &index )
     }
     if( !source.data( VLCModelSubInterface::LEAF_NODE_ROLE ).toBool() )
     {
-        browse( source );
+        browser->browse( source );
         return;
     }
     if( LibraryData::isFolder( model, source ) )
     {
-        expanding = source;
-        expandFailed = false;
-        expandTimer->start();   /* the loading state until it is listed */
-        LibraryData::expand( p_intf, model, source, &expandingId, &expandRequested );
-        updateState();
+        browser->expand( source );
         return;
     }
     input_item_t *input = model->getInputItem( source );
@@ -231,46 +210,6 @@ QModelIndex MediaPage::rootIndex() const
     return view->model() ? view->rootIndex() : filter->mapFromSource( detachedRoot );
 }
 
-void MediaPage::browse( const QModelIndex &source )
-{
-    setAttached( true );
-    expandTimer->stop();
-    expandFailed = false;
-    header->search()->clear();   /* a search is for the folder it was typed in */
-    filter->setBrowseRoot( source );
-    const QModelIndex root = filter->mapFromSource( source );
-    view->setRootIndex( root );
-    view->setCurrentIndex( filter->index( 0, 0, root ) );
-    view->scrollToTop();
-    updateState();
-}
-
-void MediaPage::goBack()
-{
-    setAttached( true );
-    if( expandTimer->isActive() || expandFailed )
-    {
-        /* gives up on the folder being opened: back to its parent's cards */
-        expandTimer->stop();
-        expandFailed = false;
-        expandingId = -1;
-        updateState();
-        view->setFocus();
-        return;
-    }
-    const QModelIndex root = view->rootIndex();
-    if( !root.isValid() )
-        return;
-    const QPersistentModelIndex from = filter->mapToSource( root );
-    header->search()->clear();
-    filter->setBrowseRoot( from.parent() );
-    view->setRootIndex( filter->mapFromSource( from.parent() ) );
-    view->setCurrentIndex( filter->mapFromSource( from ) );
-    view->scrollTo( view->currentIndex() );
-    view->setFocus();
-    updateState();
-}
-
 void MediaPage::updateState()
 {
     /* the browsed folder may have gone: the view is back at the top then */
@@ -289,26 +228,21 @@ void MediaPage::updateState()
                              qtr( "Try again" ), QString() );
     else if( !model || ( model->rowCount() == 0 && !scanning ) )
         page = empty;
-    else if( expandTimer->isActive() || !view->model()
-          || ( scanning && filter->rowCount( root ) == 0 ) )
-        notice->showLoading( qtr( "Loading..." ) );
-    else if( expandFailed )
-        notice->showMessage( RedesignIcons::IconError, Theme::Error, qtr( "This folder can't be opened" ),
-                             qtr( "VLC could not list \"%1\". It may be unreadable, "
-                                  "or on a drive or share that is gone." )
-                                 .arg( expanding.isValid() ? expanding.data().toString() : QString() ),
-                             qtr( "Try again" ), qtr( "Back" ) );
-    else if( filter->rowCount( root ) > 0 )
-        page = view;
-    else if( !search.isEmpty() )
-        notice->showMessage( RedesignIcons::IconSearch, Theme::Dim, qtr( "No results" ),
-                             qtr( "Nothing here matches \"%1\"." ).arg( search ),
-                             qtr( "Clear search" ), QString() );
-    else
-        notice->showMessage( RedesignIcons::IconFolder, Theme::Dim, qtr( "This folder is empty" ),
-                             kind == Videos ? qtr( "There are no videos or folders in this folder." )
-                                            : qtr( "There is no music in this folder." ),
-                             qtr( "Back" ), QString() );
+    else if( !browser->showExpandState( notice, qtr( "VLC could not list \"%1\". It may be unreadable, "
+                                                     "or on a drive or share that is gone." ), QString() ) )
+    {
+        if( !view->model() || ( scanning && filter->rowCount( root ) == 0 ) )
+            notice->showLoading( qtr( "Loading..." ) );
+        else if( filter->rowCount( root ) > 0 )
+            page = view;
+        else if( !search.isEmpty() )
+            notice->showNoResults( qtr( "Nothing here matches \"%1\"." ).arg( search ) );
+        else
+            notice->showMessage( RedesignIcons::IconFolder, Theme::Dim, qtr( "This folder is empty" ),
+                                 kind == Videos ? qtr( "There are no videos or folders in this folder." )
+                                                : qtr( "There is no music in this folder." ),
+                                 qtr( "Back" ), QString() );
+    }
 
     /* the keyboard follows when its card or button goes away */
     QWidget *focus = QApplication::focusWidget();
@@ -322,23 +256,6 @@ void MediaPage::noticeAction( bool primary )
 {
     if( !model && loadFailed )
         load();
-    else if( expandFailed && primary && expanding.isValid() )
-    {
-        /* the first request is over (a preparse ends within the timeout):
-         * asking again cannot add the items twice */
-        expandFailed = false;
-        expandRequested.remove( model->itemId( expanding ) );
-        expandTimer->start();
-        LibraryData::expand( p_intf, model, expanding, &expandingId, &expandRequested );
-        updateState();
-    }
-    else if( expandFailed )
-        goBack();
-    else if( !header->search()->text().trimmed().isEmpty() )
-    {
-        header->search()->clear();
-        view->setFocus();
-    }
     else
-        goBack();
+        browser->noticeAction( primary );
 }

@@ -136,8 +136,7 @@ static const int tileColumns[] = { Library::NetColsXS, Library::NetColsS,
                                    Library::NetColsM, Library::NetColsL };
 
 NetworkPage::NetworkPage( intf_thread_t *_p_intf, QWidget *parent )
-    : QWidget( parent ), p_intf( _p_intf ), browsed( NULL ), topIsItem( false ),
-      expandingId( -1 ), loaded( false ), expandFailed( false )
+    : QWidget( parent ), p_intf( _p_intf ), browsed( NULL ), topIsItem( false ), loaded( false )
 {
     const Theme *t = Theme::instance();
     const QString title = qtr( "Network" );
@@ -174,8 +173,11 @@ NetworkPage::NetworkPage( intf_thread_t *_p_intf, QWidget *parent )
     notice = new LibraryNotice( body );
     body->addWidget( notice );
     layout->addWidget( body, 1 );
-    connect( notice, &LibraryNotice::primaryClicked, this, [this]() { noticeAction( true ); } );
-    connect( notice, &LibraryNotice::secondaryClicked, this, [this]() { noticeAction( false ); } );
+    browser = new LibraryBrowser( p_intf, filter, list, header, this );
+    connect( browser, &LibraryBrowser::changed, this, &NetworkPage::updateState );
+    connect( browser, &LibraryBrowser::backFromTop, this, &NetworkPage::showTiles );
+    connect( notice, &LibraryNotice::primaryClicked, browser, [this]() { browser->noticeAction( true ); } );
+    connect( notice, &LibraryNotice::secondaryClicked, browser, [this]() { browser->noticeAction( false ); } );
 
     rebuild = new QTimer( this );
     rebuild->setSingleShot( true );   /* one rebuild for a burst of changes */
@@ -189,16 +191,10 @@ NetworkPage::NetworkPage( intf_thread_t *_p_intf, QWidget *parent )
     loading->setSingleShot( true );
     loading->setInterval( Library::NetSettleMs );
     connect( loading, &QTimer::timeout, this, &NetworkPage::updateState );
-    expandTimer = new QTimer( this );
-    expandTimer->setSingleShot( true );
-    expandTimer->setInterval( Library::ExpandTimeoutMs );
-    connect( expandTimer, &QTimer::timeout, this, [this]() {
-        expandFailed = true;   /* still browsed into if its items come later */
-        updateState();
-    } );
 
-    connect( header, &LibraryHeader::backRequested, this, &NetworkPage::goBack );
-    connect( list, &CardView::backRequested, this, &NetworkPage::goBack );
+    /* the header's back shows only in a list */
+    connect( header, &LibraryHeader::backRequested, browser, &LibraryBrowser::goBack );
+    connect( list, &CardView::backRequested, browser, &LibraryBrowser::goBack );
     connect( list, &CardView::cardActivated, this, &NetworkPage::activate );
     connect( header->search(), &QLineEdit::textChanged, this, [this]( const QString &raw ) {
         const QString text = raw.trimmed();
@@ -207,17 +203,6 @@ NetworkPage::NetworkPage( intf_thread_t *_p_intf, QWidget *parent )
         else
             layoutTiles();
         updateState();
-    } );
-    connect( THEMIM, &MainInputManager::leafBecameParent, this, [this]( int id ) {
-        expandRequested.remove( id );   /* a node now: never expanded again */
-        if( id != expandingId || !browsed )
-            return;
-        expandingId = -1;
-        expandTimer->stop();
-        expandFailed = false;
-        const QModelIndex source = browsed->indexByPLID( id, 0 );
-        if( source.isValid() )
-            browse( source );
     } );
 }
 
@@ -261,7 +246,7 @@ void NetworkPage::load()
 {
     QWidget *content = tilesPage->widget();
     NetworkTile *stream = new NetworkTile( RedesignIcons::IconOpenNetwork, qtr( "Open network stream" ),
-                                           QString( "http, rtsp, rtp, smb..." ), content );
+                                           qtr( "http, rtsp, rtp, smb..." ), content );
     connect( stream, &QAbstractButton::clicked, []() { THEDP->openNetDialog(); } );
     streamTiles.append( stream );
 
@@ -308,8 +293,6 @@ void NetworkPage::load()
             streamTiles.insert( icecast ? 1 : streamTiles.count(), tile );
         }
     }
-    for( int i = 1; i < streamTiles.count(); i++ )
-        setTabOrder( streamTiles.at( i - 1 ), streamTiles.at( i ) );
     settle->start();
     rebuildLanTiles();
 }
@@ -334,6 +317,13 @@ void NetworkPage::rebuildLanTiles()
             } );
             lanTiles.append( tile );
         }
+    /* new tiles join the end of the focus chain: the order they are drawn */
+    QWidget *previous = header->search();
+    foreach( NetworkTile *tile, lanTiles + streamTiles )
+    {
+        setTabOrder( previous, tile );
+        previous = tile;
+    }
     layoutTiles();
     updateState();
     if( focused >= 0 )
@@ -400,21 +390,13 @@ void NetworkPage::open( PLModel *model, const QModelIndex &source, const QString
     top = source;
     topTitle = title;
     topIsItem = source.isValid();
+    browser->setTop( source );
     body->setCurrentWidget( list );
-    browse( source );
+    browser->browse( source );
     body->currentWidget()->setFocus();   /* the list, or its state's button */
     /* a server or share not listed yet */
     if( topIsItem && source.data( VLCModelSubInterface::LEAF_NODE_ROLE ).toBool() )
-        expand( source );
-}
-
-void NetworkPage::expand( const QModelIndex &source )
-{
-    expanding = source;
-    expandFailed = false;
-    expandTimer->start();   /* the loading state until it is listed */
-    LibraryData::expand( p_intf, browsed, source, &expandingId, &expandRequested );
-    updateState();
+        browser->expand( source );
 }
 
 void NetworkPage::activate( const QModelIndex &index )
@@ -424,12 +406,12 @@ void NetworkPage::activate( const QModelIndex &index )
     const QModelIndex source = filter->mapToSource( index );
     if( !source.data( VLCModelSubInterface::LEAF_NODE_ROLE ).toBool() )
     {
-        browse( source );
+        browser->browse( source );
         return;
     }
     if( LibraryData::isFolder( browsed, source ) )
     {
-        expand( source );
+        browser->expand( source );
         return;
     }
     input_item_t *input = browsed->getInputItem( source );
@@ -440,53 +422,9 @@ void NetworkPage::activate( const QModelIndex &index )
     LibraryData::revealWhenPlaying( p_intf, input, false );
 }
 
-void NetworkPage::browse( const QModelIndex &source )
-{
-    expandTimer->stop();
-    expandFailed = false;
-    header->search()->clear();
-    filter->setBrowseRoot( source );
-    const QModelIndex root = filter->mapFromSource( source );
-    list->setRootIndex( root );
-    list->setCurrentIndex( filter->index( 0, 0, root ) );
-    list->scrollToTop();
-    updateState();
-}
-
-void NetworkPage::goBack()
-{
-    if( !listing() )
-        return;
-    const QModelIndex root = list->rootIndex();
-    if( ( expandTimer->isActive() || expandFailed ) && top != filter->mapToSource( root ) )
-    {
-        /* gives up on the folder being opened: back to its parent's rows */
-        expandTimer->stop();
-        expandFailed = false;
-        expandingId = -1;
-        updateState();
-        list->setFocus();
-        return;
-    }
-    const QPersistentModelIndex from = filter->mapToSource( root );
-    if( top == from )
-    {
-        showTiles();
-        return;
-    }
-    header->search()->clear();
-    filter->setBrowseRoot( from.parent() );
-    list->setRootIndex( filter->mapFromSource( from.parent() ) );
-    list->setCurrentIndex( filter->mapFromSource( from ) );
-    list->scrollTo( list->currentIndex() );
-    updateState();
-}
-
 void NetworkPage::showTiles()
 {
-    expandTimer->stop();
-    expandFailed = false;
-    expandingId = -1;
+    browser->cancelExpand();
     body->setCurrentWidget( tilesPage );
     header->search()->clear();
     filter->setText( QString() );
@@ -525,26 +463,20 @@ void NetworkPage::updateState()
      * or nothing matches */
     const QString search = header->search()->text().trimmed();
     QWidget *page = notice;
-    if( expandTimer->isActive() )
-        notice->showLoading( qtr( "Loading..." ) );
-    else if( expandFailed )
-        notice->showMessage( RedesignIcons::IconError, Theme::Error, qtr( "This folder can't be opened" ),
-                             qtr( "VLC could not list \"%1\". The server or share may be "
-                                  "offline, or the folder unreadable." )
-                                 .arg( expanding.isValid() ? browsed->getTitle( expanding ) : topTitle ),
-                             qtr( "Try again" ), qtr( "Back" ) );
-    else if( filter->rowCount( root ) > 0 )
-        page = list;
-    else if( loading->isActive() )
-        notice->showLoading( qtr( "Loading..." ) );
-    else if( !search.isEmpty() )
-        notice->showMessage( RedesignIcons::IconSearch, Theme::Dim, qtr( "No results" ),
-                             qtr( "Nothing here matches \"%1\"." ).arg( search ),
-                             qtr( "Clear search" ), QString() );
-    else
-        notice->showMessage( RedesignIcons::IconFolder, Theme::Dim, qtr( "Nothing found here" ),
-                             qtr( "There is no media in this folder, or it could not be listed." ),
-                             qtr( "Back" ), QString() );
+    if( !browser->showExpandState( notice, qtr( "VLC could not list \"%1\". The server or share may be "
+                                                "offline, or the folder unreadable." ), topTitle ) )
+    {
+        if( filter->rowCount( root ) > 0 )
+            page = list;
+        else if( loading->isActive() )
+            notice->showLoading( qtr( "Loading..." ) );
+        else if( !search.isEmpty() )
+            notice->showNoResults( qtr( "Nothing here matches \"%1\"." ).arg( search ) );
+        else
+            notice->showMessage( RedesignIcons::IconFolder, Theme::Dim, qtr( "Nothing found here" ),
+                                 qtr( "There is no media in this folder, or it could not be listed." ),
+                                 qtr( "Back" ), QString() );
+    }
 
     /* the keyboard follows when its row or button goes away */
     QWidget *focus = QApplication::focusWidget();
@@ -554,20 +486,3 @@ void NetworkPage::updateState()
         page->setFocus();
 }
 
-void NetworkPage::noticeAction( bool primary )
-{
-    if( expandFailed && primary && expanding.isValid() )
-    {
-        /* the first request is over (a preparse ends within the timeout):
-         * asking again cannot add the items twice */
-        expandRequested.remove( browsed->itemId( expanding ) );
-        expand( expanding );
-    }
-    else if( !expandFailed && !header->search()->text().trimmed().isEmpty() )
-    {
-        header->search()->clear();
-        list->setFocus();
-    }
-    else
-        goBack();
-}

@@ -40,12 +40,13 @@ class QTimer;
  * (a card on screen) goes first. The user's media are only read. Also lists
  * local folders (the videos in them, and a video further down for a folder
  * without its own) and tells, from the recents (RecentsMRL), where a file
- * resumes and whether it was watched. */
+ * resumes and whether it was watched. One for Home and Videos (instance):
+ * one process budget, one cache. */
 class Thumbnailer : public QObject
 {
     Q_OBJECT
 public:
-    Thumbnailer( intf_thread_t *, QObject *parent );
+    static Thumbnailer *instance( intf_thread_t * );
     ~Thumbnailer();
 
     /* The frame (a PNG file) of a local video, empty while it is made or
@@ -59,10 +60,10 @@ public:
     QString folderFrame( const QString &dir );
     /* Where a file resumes, 0..1, or -1 when it does not */
     qreal resume( const QString &path ) const;
-    /* How many videos of a listed folder were played to their end (or
-     * stopped too soon to resume, as RecentsMRL keeps no other state) */
+    /* How many videos of a listed folder were played to their end */
     int watchedIn( const QString &dir );
-    /* Drops the queue and the listings: the page was left */
+    /* Drops the queue, the listings and the failures: the page was left.
+     * Nothing starts again until a frame or a listing is asked for. */
     void cancel();
 
     static bool isVideo( const QString &path );
@@ -88,20 +89,23 @@ private:
         QProcess *process;
         QElapsedTimer clock;
     };
+    Thumbnailer( intf_thread_t *, QObject *parent );
     void startNext();
     void start( const Request & );
     void check();
     void finish( QProcess *, bool ok );
-    static void stopProcess( QProcess * );
+    static void stopProcess( QProcess *, const QString &tmpFile );
 
     intf_thread_t *p_intf;
+    bool active;                             /* a page asked since cancel() */
+    int serial;                              /* of the part files */
     QString cacheDir;
     QHash<QString, QString> frames;          /* key: its PNG file */
     QSet<QString> pendingFrames, failedFrames, pendingDirs;
     QHash<QString, QStringList> dirs;
     QHash<QString, QString> covers;          /* key: of dirs, a video under it */
     QHash<QString, int> watchedCounts;       /* key: of dirs, as painted */
-    QHash<QString, int64_t> lengths;         /* key: length asked with */
+    QHash<QString, int64_t> lengths;         /* key: length asked with, while probed */
     QHash<QString, qreal> played;            /* key: resume point, 1 when watched */
     QList<Request> queue;                    /* the latest asked first */
     QList<Job> jobs;                         /* running */
@@ -110,7 +114,7 @@ private:
 };
 
 /* The probe (size and date, the cached frame) of a file, or the listing of
- * a folder, on LibraryData::workerPool(): an offline share can block */
+ * a folder, on LibraryData::filePool(): an offline share can block */
 class ThumbJob : public QObject, public QRunnable
 {
     Q_OBJECT
