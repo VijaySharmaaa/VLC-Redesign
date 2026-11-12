@@ -25,6 +25,7 @@
 #include <QDateTime>
 #include <QWidget>
 
+class QFileSystemWatcher;
 class QLabel;
 class QPushButton;
 class QStackedWidget;
@@ -76,6 +77,7 @@ private:
     int section;
     bool narrow;
     QString configFile;     /* vlcrc */
+    QFileSystemWatcher *watcher; /* on vlcrc's folder, NULL without one */
     QDateTime configTime;   /* its time when the panels last matched it */
 };
 

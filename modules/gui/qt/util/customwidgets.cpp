@@ -29,6 +29,7 @@
 #endif
 
 #include "customwidgets.hpp"
+#include "util/theme.hpp"
 
 #include <QtMath>  // for wheel deadzone calculation
 #include <QAccessible>
@@ -42,6 +43,10 @@
 #include <QToolTip>
 #include <QStyle>
 #include <QLocale>
+#include <QFrame>
+#include <QBoxLayout>
+#include <QComboBox>
+#include <QLineEdit>
 #include <vlc_actions.h>
 
 #define SPINNER_SIZE 32
@@ -646,6 +651,59 @@ void WheelToVLCConverter::wheelEvent( const QWheelEvent* e )
     {
         m_scrollAmount = p;
     }
+}
+
+QFrame *cardRow( QLabel *title, const QString &desc, const QList<QWidget *> &controls,
+                 const char *role, const QMargins &pad, int gap, int descGap,
+                 int controlGap )
+{
+    const Theme *t = Theme::instance();
+    QFrame *row = new QFrame;
+    row->setProperty( "role", role );
+    QHBoxLayout *layout = new QHBoxLayout( row );
+    layout->setContentsMargins( pad );
+    layout->setSpacing( gap );
+
+    QVBoxLayout *text = new QVBoxLayout;
+    text->setSpacing( descGap );
+    QFont font = t->font( Theme::Body );
+    font.setWeight( QFont::Medium );
+    title->setFont( font );
+    /* a long translation wraps: the narrow sheet does not scroll sideways */
+    title->setWordWrap( true );
+    /* a form's label may be right-aligned for its old grid column */
+    title->setAlignment( Qt::AlignLeading | Qt::AlignVCenter );
+    text->addWidget( title );
+    if( !desc.isEmpty() )
+    {
+        QLabel *hint = new QLabel( desc );
+        hint->setProperty( "role", "hint" );
+        hint->setFont( t->font( Theme::Meta ) );
+        hint->setWordWrap( true );
+        text->addWidget( hint );
+    }
+    layout->addLayout( text, 1 );
+
+    QHBoxLayout *right = new QHBoxLayout;
+    right->setSpacing( controlGap );
+    foreach( QWidget *control, controls )
+        right->addWidget( control );
+    layout->addLayout( right );
+    return row;
+}
+
+void nameFromLabels( QWidget *root )
+{
+    foreach( QLabel *label, root->findChildren<QLabel *>() )
+    {
+        QWidget *buddy = label->buddy();
+        if( buddy && buddy->accessibleName().isEmpty() )
+            buddy->setAccessibleName( label->text().remove( QLatin1Char( '&' ) )
+                                                   .remove( QLatin1Char( ':' ) ).trimmed() );
+    }
+    foreach( QComboBox *combo, root->findChildren<QComboBox *>() )
+        if( combo->lineEdit() && combo->lineEdit()->accessibleName().isEmpty() )
+            combo->lineEdit()->setAccessibleName( combo->accessibleName() );
 }
 
 /* A checkable group box disables each child while that child is still

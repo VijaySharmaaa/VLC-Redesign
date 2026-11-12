@@ -38,6 +38,7 @@
 #include "animators.hpp"
 #include "qt.hpp"
 
+class QFrame;
 class QWidget;
 
 class QFramelessButton : public QPushButton
@@ -170,6 +171,17 @@ QString timeString( int64_t secs );
 QString positionText( float pos, int64_t time, int length, const QString &pattern );
 /* The playback speed: "1.50×" */
 QString rateText( float rate );
+/* A row of a card (Preferences, the Synchronization tab): title in Medium
+ * Body over a wrapping Meta hint (none when desc is empty), the controls on
+ * the right, gap between them. The row's QSS role is role; item 0 of its
+ * layout is the text column. */
+QFrame *cardRow( QLabel *title, const QString &desc, const QList<QWidget *> &controls,
+                 const char *role, const QMargins &pad, int gap, int descGap,
+                 int controlGap );
+/* UI Automation reads neither a buddy label nor an editable combo box's
+ * name for its edit: under root, each label's buddy without a name gets
+ * the label's text, and each editable combo box's edit the box's name */
+void nameFromLabels( QWidget *root );
 /* Call once the widgets under root are built: see customwidgets.cpp */
 void dropEarlyAccessibles( QWidget *root );
 
