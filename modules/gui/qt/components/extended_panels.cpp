@@ -1702,30 +1702,13 @@ QFrame *syncRow( const QString &title, const QString &desc, QWidget *control )
 {
     using namespace RedesignTokens;
     Theme *t = Theme::instance();
-    QFrame *row = new QFrame;
-    row->setProperty( "role", "fxRow" );
-    QHBoxLayout *layout = new QHBoxLayout( row );
     const int pad = t->px( Effects::SyncRowPad );
-    layout->setContentsMargins( pad, pad, pad, pad );
-    layout->setSpacing( t->px( Effects::SyncRowGap ) );
-    QVBoxLayout *texts = new QVBoxLayout;
-    texts->setSpacing( 0 );
     QLabel *titleLabel = new QLabel( title );
-    QFont titleFont = t->font( Theme::Body );
-    titleFont.setWeight( QFont::Medium );
-    titleLabel->setFont( titleFont );
     titleLabel->setBuddy( control );
-    QLabel *descLabel = new QLabel( desc );
-    descLabel->setFont( t->font( Theme::Meta ) );
-    descLabel->setProperty( "role", "hint" );
-    descLabel->setWordWrap( true );
-    texts->addWidget( titleLabel );
-    texts->addWidget( descLabel );
-    layout->addLayout( texts, 1 );
-    layout->addWidget( control );
     control->setAccessibleName( title );
     control->setAccessibleDescription( desc );
-    return row;
+    return cardRow( titleLabel, desc, QList<QWidget *>() << control, "fxRow",
+                    QMargins( pad, pad, pad, pad ), t->px( Effects::SyncRowGap ), 0, 0 );
 }
 
 }

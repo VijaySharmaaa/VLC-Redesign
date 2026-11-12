@@ -41,6 +41,7 @@
 #include "util/customwidgets.hpp"     /* dropEarlyAccessibles */
 #include "util/qt_dirs.hpp"
 #include "util/theme.hpp"
+#include "util/redesign_icons.hpp"
 #include "util/validators.hpp"
 #include <vlc_intf_strings.h>
 #include <vlc_modules.h>
@@ -101,6 +102,9 @@ FileOpenPanel::FileOpenPanel( QWidget *_parent, intf_thread_t *_p_intf ) :
     /* Deactivate the subtitles control by default. */
     ui.subGroupBox->setEnabled( false );
     ui.fileListWidg->setAccessibleName( qtr( "Selected files" ) );
+    /* the theme's glyphs, not the stock playlist pixmaps */
+    ui.fileBrowseButton->setIcon( Theme::themedIcon( RedesignIcons::IconAdd, Theme::Text2 ) );
+    ui.removeFileButton->setIcon( Theme::themedIcon( RedesignIcons::IconRemove, Theme::Text2 ) );
 
     /* Connects  */
     BUTTONACT( ui.fileBrowseButton, browseFile );
@@ -112,6 +116,7 @@ FileOpenPanel::FileOpenPanel( QWidget *_parent, intf_thread_t *_p_intf ) :
     connect( ui.fileListWidg, &QListWidget::itemChanged, this, &FileOpenPanel::updateMRL );
     connect( ui.subInput, &QLineEdit::textChanged, this, &FileOpenPanel::updateMRL );
     updateButtons();
+    nameFromLabels( this );
 }
 
 inline void FileOpenPanel::BuildOldPanel()
@@ -369,6 +374,7 @@ DiscOpenPanel::DiscOpenPanel( QWidget *_parent, intf_thread_t *_p_intf ) :
 
     /* Run once the updateButtons function in order to fill correctly the comboBoxes */
     updateButtons();
+    nameFromLabels( this );
 }
 
 #ifdef _WIN32 /* Disc drives probing for Windows */
@@ -720,6 +726,7 @@ NetOpenPanel::NetOpenPanel( QWidget *_parent, intf_thread_t *_p_intf ) :
     /* QComboBox is by default case insensitive when editable */
     ui.urlComboBox->completer()->setCaseSensitivity( Qt::CaseSensitive );
     ui.urlComboBox->setFocus();
+    nameFromLabels( this );
 }
 
 NetOpenPanel::~NetOpenPanel()
@@ -812,6 +819,7 @@ protected:
     {
         for( int i = 0; i < 2; i++ )
         {
+            devices[i].clear();   /* read only once the scan has finished */
             char **values, **texts;
             const ssize_t count = config_GetPszChoices( obj, dshowDevOptions[i], &values, &texts );
             for( ssize_t j = 0; j < count; j++ )
@@ -899,10 +907,11 @@ void CaptureOpenPanel::initialize()
         dshowDevLayout->addWidget( combo, i, 1 );
     }
     if( !dshowScan )
-    {
         dshowScan = new DshowScan( VLC_OBJECT( p_intf->obj.libvlc ) );
+    /* each new panel lists the devices plugged in by then, as stock did;
+     * one still scanning is left to finish (it fills this panel too) */
+    if( !dshowScan->isRunning() )
         dshowScan->start();
-    }
     /* connected first: a scan that ends meanwhile still fills them */
     connect( dshowScan, &QThread::finished, this, &CaptureOpenPanel::fillDshowDevices );
     if( dshowScan->isFinished() )
@@ -918,6 +927,7 @@ void CaptureOpenPanel::initialize()
     dshowPropLayout->addWidget( dshowVSizeLabel, 0, 0 );
 
     dshowVSizeLine = new QLineEdit;
+    dshowVSizeLabel->setBuddy( dshowVSizeLine );
     dshowPropLayout->addWidget( dshowVSizeLine, 0, 1);
     dshowPropLayout->addItem( new QSpacerItem( 20, 20, QSizePolicy::Expanding ),
             1, 0, 3, 1 );
@@ -1246,6 +1256,7 @@ void CaptureOpenPanel::initialize()
              stackedPropLayout, &QStackedLayout::setCurrentIndex );
     connect( ui.deviceCombo, QOverload<int>::of(&QComboBox::activated), this, &CaptureOpenPanel::updateMRL );
     connect( ui.deviceCombo, QOverload<int>::of(&QComboBox::activated), this, &CaptureOpenPanel::updateButtons );
+    nameFromLabels( this );
 
 #undef CuMRL
 #undef addModuleAndLayouts

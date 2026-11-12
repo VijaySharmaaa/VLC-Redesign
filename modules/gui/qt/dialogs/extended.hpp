@@ -27,26 +27,21 @@
 #include "qt.hpp"
 
 #include "components/extended_panels.hpp"
+#include "components/side_panel.hpp"
 #include "util/breakpoints.hpp"
 #include "util/singleton.hpp"
 
-#include <QWidget>
-
-class QBoxLayout;
 class QPushButton;
 class QTabWidget;
 class QToolButton;
 class QHBoxLayout;
-class QVariantAnimation;
-class OverlayHost;
 
 /* The Effects and filters sheet (DESIGN_SPEC 7, decision P5-1). With the
  * main window it docks at the right of the central stack like the
- * PlaylistPanel (the video shrinks), and at XS it is a tool window over the
- * right of the stack. Without one (Qt only as dialog provider) it is a
+ * PlaylistPanel (SidePanel: the video shrinks, a drawer at XS). Without one (Qt only as dialog provider) it is a
  * window of its own that keeps EPanel/geometry. The two docked panels share
  * the right side: opening one closes the other. */
-class ExtendedDialog : public QWidget, public Singleton<ExtendedDialog>
+class ExtendedDialog : public SidePanel, public Singleton<ExtendedDialog>
 {
     Q_OBJECT
 public:
@@ -68,29 +63,17 @@ protected:
     /* the deck's effects button shows open meanwhile */
     void showEvent( QShowEvent * ) Q_DECL_OVERRIDE;
     void hideEvent( QHideEvent * ) Q_DECL_OVERRIDE;
-    void paintEvent( QPaintEvent * ) Q_DECL_OVERRIDE;
-    void resizeEvent( QResizeEvent * ) Q_DECL_OVERRIDE;
+    void paintSheet( QPainter &, const QRect & ) Q_DECL_OVERRIDE;
     void keyPressEvent( QKeyEvent * ) Q_DECL_OVERRIDE;
 
 private:
     ExtendedDialog( intf_thread_t * );
     virtual ~ExtendedDialog();
 
-    void setShownWidth( int );
-    void place();
-    int shadowWidth() const;
     void showPage( QTabWidget *pages, int page );
     void updateMore();
 
     intf_thread_t *p_intf;
-    QBoxLayout *dock;           /* NULL without the main window */
-    QWidget *dockParent;
-    OverlayHost *host;
-    QWidget *content;           /* full width, revealed as the sheet slides */
-    QVariantAnimation *slide;
-    int fullWidth;
-    int shownWidth;
-    bool drawer;
 
     SyncControls *syncW;
     ExtVideo *videoEffect;

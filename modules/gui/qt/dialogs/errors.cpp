@@ -51,8 +51,7 @@ ErrorsDialog::ErrorsDialog( intf_thread_t *_p_intf )
     setWindowTitle( qtr( "Errors" ) );
     setWindowRole( "vlc-errors" );
     /* a modal sheet in the design (1.6.5): Close only, no min/max */
-    setWindowFlags( Qt::Dialog | Qt::WindowTitleHint | Qt::WindowSystemMenuHint |
-                    Qt::WindowCloseButtonHint );
+    setWindowFlags( sheetWindowFlags() );
 
     Theme *t = Theme::instance();
     resize( t->px( Dialogs::ErrorW ), t->px( Dialogs::ErrorH ) );
@@ -64,9 +63,6 @@ ErrorsDialog::ErrorsDialog( intf_thread_t *_p_intf )
     icon->setProperty( "role", "errorIcon" );
     icon->setFixedSize( t->px( Dialogs::ErrorIcon ), t->px( Dialogs::ErrorIcon ) );
     icon->setAlignment( Qt::AlignCenter );
-    const int glyph = t->px( Dialogs::ErrorGlyph );
-    icon->setPixmap( t->icon( RedesignIcons::IconError, Theme::Error, QSize( glyph, glyph ) )
-                         .pixmap( glyph, glyph ) );
 
     title = new QLabel;
     title->setFont( t->font( Theme::PanelTitle ) );
@@ -148,6 +144,9 @@ ErrorsDialog::ErrorsDialog( intf_thread_t *_p_intf )
     connect( logButton, &QPushButton::clicked, THEDP, &DialogsProvider::messagesDialog );
     /* toggled, not clicked: assistive tools toggle without a click */
     connect( stopShowing, &QCheckBox::toggled, this, &ErrorsDialog::dontShow );
+    /* the glyph and the MRL colour follow the theme and the screen scale */
+    connect( t, &Theme::changed, this, &ErrorsDialog::applyTheme );
+    applyTheme();
 }
 
 ErrorsDialog::~ErrorsDialog()
@@ -180,20 +179,50 @@ void ErrorsDialog::addError( const QString& title, const QString& text, bool fro
         if( state != PLAYING_S && state != PAUSE_S )
             setFailedItem( input_GetItem( input ) );
     }
-    add( true, title, text );
+    add( title, text );
 }
 
-/*void ErrorsDialog::addWarning( QString title, QString text )
-{
-    add( false, title, text );
-}*/
-
-void ErrorsDialog::add( bool, const QString& title, const QString& text )
+void ErrorsDialog::add( const QString& title, const QString& text )
 {
     showEmpty( false );
     this->title->setText( title );
+    /* a bounded list: a playlist of dead streams fails once per item */
+    if( entries.count() >= MaxEntries )
+        entries.removeFirst();
     entries.append( qMakePair( title, text ) );
+    /* hidden, the text is built on show (showEvent) */
+    if( isVisible() )
+        updateBody();
+    if ( var_InheritBool( p_intf, "qt-error-dialogs" ) )
+    {
+        /* errors show: the box may still say hidden from before a Reset */
+        QSignalBlocker blocker( stopShowing );
+        stopShowing->setChecked( false );
+        /* on open: the keys on Retry when it is offered, else on Close */
+        if( !isVisible() )
+            ( retryButton->isHidden() ? closeButton : retryButton )->setFocus();
+        show();
+    }
+}
 
+void ErrorsDialog::showEvent( QShowEvent *event )
+{
+    updateBody();
+    QVLCDialog::showEvent( event );
+}
+
+void ErrorsDialog::applyTheme()
+{
+    Theme *t = Theme::instance();
+    const int glyph = t->px( Dialogs::ErrorGlyph );
+    icon->setPixmap( t->icon( RedesignIcons::IconError, Theme::Error, QSize( glyph, glyph ) )
+                         .pixmap( glyph, glyph ) );
+    if( isVisible() )
+        updateBody();
+}
+
+void ErrorsDialog::updateBody()
+{
     /* shortcut: the MRL is found as a quoted word, as the core's "unable
      * to open the MRL '%s'" puts it; mark it up if other messages need it */
     static const QRegularExpression quoted( QStringLiteral( "'(\\S+)'" ) );
@@ -213,16 +242,6 @@ void ErrorsDialog::add( bool, const QString& title, const QString& text )
         html.prepend( part );
     }
     body->setText( html.join( QLatin1String( "<br><br>" ) ) );
-    if ( var_InheritBool( p_intf, "qt-error-dialogs" ) )
-    {
-        /* errors show: the box may still say hidden from before a Reset */
-        QSignalBlocker blocker( stopShowing );
-        stopShowing->setChecked( false );
-        /* on open: the keys on Retry when it is offered, else on Close */
-        if( !isVisible() )
-            ( retryButton->isHidden() ? closeButton : retryButton )->setFocus();
-        show();
-    }
 }
 
 void ErrorsDialog::close()

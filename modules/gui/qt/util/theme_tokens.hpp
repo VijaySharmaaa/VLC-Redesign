@@ -476,4 +476,15 @@ namespace RedesignTokens
     }
 }
 
+/* fullpass lane D */
+namespace RedesignTokens
+{
+    namespace Dialogs
+    {
+        /* not in tokens.json: the Go to Time field's text inset, so the
+         * large timecode clears the field's border and focus ring */
+        static const int JumpPadX = 12;
+    }
+}
+
 #endif

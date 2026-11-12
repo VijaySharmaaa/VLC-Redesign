@@ -26,7 +26,6 @@
 #include "components/playlist/views.hpp"            /* PlListView */
 #include "components/playlist/sorting.h"            /* COLUMN_* */
 #include "components/library/library_widgets.hpp"     /* setupSearchField */
-#include "components/overlay_host.hpp"
 #include "input_manager.hpp"
 #include "dialogs_provider.hpp"
 #include "menus.hpp"                    /* MENU_KEY_* */
@@ -43,7 +42,6 @@
 #include <QKeySequence>
 #include <QLabel>
 #include <QLineEdit>
-#include <QLinearGradient>
 #include <QMenu>
 #include <QPainter>
 #include <QStyledItemDelegate>
@@ -171,20 +169,14 @@ void RowDelegate::paint( QPainter *p, const QStyleOptionViewItem &option,
 } // namespace
 
 PlaylistPanel::PlaylistPanel( intf_thread_t *_p_intf, QBoxLayout *_dock, QWidget *over )
-    : QWidget( _dock->parentWidget() ), p_intf( _p_intf ), dock( _dock ),
-      dockParent( _dock->parentWidget() ), fullWidth( 0 ), shownWidth( 0 ), drawer( false )
+    : SidePanel( _dock, over ), p_intf( _p_intf )
 {
     setObjectName( "playlistPanel" );
     setAccessibleName( qtr( "Playlist" ) );
-    /* the drawer's shadow is see-through; paintEvent fills the panel */
-    setAttribute( Qt::WA_TranslucentBackground );
-    hide();
-    dock->addWidget( this );
 
     Theme *t = Theme::instance();
     model = PLModel::getPLModel( p_intf );
 
-    content = new QWidget( this );
     QVBoxLayout *layout = new QVBoxLayout( content );
     layout->setContentsMargins( 0, 0, 0, 0 );
     layout->setSpacing( 0 );
@@ -297,14 +289,6 @@ PlaylistPanel::PlaylistPanel( intf_thread_t *_p_intf, QBoxLayout *_dock, QWidget
     connect( model, &QAbstractItemModel::dataChanged, this, [this]() { countTimer.start(); } );
     countTimer.start();
 
-    host = new OverlayHost( over, this );
-    connect( host, &OverlayHost::changed, this, &PlaylistPanel::place );
-
-    slide = new QVariantAnimation( this );
-    slide->setEasingCurve( OverlayWindow::enterCurve() );
-    connect( slide, &QVariantAnimation::valueChanged, this,
-             [this]( const QVariant &v ) { setShownWidth( v.toInt() ); } );
-
     connect( t, &Theme::changed, this, [this]() { update(); view->viewport()->update(); } );
 }
 
@@ -312,14 +296,13 @@ void PlaylistPanel::setOpen( bool open )
 {
     if( open == isVisible() )
         return;
-    slide->stop();
     if( !open )
     {
+        slide->stop();
         hide();   /* exit is instant */
         return;
     }
-    const int ms = Theme::instance()->duration( Theme::PanelSlide );
-    setShownWidth( ms ? 0 : fullWidth );
+    slideIn();
     show();
     view->scrollTo( model->currentIndex() );
     if( drawer )
@@ -329,99 +312,13 @@ void PlaylistPanel::setOpen( bool open )
         activateWindow();
         view->setFocus();
     }
-    if( ms )
-    {
-        slide->setDuration( ms );
-        slide->setStartValue( 0 );
-        slide->setEndValue( fullWidth );
-        slide->start();
-    }
 }
 
 void PlaylistPanel::setBreakpoint( BreakpointWatcher::Size bp )
 {
     static const Theme::SizeRole widths[] = {
         Theme::PlaylistS, Theme::PlaylistS, Theme::PlaylistM, Theme::PlaylistL };
-    fullWidth = Theme::instance()->metric( widths[bp] );
-
-    const bool shown = isVisible();
-    if( ( bp == BreakpointWatcher::XS ) != drawer )
-    {
-        /* the panel moves, never the video: its native window stays put */
-        drawer = bp == BreakpointWatcher::XS;
-        if( drawer )
-        {
-            dock->removeWidget( this );
-            setParent( dockParent->window(),
-                       Qt::Tool | Qt::FramelessWindowHint | Qt::NoDropShadowWindowHint );
-            /* the docked fixed width would clamp the drawer's geometry */
-            setMinimumWidth( 0 );
-            setMaximumWidth( QWIDGETSIZE_MAX );
-        }
-        else
-        {
-            /* Qt::Widget drops the drawer's FramelessWindowHint: with it, a
-             * native child of an alpha (translucent) format is flushed as a
-             * layered window, which a child cannot be: it stays blank */
-            setParent( dockParent, Qt::Widget );
-            dock->addWidget( this );
-        }
-        if( shown )
-            show();   /* setParent() hides */
-    }
-    slide->stop();
-    setShownWidth( fullWidth );
-}
-
-void PlaylistPanel::setShownWidth( int w )
-{
-    shownWidth = w;
-    if( drawer )
-        place();
-    else
-        setFixedWidth( w );
-}
-
-int PlaylistPanel::shadowWidth() const
-{
-    return drawer ? Theme::instance()->px( Playlist::DrawerShadow ) : 0;
-}
-
-/* The drawer: over the right of the target, the shadow to its left */
-void PlaylistPanel::place()
-{
-    if( !drawer )
-        return;
-    const QRect target = host->targetRect();
-    const int w = shownWidth + shadowWidth();
-    /* shortcut: always on the right, as in a left-to-right layout; mirror
-     * it with the dock once right-to-left layouts are checked */
-    setGeometry( target.right() + 1 - w, target.top(), w, target.height() );
-}
-
-void PlaylistPanel::resizeEvent( QResizeEvent * )
-{
-    content->setGeometry( shadowWidth(), 0, fullWidth, height() );
-}
-
-void PlaylistPanel::paintEvent( QPaintEvent * )
-{
-    Theme *t = Theme::instance();
-    QPainter p( this );
-    const int s = shadowWidth();
-    if( s )
-    {
-        /* shortcut: a linear ramp for the prototype's 50 px blur */
-        QColor shadow( Qt::black );
-        shadow.setAlpha( Playlist::DrawerShadowAlpha );
-        QLinearGradient ramp( 0, 0, s, 0 );
-        ramp.setColorAt( 0, Qt::transparent );
-        ramp.setColorAt( 1, shadow );
-        p.fillRect( 0, 0, s, height(), ramp );
-    }
-    p.fillRect( s, 0, width() - s, height(), t->color( Theme::Panel ) );
-    /* the hairline towards the content */
-    p.fillRect( s, 0, Size::Hairline, height(), t->ink( InkAlpha::Divider ) );
+    setDocked( bp == BreakpointWatcher::XS, Theme::instance()->metric( widths[bp] ) );
 }
 
 void PlaylistPanel::keyPressEvent( QKeyEvent *e )

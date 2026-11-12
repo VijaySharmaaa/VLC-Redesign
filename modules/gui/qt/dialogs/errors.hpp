@@ -41,11 +41,13 @@ class ErrorsDialog : public QVLCDialog, public Singleton<ErrorsDialog>
 public:
 
     void addError( const QString&, const QString&, bool fromCore = false );
-    /*void addWarning( QString, QString );*/
+protected:
+    void showEvent( QShowEvent * ) override;
 private:
     virtual ~ErrorsDialog();
     ErrorsDialog( intf_thread_t * );
-    void add( bool, const QString&, const QString& );
+    void add( const QString&, const QString& );
+    void updateBody();
     void setFailedItem( input_item_t * );
     void showEmpty( bool );
 
@@ -56,6 +58,7 @@ private:
     QScrollArea *scroll;
     QPushButton *retryButton, *closeButton, *clearButton;
     QCheckBox *stopShowing;
+    enum { MaxEntries = 50 }; /* the newest errors kept */
     QList<QPair<QString, QString> > entries; /* title, text */
     input_item_t *failedItem; /* held: the item whose open failed */
 private slots:
@@ -63,6 +66,7 @@ private slots:
     void clear();
     void retry();
     void dontShow();
+    void applyTheme();
 
     friend class    Singleton<ErrorsDialog>;
 };

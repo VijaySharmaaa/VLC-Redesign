@@ -147,6 +147,14 @@ protected:
     }
 };
 
+/* A sheet of the design (Errors, Open Media, About, Effects as a window):
+ * a dialog with Close only, no minimise or maximise */
+static inline Qt::WindowFlags sheetWindowFlags()
+{
+    return Qt::Dialog | Qt::WindowTitleHint | Qt::WindowSystemMenuHint |
+           Qt::WindowCloseButtonHint;
+}
+
 class QVLCDialog : public QDialog
 {
 public:

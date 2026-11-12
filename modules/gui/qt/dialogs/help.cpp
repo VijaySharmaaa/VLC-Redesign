@@ -102,8 +102,7 @@ AboutDialog::AboutDialog( intf_thread_t *_p_intf)
     /* a small modal sheet (2.6.2): Close only; the cone, the name, the
      * version in mono, the blurb, the Authors / License / Credits links,
      * and a panel footer with Close */
-    setWindowFlags( Qt::Dialog | Qt::WindowTitleHint | Qt::WindowSystemMenuHint |
-                    Qt::WindowCloseButtonHint );
+    setWindowFlags( sheetWindowFlags() );
     Theme *t = Theme::instance();
     /* the card's width (applyTheme); its height follows the wrapped blurb.
      * The spacing reuses the library empty state's */

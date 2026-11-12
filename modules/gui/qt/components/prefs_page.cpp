@@ -23,6 +23,7 @@
 #include "qt.hpp"
 #include "components/prefs_page.hpp"
 #include "dialogs/preferences.hpp"
+#include "util/customwidgets.hpp"
 #include "util/theme.hpp"
 #include "util/redesign_icons.hpp"
 
@@ -62,44 +63,16 @@ const PrefsPage::Section PrefsPage::sections[] = {
     { N_( "Advanced" ),  RedesignIcons::IconPrefAdvanced },
 };
 
-/* A row of a card: label and description on the left, the controls on the
- * right; the rows after the first draw a hairline above them */
+/* A row of a card; the rows after the first draw a hairline above them */
 static QFrame *cardRow( QLabel *name, const QString &desc,
                         const QList<QWidget *> &controls, bool first )
 {
     const Theme *t = Theme::instance();
-    QFrame *row = new QFrame;
-    row->setProperty( "role", first ? "prefsRow" : "prefsRowNext" );
+    const int padX = t->px( Prefs::RowPadX ), padY = t->px( Prefs::RowPadY );
+    QFrame *row = ::cardRow( name, desc, controls, first ? "prefsRow" : "prefsRowNext",
+                             QMargins( padX, padY, padX, padY ), t->px( Prefs::RowGap ),
+                             t->px( Prefs::DescGap ), t->px( Prefs::ButtonGap ) );
     row->setMinimumHeight( t->px( Prefs::RowMinH ) );
-    QHBoxLayout *layout = new QHBoxLayout( row );
-    layout->setContentsMargins( t->px( Prefs::RowPadX ), t->px( Prefs::RowPadY ),
-                                t->px( Prefs::RowPadX ), t->px( Prefs::RowPadY ) );
-    layout->setSpacing( t->px( Prefs::RowGap ) );
-
-    QVBoxLayout *text = new QVBoxLayout;
-    text->setSpacing( t->px( Prefs::DescGap ) );
-    QFont font = t->font( Theme::Body );
-    font.setWeight( QFont::Medium );
-    name->setFont( font );
-    name->setWordWrap( true );
-    /* a form's label may be right-aligned for its old grid column */
-    name->setAlignment( Qt::AlignLeading | Qt::AlignVCenter );
-    text->addWidget( name );
-    if( !desc.isEmpty() )
-    {
-        QLabel *hint = new QLabel( desc );
-        hint->setProperty( "role", "hint" );
-        hint->setFont( t->font( Theme::Meta ) );
-        hint->setWordWrap( true );
-        text->addWidget( hint );
-    }
-    layout->addLayout( text, 1 );
-
-    QHBoxLayout *right = new QHBoxLayout;
-    right->setSpacing( t->px( Prefs::ButtonGap ) );
-    foreach( QWidget *control, controls )
-        right->addWidget( control );
-    layout->addLayout( right );
     return row;
 }
 
@@ -171,9 +144,10 @@ public:
         const int margin = style->pixelMetric( QStyle::PM_FocusFrameHMargin, 0, opt.widget ) + 1;
         const QRect cell = opt.rect.adjusted( margin, 0, -margin, 0 );
         const QString text = fm.elidedText( key, Qt::ElideRight, qMax( 0, cell.width() - 2 * padX ) );
-        /* the face's padding inside a 1 px outline, 2 px at the bottom */
-        QRect cap( 0, 0, qMin( cell.width(), fm.width( text ) + 2 * padX + 2 ),
-                   fm.height() + 2 * padY + 1 + bottom );
+        /* the face's padding inside a hairline outline, thicker at the bottom */
+        const int line = Size::Hairline;
+        QRect cap( 0, 0, qMin( cell.width(), fm.width( text ) + 2 * padX + 2 * line ),
+                   fm.height() + 2 * padY + line + bottom );
         cap.moveTopLeft( QPoint( opt.direction == Qt::RightToLeft ? cell.right() + 1 - cap.width() : cell.left(),
                                  cell.top() + ( cell.height() - cap.height() ) / 2 ) );
 
@@ -183,9 +157,9 @@ public:
         /* the outline, its bottom thicker, under the face */
         p->setBrush( t->ink( InkAlpha::Keycap ) );
         p->drawRoundedRect( cap, radius, radius );
-        const QRect face = cap.adjusted( 1, 1, -1, -bottom );
+        const QRect face = cap.adjusted( line, line, -line, -bottom );
         p->setBrush( t->color( Theme::Raised ) );
-        p->drawRoundedRect( face, radius - 1, radius - 1 );
+        p->drawRoundedRect( face, radius - line, radius - line );
         p->setFont( font );
         p->setPen( t->color( Theme::Text ) );
         p->drawText( face.translated( 0, -t->textNudge( font ) ), Qt::AlignCenter, text );
@@ -204,7 +178,7 @@ public:
             const QStyle *style = option.widget ? option.widget->style() : QApplication::style();
             const int margin = style->pixelMetric( QStyle::PM_FocusFrameHMargin, 0, option.widget ) + 1;
             s.setWidth( QFontMetrics( t->font( Theme::Mono ) ).width( index.data().toString() )
-                        + 2 * t->px( Prefs::KeycapPadX ) + 2 + 2 * margin );
+                        + 2 * t->px( Prefs::KeycapPadX ) + 2 * Size::Hairline + 2 * margin );
         }
         return s;
     }
@@ -520,7 +494,7 @@ static void toRows( QWidget *box, const QString &orphan, bool inCard, bool place
 
 PrefsPage::PrefsPage( intf_thread_t *_p_intf, QWidget *_tabAnchor )
     : QWidget( NULL ), p_intf( _p_intf ), tabAnchor( _tabAnchor ), section( SPrefsDefaultCat ),
-      narrow( false )
+      narrow( false ), watcher( NULL )
 {
     static_assert( sizeof( sections ) / sizeof( sections[0] ) == SectionCount,
                    "one entry per section" );
@@ -596,7 +570,7 @@ PrefsPage::PrefsPage( intf_thread_t *_p_intf, QWidget *_tabAnchor )
     if( !configFile.isEmpty() )
     {
         configTime = QFileInfo( configFile ).lastModified();
-        QFileSystemWatcher *watcher = new QFileSystemWatcher( this );
+        watcher = new QFileSystemWatcher( this );
         watcher->addPath( QFileInfo( configFile ).absolutePath() );
         connect( watcher, &QFileSystemWatcher::directoryChanged, this, &PrefsPage::configSaved );
     }
@@ -716,6 +690,12 @@ void PrefsPage::reset()
 void PrefsPage::showAllSettings()
 {
     PrefsDialog *dialog = new PrefsDialog( window(), p_intf, true );
+    /* the folder may only exist now, after the dialog's first save */
+    connect( dialog, &QDialog::finished, this, [this]() {
+        if( watcher && watcher->directories().isEmpty() )
+            watcher->addPath( QFileInfo( configFile ).absolutePath() );
+        configSaved();
+    } );
     dialog->toggleVisible();
 }
 
