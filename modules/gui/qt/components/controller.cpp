@@ -343,7 +343,7 @@ void AbstractController::createAndAddWidget( QBoxLayout *controlLayout_,
 #define BUTTON_SET_BAR2( button, image, tooltip ) \
     button->setToolTip( tooltip );          \
     button->setAccessibleName( tooltip );   \
-    button->setIcon( QIcon( ":/"#image ".svg" ) );
+    button->setIcon( deckIcon( RedesignIcons::image ) );
 
 #define ENABLE_ON_VIDEO( a ) \
     connect( THEMIM->getIM(), &InputManager::voutChanged, a, &QToolButton::setEnabled ); \
