@@ -142,6 +142,8 @@ private:
     /* */
     void sortInternal( QModelIndex rootIndex, int mode, int type );
     void sort( QModelIndex caller, QModelIndex rootIndex, const int column, Qt::SortOrder order );
+    bool applyFilter( const QString& search_text, const QModelIndex & root, bool b_recursive );
+    bool isMain() const;
 
     /* Lookups */
     PLItem *findByPLId( PLItem *, int i_plitemid ) const;
@@ -161,15 +163,22 @@ private:
 
 public slots:
     virtual void activateItem( const QModelIndex &index ) Q_DECL_OVERRIDE;
+    /* another model sorted, moved or filtered the main playlist: show it
+     * again (its items keep the filter), when this one shows it too */
+    void followMain();
 
 signals:
     /* filter() ran on the main playlist (THEPL->p_playing), whose items
      * keep the result: its other views show the same search */
     void searchChanged( const QString & );
+    /* this model sorted, moved or filtered the main playlist */
+    void mainEdited();
 
 public:
     /* the main playlist's latest filter() text */
     static QString mainSearch() { return mainSearchText; }
+    /* this model shows the main playlist with that filter already */
+    bool mainFiltered( const QString &text ) const;
 
 private:
     static QString mainSearchText;

@@ -234,20 +234,22 @@ PlaylistPanel::PlaylistPanel( intf_thread_t *_p_intf, QBoxLayout *_dock, QWidget
     filter->setToolTip( qtr( "Filter playlist" ) );
     setupSearchField( filter, qtr( "Filter" ), qtr( "Clear filter" ) );
     filter->setFixedHeight( t->metric( Theme::SelectH ) );
-    PLModel *shared = PLModel::getPLModel( p_intf );
-    connect( filter, &QLineEdit::textChanged, this, [this, shared]( const QString &text ) {
-        /* not when the shared model's own search set this text */
-        const bool fromHere = PLModel::mainSearch() != text;
-        model->filter( text, QModelIndex(), true );
-        /* the shared model (the playlist window, audio mode's tracks)
-         * shows the same, while it shows the main playlist */
-        if( fromHere && shared->itemId( QModelIndex() ) == THEPL->p_playing->i_id )
-            shared->filter( text, QModelIndex(), true );
+    connect( filter, &QLineEdit::textChanged, this, [this]( const QString &text ) {
+        /* not when the shared model's search set this text */
+        if( !model->mainFiltered( text ) )
+            model->filter( text, QModelIndex(), true );
     } );
+    /* the shared model (the playlist window, audio mode's tracks) and this
+     * one show the same order and filter, while it shows the main playlist */
+    PLModel *shared = PLModel::getPLModel( p_intf );
+    connect( model, &PLModel::mainEdited, shared, &PLModel::followMain );
+    connect( shared, &PLModel::mainEdited, model, &PLModel::followMain );
     connect( shared, &PLModel::searchChanged, filter, [filter]( const QString &text ) {
         if( filter->text() != text )
             filter->setText( text );
     } );
+    /* a search made in the playlist window before this opened */
+    filter->setText( PLModel::mainSearch() );
     QHBoxLayout *filterRow = new QHBoxLayout;
     filterRow->setContentsMargins( t->px( Playlist::FilterMarginX ), 0,
                                    t->px( Playlist::FilterMarginX ), t->px( Playlist::FilterMarginBottom ) );

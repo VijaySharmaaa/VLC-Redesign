@@ -508,6 +508,11 @@ void StandardPLPanel::search( const QString& searchText )
     bool can_search;
     p_selector->getCurrentItemInfos( &type, &can_search, &name );
 
+    /* the docked playlist's filter, already applied here */
+    PLModel *plModel = qobject_cast<PLModel *>( model );
+    if( plModel && plModel->mainFiltered( searchText ) )
+        return;
+
     if( type != SD_TYPE || !can_search )
     {
         bool flat = ( currentView == iconView ||

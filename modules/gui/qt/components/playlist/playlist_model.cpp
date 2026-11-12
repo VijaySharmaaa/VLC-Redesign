@@ -265,6 +265,8 @@ void PLModel::dropMove( const PlMimeData * plMimeData, PLItem *target, int row )
 
     insertChildren( target, model_items, model_pos );
     free( pp_items );
+    if( isMain() )
+        emit mainEdited();
 }
 
 void PLModel::activateItem( const QModelIndex &index )
@@ -664,7 +666,10 @@ void PLModel::processItemAppend( int i_pl_itemid, int i_pl_itemidparent )
         emit currentIndexChanged( index( newItem, 0 ) );
 
     if( latestSearch.isEmpty() ) return;
-    filter( latestSearch, index( rootItem, 0), false /*FIXME*/ );
+    /* not filter(): the other models get their own append, and the search
+     * did not change. shortcut: each model re-runs the search per appended
+     * item; filter only the new item when long filtered loads are slow */
+    applyFilter( latestSearch, index( rootItem, 0), false /*FIXME*/ );
 }
 
 void PLModel::rebuild( playlist_item_t *p_root )
@@ -677,6 +682,9 @@ void PLModel::rebuild( playlist_item_t *p_root )
         if( rootItem ) rootItem->clearChildren();
         if( p_root ) // Can be NULL
         {
+            /* the main playlist's items keep the filter */
+            if( p_root == p_playlist->p_playing )
+                latestSearch = mainSearchText;
             if ( rootItem ) delete rootItem;
             rootItem = new PLItem( p_root );
         }
@@ -881,9 +889,21 @@ void PLModel::sortInternal( QModelIndex rootIndex, int mode, int type )
             endInsertRows( );
         }
     }
+    if( isMain() )
+        emit mainEdited();
 }
 
 void PLModel::filter( const QString& search_text, const QModelIndex & idx, bool b_recursive )
+{
+    const bool main = applyFilter( search_text, idx, b_recursive );
+    if( isMain() ) /* also a node's filter, in the playlist window */
+        emit mainEdited();
+    if( main )
+        emit searchChanged( search_text );
+}
+
+/* returns whether it filtered the main playlist */
+bool PLModel::applyFilter( const QString& search_text, const QModelIndex & idx, bool b_recursive )
 {
     latestSearch = search_text;
     bool main;
@@ -915,10 +935,30 @@ void PLModel::filter( const QString& search_text, const QModelIndex & idx, bool 
     if( !idx.isValid() )
         rebuild();
     if( main )
-    {
         mainSearchText = search_text;
-        emit searchChanged( search_text );
-    }
+    return main;
+}
+
+bool PLModel::isMain() const
+{
+    /* p_playing is set once, when the playlist is created */
+    return rootItem->id() == p_playlist->p_playing->i_id;
+}
+
+void PLModel::followMain()
+{
+    if( !isMain() )
+        return;
+    const bool searched = latestSearch != mainSearchText;
+    latestSearch = mainSearchText;
+    rebuild();
+    if( searched )
+        emit searchChanged( mainSearchText );
+}
+
+bool PLModel::mainFiltered( const QString &text ) const
+{
+    return text == mainSearchText && text == latestSearch && isMain();
 }
 
 void PLModel::removeAll()
