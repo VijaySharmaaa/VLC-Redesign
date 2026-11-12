@@ -33,10 +33,10 @@
 #include "input_manager.hpp"
 #include "dialogs_provider.hpp"
 #include "actions_manager.hpp"   /* EXTENDED_ACTION, PLAYLIST_ACTION */
-#include "components/overlay_host.hpp"
 #include "menus.hpp"                    /* MENU_KEY_EFFECTS */
 #include "components/playlist/playlist_panel.hpp"
 #include "util/customwidgets.hpp"      /* withHotkey */
+#include "util/qvlcframe.hpp"          /* sheetWindowFlags */
 #include "util/theme.hpp"
 #include "util/redesign_icons.hpp"
 
@@ -46,7 +46,6 @@
 #include <QKeyEvent>
 #include <QAbstractButton>
 #include <QLabel>
-#include <QLinearGradient>
 #include <QMenu>
 #include <QPainter>
 #include <QPushButton>
@@ -56,7 +55,6 @@
 #include <QTabBar>
 #include <QTabWidget>
 #include <QToolButton>
-#include <QVariantAnimation>
 #include <vlc_modules.h>
 
 using namespace RedesignTokens;
@@ -198,29 +196,37 @@ private:
     }
 };
 
+/* the main window's central stack, NULL without one (Qt only as dialog
+ * provider) */
+QWidget *centralStack( intf_thread_t *p_intf )
+{
+    MainInterface *p_mi = p_intf->p_sys->p_mi;
+    return p_mi ? p_mi->getCentralStack() : NULL;
+}
+
+/* the layout the stack sits in, which the sheet docks into */
+QBoxLayout *dockBeside( QWidget *over )
+{
+    if( !over )
+        return NULL;
+    QBoxLayout *dock = qobject_cast<QBoxLayout *>( over->parentWidget()->layout() );
+    assert( dock );
+    return dock;
+}
+
 }
 
 ExtendedDialog::ExtendedDialog( intf_thread_t *_p_intf )
-               : QWidget( NULL ), p_intf( _p_intf ), dock( NULL ), dockParent( NULL ),
-                 host( NULL ), slide( NULL ), fullWidth( 0 ), shownWidth( 0 ), drawer( false )
+               : SidePanel( dockBeside( centralStack( _p_intf ) ), centralStack( _p_intf ) ),
+                 p_intf( _p_intf )
 {
     MainInterface *p_mi = p_intf->p_sys->p_mi;
-    QWidget *over = p_mi ? p_mi->getCentralStack() : NULL;
-    if( over )
-    {
-        dockParent = over->parentWidget();
-        dock = qobject_cast<QBoxLayout *>( dockParent->layout() );
-        assert( dock );
-        setParent( dockParent );
-    }
     setObjectName( "effectsSheet" );
     setAccessibleName( qtr( "Effects and filters" ) );
     setWindowTitle( qtr( "Adjustments and Effects" ) );
     setWindowRole( "vlc-extended" );
-    hide();
 
     Theme *t = Theme::instance();
-    content = new QWidget( this );
     QVBoxLayout *layout = new QVBoxLayout( content );
     layout->setContentsMargins( 0, 0, 0, 0 );
     layout->setSpacing( t->px( Effects::TabsPadTop ) );
@@ -388,15 +394,8 @@ ExtendedDialog::ExtendedDialog( intf_thread_t *_p_intf )
     layout->addLayout( foot );
     connect( m_applyButton, &QPushButton::clicked, this, &ExtendedDialog::saveConfig );
 
-    /* UI Automation does not read a buddy label: every slider and box of
-     * the panels gets its label's text as its name */
-    foreach( QLabel *label, content->findChildren<QLabel *>() )
-    {
-        QWidget *buddy = label->buddy();
-        if( buddy && buddy->accessibleName().isEmpty() )
-            buddy->setAccessibleName( label->text().remove( QLatin1Char( '&' ) )
-                                                   .remove( QLatin1Char( ':' ) ).trimmed() );
-    }
+    /* every slider and box of the panels is named after its label */
+    nameFromLabels( content );
 
     /* the filter groups are checkable group boxes */
     dropEarlyAccessibles( content );
@@ -408,8 +407,8 @@ ExtendedDialog::ExtendedDialog( intf_thread_t *_p_intf )
     {
         /* a window of its own (no main interface, e.g. -I skins2): a
          * sheet with Close only, as the dialogs */
-        setWindowFlags( Qt::Dialog | Qt::WindowTitleHint | Qt::WindowSystemMenuHint |
-                        Qt::WindowCloseButtonHint );
+        setWindowFlags( sheetWindowFlags() );
+        setWindowOpacity( var_InheritFloat( p_intf, "qt-opacity" ) );
         QVBoxLayout *frame = new QVBoxLayout( this );
         frame->setContentsMargins( 0, 0, 0, 0 );
         frame->addWidget( content );
@@ -417,18 +416,6 @@ ExtendedDialog::ExtendedDialog( intf_thread_t *_p_intf )
             resize( t->px( Effects::SheetW ), sizeHint().height() );
         return;
     }
-
-    /* the drawer's shadow is see-through; paintEvent fills the sheet */
-    setAttribute( Qt::WA_TranslucentBackground );
-    dock->addWidget( this );
-
-    host = new OverlayHost( over, this );
-    connect( host, &OverlayHost::changed, this, &ExtendedDialog::place );
-
-    slide = new QVariantAnimation( this );
-    slide->setEasingCurve( OverlayWindow::enterCurve() );
-    connect( slide, &QVariantAnimation::valueChanged, this,
-             [this]( const QVariant &v ) { setShownWidth( v.toInt() ); } );
 
     setBreakpoint( p_mi->getBreakpoints()->current() );
     connect( p_mi->getBreakpoints(), &BreakpointWatcher::changed,
@@ -456,17 +443,7 @@ void ExtendedDialog::showEvent( QShowEvent *e )
     /* back from a minimised window: no slide, the focus stays */
     if( !dock || e->spontaneous() )
         return;
-    slide->stop();
-    const int ms = Theme::instance()->duration( Theme::PanelSlide );
-    if( ms )
-    {
-        slide->setDuration( ms );
-        slide->setStartValue( 0 );
-        slide->setEndValue( fullWidth );
-        slide->start();
-    }
-    else
-        setShownWidth( fullWidth );
+    slideIn();
     if( drawer )
     {
         /* a window of its own: take the keys, Esc gives them back */
@@ -486,104 +463,32 @@ void ExtendedDialog::hideEvent( QHideEvent *e )
 
 void ExtendedDialog::setBreakpoint( BreakpointWatcher::Size bp )
 {
-    fullWidth = Theme::instance()->px( bp == BreakpointWatcher::XS ? Effects::SheetWXS
-                                                                   : Effects::SheetW );
-    const bool shown = isVisible();
-    if( ( bp == BreakpointWatcher::XS ) != drawer )
-    {
-        /* the sheet moves, never the video: its native window stays put */
-        drawer = bp == BreakpointWatcher::XS;
-        if( drawer )
-        {
-            dock->removeWidget( this );
-            setParent( dockParent->window(),
-                       Qt::Tool | Qt::FramelessWindowHint | Qt::NoDropShadowWindowHint );
-            /* the docked fixed width would clamp the drawer's geometry */
-            setMinimumWidth( 0 );
-            setMaximumWidth( QWIDGETSIZE_MAX );
-        }
-        else
-        {
-            /* Qt::Widget drops the drawer's FramelessWindowHint: with it, a
-             * native child of an alpha (translucent) format is flushed as a
-             * layered window, which a child cannot be: it stays blank */
-            setParent( dockParent, Qt::Widget );
-            dock->addWidget( this );
-        }
-        /* the drawer's tabs need the whole row for their labels: "More"
-         * goes up beside the close button */
-        if( drawer )
-        {
-            mainTabW->setCornerWidget( NULL, Qt::TopRightCorner );
-            head->insertWidget( 1, moreCorner );
-        }
-        else
-        {
-            head->removeWidget( moreCorner );
-            mainTabW->setCornerWidget( moreCorner, Qt::TopRightCorner );
-        }
-        moreCorner->show();
-        if( shown )
-            show();   /* setParent() hides */
-    }
-    slide->stop();
-    setShownWidth( fullWidth );
-}
-
-/* shortcut: the dock and drawer code repeats PlaylistPanel's; share one
- * side panel class once a third panel needs it */
-void ExtendedDialog::setShownWidth( int w )
-{
-    shownWidth = w;
-    if( drawer )
-        place();
-    else
-        setFixedWidth( w );
-}
-
-int ExtendedDialog::shadowWidth() const
-{
-    return drawer ? Theme::instance()->px( Playlist::DrawerShadow ) : 0;
-}
-
-/* The drawer: over the right of the stack, the shadow to its left */
-void ExtendedDialog::place()
-{
-    if( !drawer )
+    const bool xs = bp == BreakpointWatcher::XS;
+    if( !setDocked( xs, Theme::instance()->px( xs ? Effects::SheetWXS : Effects::SheetW ) ) )
         return;
-    const QRect target = host->targetRect();
-    const int w = shownWidth + shadowWidth();
-    /* shortcut: always on the right, as in a left-to-right layout; mirror
-     * it with the dock once right-to-left layouts are checked */
-    setGeometry( target.right() + 1 - w, target.top(), w, target.height() );
-}
-
-void ExtendedDialog::resizeEvent( QResizeEvent * )
-{
-    if( dock )
-        content->setGeometry( shadowWidth(), 0, fullWidth, height() );
-}
-
-void ExtendedDialog::paintEvent( QPaintEvent * )
-{
-    Theme *t = Theme::instance();
-    QPainter p( this );
-    const int s = shadowWidth();
-    if( s )
+    /* the drawer's tabs need the whole row for their labels: "More"
+     * goes up beside the close button */
+    if( drawer )
     {
-        /* shortcut: a linear ramp for the prototype's 50 px blur */
-        QColor shadow( Qt::black );
-        shadow.setAlpha( Playlist::DrawerShadowAlpha );
-        QLinearGradient ramp( 0, 0, s, 0 );
-        ramp.setColorAt( 0, Qt::transparent );
-        ramp.setColorAt( 1, shadow );
-        p.fillRect( 0, 0, s, height(), ramp );
+        mainTabW->setCornerWidget( NULL, Qt::TopRightCorner );
+        head->insertWidget( 1, moreCorner );
+        /* qt-opacity, as stock's window had; docked it is part of the main
+         * window, which has its own */
+        setWindowOpacity( var_InheritFloat( p_intf, "qt-opacity" ) );
     }
+    else
+    {
+        head->removeWidget( moreCorner );
+        mainTabW->setCornerWidget( moreCorner, Qt::TopRightCorner );
+    }
+    moreCorner->show();
+}
+
+void ExtendedDialog::paintSheet( QPainter &p, const QRect &sheet )
+{
     /* FxBg is 0.97 opaque: over the panel colour, never over nothing */
-    p.fillRect( s, 0, width() - s, height(), t->color( Theme::Panel ) );
-    p.fillRect( s, 0, width() - s, height(), t->color( Theme::FxBg ) );
-    if( dock )
-        p.fillRect( s, 0, Size::Hairline, height(), t->ink( InkAlpha::Divider ) );
+    SidePanel::paintSheet( p, sheet );
+    p.fillRect( sheet, Theme::instance()->color( Theme::FxBg ) );
 }
 
 /* QVLCDialog's keys: Esc and Enter close, Enter on a button presses it

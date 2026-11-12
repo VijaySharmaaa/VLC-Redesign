@@ -101,6 +101,7 @@ libqt_plugin_la_SOURCES = \
 	gui/qt/components/controller.cpp gui/qt/components/controller.hpp \
 	gui/qt/components/deck_popover.cpp gui/qt/components/deck_popover.hpp \
 	gui/qt/components/overlay_host.cpp gui/qt/components/overlay_host.hpp \
+	gui/qt/components/side_panel.cpp gui/qt/components/side_panel.hpp \
 	gui/qt/components/toast.cpp gui/qt/components/toast.hpp \
 	gui/qt/components/drop_overlay.cpp gui/qt/components/drop_overlay.hpp \
 	gui/qt/components/video_overlays.cpp gui/qt/components/video_overlays.hpp \
