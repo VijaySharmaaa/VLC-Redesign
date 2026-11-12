@@ -370,7 +370,7 @@ QString hotkeyText( intf_thread_t *p_intf, const char *id )
         /* translated as the menu does (qtr( MENU_KEY_PLAYLIST )); a key
          * name's own translation (French "Esc") does not parse: as is */
         QKeySequence seq( qtr( id ) );
-        if( seq.isEmpty() || seq[0] == Qt::Key_unknown )
+        if( seq.isEmpty() || ( seq[0] & ~Qt::KeyboardModifierMask ) == Qt::Key_unknown )
             seq = QKeySequence( QString::fromUtf8( id ) );
         return seq.toString( QKeySequence::NativeText );
     }
