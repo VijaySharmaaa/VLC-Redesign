@@ -800,6 +800,8 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
             ui.stylesCombo->setCurrentIndex( ui.stylesCombo->findText(
                         getSettings()->value( "MainWindow/QtStyle", "" ).toString() ) );
             ui.stylesCombo->insertSeparator( 1 );
+            /* UI Automation lists the separator too: not as a nameless item */
+            ui.stylesCombo->setItemData( 1, qtr( "Separator" ), Qt::AccessibleTextRole );
             if ( ui.stylesCombo->currentIndex() < 0 )
                 ui.stylesCombo->setCurrentIndex( 0 ); /* default */
 
