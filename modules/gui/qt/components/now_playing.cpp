@@ -125,6 +125,7 @@ QFont fontAt( Theme::TypeRole role, int tokenPx, bool semibold )
     QFont f = Theme::instance()->font( role );
     f.setPixelSize( Theme::instance()->px( tokenPx ) );
     f.setWeight( semibold ? QFont::DemiBold : QFont::Normal );
+    f.setCapitalization( QFont::MixedCase );  /* an Overline size, not its capitals */
     return f;
 }
 
@@ -711,7 +712,7 @@ AudioModePage::AudioModePage( intf_thread_t *_p_i, NowPlayingInfo *_info, QWidge
     QVBoxLayout *rl = new QVBoxLayout;
     rl->setSpacing( 0 );
     rl->addSpacing( t->px( NowPlaying::HeaderTop ) );
-    QLabel *overline = new QLabel( qtr( "Now playing" ).toUpper(), this );
+    QLabel *overline = new QLabel( qtr( "Now playing" ), this );
     overline->setFont( t->font( Theme::Overline ) );
     overline->setProperty( "np", "accent" );
     rl->addWidget( overline );

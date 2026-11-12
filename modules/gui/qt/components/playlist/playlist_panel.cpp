@@ -138,6 +138,7 @@ void RowDelegate::paint( QPainter *p, const QStyleOptionViewItem &option,
     titleFont.setWeight( QFont::Medium );
     QFont metaFont = t->font( Theme::Overline );   /* 11 px, regular */
     metaFont.setWeight( QFont::Normal );
+    metaFont.setCapitalization( QFont::MixedCase );
     const QFontMetrics titleFm( titleFont ), metaFm( metaFont );
 
     QStringList metaParts;

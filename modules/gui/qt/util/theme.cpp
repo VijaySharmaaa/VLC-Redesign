@@ -915,6 +915,9 @@ QFont Theme::font(TypeRole role) const
     if (role == Display || role == PageTitle || role == PanelTitle || role == Overline
         || role == NavTitle)
         f.setWeight(QFont::DemiBold);
+    /* drawn in capitals, the text stays as translated (screen readers) */
+    if (role == Overline)
+        f.setCapitalization(QFont::AllUppercase);
     return f;
 }
 
