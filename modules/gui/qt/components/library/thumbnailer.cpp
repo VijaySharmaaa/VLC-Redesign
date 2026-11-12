@@ -40,6 +40,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QMutex>
 #include <QPointer>
 #include <QProcess>
 #include <QThread>
@@ -69,44 +70,34 @@ bool Thumbnailer::isVideo( const QString &path )
     return hasExtension( path, videoFilters() );
 }
 
-namespace {
-/* Trims the frame cache when VLC starts: the part files of grabs cut short
- * (VLC killed; no grab runs longer than ThumbTimeoutMs), then the oldest
- * frames past ThumbCacheMaxMB.
+/* Trims the frame cache once per VLC run, in the first probe: the part
+ * files of grabs cut short (VLC killed; no grab runs longer than
+ * ThumbTimeoutMs), then the oldest frames past ThumbCacheMaxMB.
  * shortcut: oldest by when the frame was made, not last shown; keep a
  * last-use date if often shown frames get made again */
-class ThumbPrune : public QRunnable
+static void pruneCache( const QString &dir )
 {
-public:
-    explicit ThumbPrune( const QString &_dir ) : dir( _dir ) {}
-    void run() Q_DECL_OVERRIDE
+    const QDateTime now = QDateTime::currentDateTime();
+    QFileInfoList frames;
+    qint64 total = 0;
+    /* oldest first */
+    foreach( const QFileInfo &info, QDir( dir ).entryInfoList(
+                 QStringList() << "*.png" << "*.swp", QDir::Files, QDir::Time | QDir::Reversed ) )
     {
-        const QDateTime now = QDateTime::currentDateTime();
-        QFileInfoList frames;
-        qint64 total = 0;
-        /* oldest first */
-        foreach( const QFileInfo &info, QDir( dir ).entryInfoList(
-                     QStringList() << "*.png" << "*.swp", QDir::Files, QDir::Time | QDir::Reversed ) )
+        if( info.suffix() == QLatin1String( "swp" )
+         || info.completeBaseName().endsWith( QLatin1String( ".part" ) ) )
         {
-            if( info.suffix() == QLatin1String( "swp" )
-             || info.completeBaseName().endsWith( QLatin1String( ".part" ) ) )
-            {
-                if( info.lastModified().msecsTo( now ) > Library::ThumbTimeoutMs )
-                    QFile::remove( info.filePath() );
-                continue;
-            }
-            frames << info;
-            total += info.size();
+            if( info.lastModified().msecsTo( now ) > Library::ThumbTimeoutMs )
+                QFile::remove( info.filePath() );
+            continue;
         }
-        const qint64 max = qint64( Library::ThumbCacheMaxMB ) << 20;
-        for( int i = 0; i < frames.count() && total > max; i++ )
-            if( QFile::remove( frames.at( i ).filePath() ) )
-                total -= frames.at( i ).size();
+        frames << info;
+        total += info.size();
     }
-
-private:
-    QString dir;
-};
+    const qint64 max = qint64( Library::ThumbCacheMaxMB ) << 20;
+    for( int i = 0; i < frames.count() && total > max; i++ )
+        if( QFile::remove( frames.at( i ).filePath() ) )
+            total -= frames.at( i ).size();
 }
 
 /**********************************************************************
@@ -154,6 +145,17 @@ void ThumbJob::run()
         emit probed( path, QString(), false );
         return;
     }
+    /* before any probe hands out a frame, so none is one it deletes */
+    {
+        static QMutex pruneLock;
+        static bool pruned = false;
+        QMutexLocker locker( &pruneLock );
+        if( !pruned )
+        {
+            pruneCache( cacheDir );
+            pruned = true;
+        }
+    }
     /* a replaced or edited file gets a new frame */
     const QByteArray id = ( keyOf( path ) + QLatin1Char( '|' ) + QString::number( info.size() )
                           + QLatin1Char( '|' )
@@ -178,17 +180,14 @@ Thumbnailer *Thumbnailer::instance( intf_thread_t *p_intf )
 }
 
 Thumbnailer::Thumbnailer( intf_thread_t *_p_intf, QObject *parent )
-    : QObject( parent ), p_intf( _p_intf ), active( false ), serial( 0 ),
+    : QObject( parent ), p_intf( _p_intf ), epoch( 0 ), serial( 0 ),
       /* each one decodes on all cores: half of them keeps VLC responsive */
       maxJobs( qBound( 1, QThread::idealThreadCount() / 2, int( Library::ThumbWorkersMax ) ) )
 {
     /* portable mode: the dir functions already point next to vlc.exe */
     char *psz = config_GetUserDir( VLC_CACHE_DIR );
     if( psz )
-    {
         cacheDir = QDir::fromNativeSeparators( qfu( psz ) ) + QLatin1String( "/thumbnails" );
-        LibraryData::filePool()->start( new ThumbPrune( cacheDir ) );
-    }
     free( psz );
 
     poll = new QTimer( this );
@@ -218,7 +217,6 @@ Thumbnailer::~Thumbnailer()
 
 QString Thumbnailer::frame( const QString &path, int64_t lengthMs )
 {
-    active = true;
     const QString key = keyOf( path );
     if( cacheDir.isEmpty() || !isVideo( path ) || failedFrames.contains( key ) )
         return QString();
@@ -241,7 +239,11 @@ QString Thumbnailer::frame( const QString &path, int64_t lengthMs )
         lengths.insert( key, lengthMs );
         ThumbJob *job = new ThumbJob( path, cacheDir, false );
         /* queued: a result that comes after this is gone is dropped */
-        connect( job, &ThumbJob::probed, this, &Thumbnailer::probed, Qt::QueuedConnection );
+        const int asked = epoch;
+        connect( job, &ThumbJob::probed, this,
+                 [this, asked]( const QString &p, const QString &file, bool cached ) {
+                     probed( p, file, cached, asked );
+                 }, Qt::QueuedConnection );
         LibraryData::filePool()->start( job );
     }
     return QString();
@@ -249,7 +251,6 @@ QString Thumbnailer::frame( const QString &path, int64_t lengthMs )
 
 const QStringList *Thumbnailer::videos( const QString &dir )
 {
-    active = true;
     const QString key = keyOf( dir );
     QHash<QString, QStringList>::const_iterator it = dirs.constFind( key );
     if( it != dirs.constEnd() )
@@ -294,16 +295,14 @@ int Thumbnailer::watchedIn( const QString &dir )
 
 void Thumbnailer::cancel()
 {
-    /* probes still running are dropped as they come (probed) */
-    active = false;
-    foreach( const Request &r, queue )
-        pendingFrames.remove( r.key );
+    /* probes still running are dropped as they come (probed); a page that
+     * asks the same frame again starts its own */
+    epoch++;
+    pendingFrames.clear();
+    lengths.clear();
     queue.clear();
     foreach( const Job &j, jobs )
-    {
-        pendingFrames.remove( j.r.key );
         stopProcess( j.process, j.tmpFile );
-    }
     jobs.clear();
     poll->stop();
     /* listed again when shown: files come and go */
@@ -317,15 +316,12 @@ void Thumbnailer::cancel()
         frames.clear();
 }
 
-void Thumbnailer::probed( const QString &path, const QString &file, bool cached )
+void Thumbnailer::probed( const QString &path, const QString &file, bool cached, int asked )
 {
+    if( asked != epoch )
+        return;
     const QString key = keyOf( path );
     const int64_t lengthMs = lengths.take( key );
-    if( !active )
-    {
-        pendingFrames.remove( key );
-        return;
-    }
     if( file.isEmpty() )
     {
         pendingFrames.remove( key );

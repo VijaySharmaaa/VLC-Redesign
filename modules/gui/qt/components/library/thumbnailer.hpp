@@ -72,7 +72,6 @@ signals:
     void changed();
 
 private slots:
-    void probed( const QString &path, const QString &file, bool cached );
     void listed( const QString &dir, const QStringList &videos, const QString &cover );
     void loadRecents();
 
@@ -90,6 +89,8 @@ private:
         QElapsedTimer clock;
     };
     Thumbnailer( intf_thread_t *, QObject *parent );
+    /* asked: the epoch of the frame() that started the probe */
+    void probed( const QString &path, const QString &file, bool cached, int asked );
     void startNext();
     void start( const Request & );
     void check();
@@ -97,7 +98,7 @@ private:
     static void stopProcess( QProcess *, const QString &tmpFile );
 
     intf_thread_t *p_intf;
-    bool active;                             /* a page asked since cancel() */
+    int epoch;                               /* cancel()s so far */
     int serial;                              /* of the part files */
     QString cacheDir;
     QHash<QString, QString> frames;          /* key: its PNG file */
