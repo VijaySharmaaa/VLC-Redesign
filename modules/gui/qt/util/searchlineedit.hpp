@@ -44,35 +44,19 @@ public:
     }
 };
 
-class QFramelessButton;
+/* A search field: a small search glyph ahead, a themed X that clears it
+ * while it has text, Esc clears too */
+void setupSearchField( QLineEdit *, const QString &searchName, const QString &clearName );
+
+/* A setupSearchField() field, "Search" while empty, as tall as a select */
 class SearchLineEdit : public QLineEdit
 {
     Q_OBJECT
 public:
     SearchLineEdit( QWidget *parent = NULL );
-    /* the grey hint while empty, "Search" by default */
-    void setMessage( const QString &text ) { messageText = text; update(); }
-
-private:
-    void resizeEvent ( QResizeEvent * event );
-    void focusInEvent( QFocusEvent *event );
-    void focusOutEvent( QFocusEvent *event );
-    void paintEvent( QPaintEvent *event );
-    void setMessageVisible( bool on );
-    QFramelessButton   *clearButton;
-    bool message;
-    QString messageText;
-
-public slots:
-    void clear();
-
-private slots:
-    void updateText( const QString& );
-    void searchEditingFinished();
 
 signals:
     void searchDelayedChanged( const QString& );
 };
 
 #endif
-

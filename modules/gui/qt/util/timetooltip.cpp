@@ -22,7 +22,6 @@
 #include "timetooltip.hpp"
 #include "util/theme.hpp"
 
-#include <QFontInfo>
 #include <QApplication>
 #include <QPainter>
 #include <QBitmap>
@@ -56,11 +55,8 @@ TimeTooltip::TimeTooltip( QWidget *parent ) :
 
 void TimeTooltip::adjustPosition()
 {
-    // The application's font size -5 pt, at least 7 pt: in pixels, here, so
-    // it follows the screen's scale
-    const Theme *t = Theme::instance();
-    mFont = QFont( "Verdana" );
-    mFont.setPixelSize( qMax( QFontInfo( qApp->font() ).pixelSize() - t->pt( 5 ), t->pt( 7 ) ) );
+    // read here, so it follows the screen's scale
+    mFont = Theme::instance()->font( Theme::Meta );
 
     if( mDisplayedText.isEmpty() )
     {
@@ -161,7 +157,8 @@ void TimeTooltip::paintEvent( QPaintEvent * )
     QPainter p( this );
     p.setRenderHints( QPainter::TextAntialiasing );
 
-    /* same colours as QToolTip in the theme's stylesheet */
+    /* QToolTip's colours; its border also on Windows 11, where DWM
+     * outlines QToolTip but not this frameless window with its tip */
     const Theme *theme = Theme::instance();
     p.setPen( theme->ink( RedesignTokens::InkAlpha::Border ) );
     p.setBrush( theme->color( Theme::Raised ) );

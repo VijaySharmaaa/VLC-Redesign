@@ -696,7 +696,7 @@ NetOpenPanel::NetOpenPanel( QWidget *_parent, intf_thread_t *_p_intf ) :
 
     /* the recent streams: the combo keeps them (and saves them), the list
      * shows them instead of a drop-down over the help */
-    QLabel *recentLabel = new QLabel( qtr( "Recent" ).toUpper(), ui.groupBox );
+    QLabel *recentLabel = new QLabel( qtr( "Recent" ), ui.groupBox );
     recentLabel->setFont( t->font( Theme::Overline ) );
     recentLabel->setProperty( "role", "hint" );
     recentView = new QListWidget( ui.groupBox );

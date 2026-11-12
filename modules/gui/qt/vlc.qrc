@@ -91,7 +91,6 @@
         <file alias="go-next.svg">pixmaps/go-next.svg</file>
         <file alias="new.svg">pixmaps/profile_new.svg</file>
         <file alias="lock.svg">pixmaps/lock.svg</file>
-        <file alias="search_clear.svg">pixmaps/search_clear.svg</file>
         <file alias="dropzone.svg">pixmaps/playlist/dropzone.svg</file>
         <file alias="valid.svg">pixmaps/valid.svg</file>
     </qresource>
@@ -170,13 +169,11 @@
         <file alias="call_to_action.svg">pixmaps/redesign/call_to_action.svg</file>
         <file alias="cast.svg">pixmaps/redesign/cast.svg</file>
         <file alias="check.svg">pixmaps/redesign/check.svg</file>
-        <file alias="check_box_outline_blank.svg">pixmaps/redesign/check_box_outline_blank.svg</file>
         <file alias="chevron_left.svg">pixmaps/redesign/chevron_left.svg</file>
         <file alias="chevron_right.svg">pixmaps/redesign/chevron_right.svg</file>
         <file alias="close.svg">pixmaps/redesign/close.svg</file>
         <file alias="code.svg">pixmaps/redesign/code.svg</file>
         <file alias="compress.svg">pixmaps/redesign/compress.svg</file>
-        <file alias="computer.svg">pixmaps/redesign/computer.svg</file>
         <file alias="cone.svg">pixmaps/redesign/cone.svg</file>
         <file alias="construction.svg">pixmaps/redesign/construction.svg</file>
         <file alias="content_copy.svg">pixmaps/redesign/content_copy.svg</file>
@@ -223,7 +220,6 @@
         <file alias="laps.svg">pixmaps/redesign/laps.svg</file>
         <file alias="last_page.svg">pixmaps/redesign/last_page.svg</file>
         <file alias="layers.svg">pixmaps/redesign/layers.svg</file>
-        <file alias="library_music.svg">pixmaps/redesign/library_music.svg</file>
         <file alias="library_music_fill.svg">pixmaps/redesign/library_music_fill.svg</file>
         <file alias="live_tv.svg">pixmaps/redesign/live_tv.svg</file>
         <file alias="logout.svg">pixmaps/redesign/logout.svg</file>
@@ -251,10 +247,8 @@
         <file alias="remove.svg">pixmaps/redesign/remove.svg</file>
         <file alias="repeat.svg">pixmaps/redesign/repeat.svg</file>
         <file alias="repeat_one.svg">pixmaps/redesign/repeat_one.svg</file>
-        <file alias="replay.svg">pixmaps/redesign/replay.svg</file>
         <file alias="replay_10.svg">pixmaps/redesign/replay_10.svg</file>
         <file alias="rss_feed.svg">pixmaps/redesign/rss_feed.svg</file>
-        <file alias="save.svg">pixmaps/redesign/save.svg</file>
         <file alias="schedule.svg">pixmaps/redesign/schedule.svg</file>
         <file alias="search.svg">pixmaps/redesign/search.svg</file>
         <file alias="settings.svg">pixmaps/redesign/settings.svg</file>
@@ -278,8 +272,6 @@
         <file alias="transform.svg">pixmaps/redesign/transform.svg</file>
         <file alias="tune.svg">pixmaps/redesign/tune.svg</file>
         <file alias="update.svg">pixmaps/redesign/update.svg</file>
-        <file alias="upload_file.svg">pixmaps/redesign/upload_file.svg</file>
-        <file alias="video_library.svg">pixmaps/redesign/video_library.svg</file>
         <file alias="videocam.svg">pixmaps/redesign/videocam.svg</file>
         <file alias="view_list.svg">pixmaps/redesign/view_list.svg</file>
         <file alias="visibility.svg">pixmaps/redesign/visibility.svg</file>

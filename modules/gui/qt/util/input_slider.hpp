@@ -37,8 +37,6 @@
 #include <QPainter>
 #include <QTime>
 
-#define MSTRTIME_MAX_SIZE 22
-
 class QMouseEvent;
 class QWheelEvent;
 class QHideEvent;
@@ -98,7 +96,6 @@ private:
     SeekPoints* chapters;
     bool b_classic;
     bool b_seekable;
-    int mHandleLength;
 
     QCommonStyle *alternativeStyle;
 
@@ -128,13 +125,11 @@ signals:
 /* Sound Slider inherited directly from QAbstractSlider */
 class QPaintEvent;
 
-#define SOUNDMAX  200 // %, as qt-max-volume
-
 class SoundSlider : public QAbstractSlider
 {
     Q_OBJECT
 public:
-    SoundSlider(QWidget *_parent, float _i_step, char *psz_colors, int max = SOUNDMAX );
+    SoundSlider(QWidget *_parent, float _i_step, char *psz_colors, int max );
     void setMuted( bool ); /* Set Mute status */
     /* the volume, also one past the maximum (a hotkey above a lowered
      * qt-max-volume): the fill stops at the end, the label shows it all */

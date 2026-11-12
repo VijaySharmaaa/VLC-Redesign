@@ -278,7 +278,7 @@ namespace
                      const QHash<int, QString> &details )
     {
         const Theme *t = Theme::instance();
-        QLabel *header = new QLabel( title.toUpper(), pop );
+        QLabel *header = new QLabel( title, pop );
         header->setFont( t->font( Theme::Overline ) );
         header->setContentsMargins( t->px( Deck::PopoverRowPadX ), 0, t->px( Deck::PopoverRowPadX ),
                                     t->px( Deck::RowGap ) );

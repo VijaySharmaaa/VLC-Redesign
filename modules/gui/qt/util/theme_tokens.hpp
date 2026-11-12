@@ -55,7 +55,6 @@ namespace RedesignTokens
     /* ---- Video surfaces (both themes) ---- */
     static const QRgb VideoSurface  = 0xFF000000;
     static const QRgb PausedBadgeBg = 0x8C000000; /* 55 % */
-    static const QRgb SubtitleBox   = 0xA6000000; /* 65 % */
     static const QRgb HeaderScrim   = 0x99000000; /* 60 %, fading to none below */
 
     struct Palette
@@ -116,7 +115,7 @@ namespace RedesignTokens
         static const int Display = 48, PageTitle = 26, PanelTitle = 16, Body = 13, Meta = 12, Overline = 11, Mono = 12;
         static const int NavTitle = 22;       /* "Preferences" over its sections */
         static const int TitleTracking = 99;  /* % letter spacing: -0.01em */
-        static const int WeightRegular = 400, WeightSemibold = 600; /* CSS weights */
+        static const int WeightSemibold = 600; /* CSS weight, the stylesheet's */
     }
 
     /* ---- Metrics (px) ---- */
@@ -145,12 +144,13 @@ namespace RedesignTokens
         static const int PlayDeck = 44, PlayNowBar = 36, PausedBadge = 76;
         static const int NowPlayingBarH = 76;
         static const int SeekTrack = 4, SeekTrackHover = 6, SeekKnob = 14, SeekKnobHover = 16;
-        static const int VolumeW = 140, VolumeMaxPercent = 125;
+        static const int VolumeW = 140;
         static const int PlaylistRowH = 40, PlaylistL = 360, PlaylistM = 320, PlaylistS = 300;
         static const int ButtonH = 34, InputH = 34, UrlInputH = 38, SelectH = 32;
         static const int ToggleW = 40, ToggleH = 20, ChipH = 28;
         static const int ToggleKnob = 12; /* the switch's knob, centred in ToggleH */
         static const int ScrollBarW = 12; /* not in tokens.json: Windows 11 thin scroll bar */
+        static const int ScrollBarPad = 2; /* not in tokens.json: around its handle */
         static const int FocusRing = 2, Hairline = 1; /* line widths, not scaled */
         static const int RadiusXs = 4, RadiusSm = 5, RadiusMd = 6, RadiusLg = 8, RadiusXl = 10, RadiusTile = 12;
     }
@@ -266,11 +266,14 @@ namespace RedesignTokens
     namespace Deck
     {
         static const int PadX = 16, PadTop = 10, PadBottom = 12, RowGap = 6, Gap = 4;
-        static const int SeekRowH = 20, SeekRowGap = 12, TimeW = 52;
+        static const int SeekRowGap = 12, TimeW = 52;
         static const int SeparatorH = 20, SeparatorMargin = 6;
         static const int PlayGlyph = 28, KnobHalo = 3, ChapterGap = 2;
         static const int VolumeH = 24, VolumeTickH = 16, VolumeLabelW = 40;
         static const int SpeedPadX = 10;
+        /* not in tokens.json: dragging the volume this far off its track
+         * puts the old level back (stock VLC's 15 px) */
+        static const int VolumeDragSlop = 15;
         static const int DisabledOpacityPercent = 35;
         static const int TracksPopoverW = 560, SpeedPopoverW = 140, PopoverGap = 12;
         static const int PopoverPadX = 6, PopoverPadTop = 12, PopoverPadBottom = 8;
@@ -316,7 +319,6 @@ namespace RedesignTokens
         /* page: PagePadTop / PagePadX, then the header row */
         static const int PagePadBottom = 32, HeaderGap = 16, HeaderBelow = 24;
         static const int SearchL = 360, SearchM = 300, SearchS = 220, SearchXS = 180;
-        static const int SearchIcon = 18;
         /* card grids, per breakpoint L / M / S / XS */
         static const int VideoColsL = 5, VideoColsM = 4, VideoColsS = 3, VideoColsXS = 2;
         static const int AlbumColsL = 7, AlbumColsM = 5, AlbumColsS = 4, AlbumColsXS = 3;
@@ -354,7 +356,6 @@ namespace RedesignTokens
         static const int TabsPadX = 14, TabsPadTop = 12, BodyPad = 18, SectionGap = 18;
         static const int ChipGap = 6, ChipPadX = 10;
         static const int BandH = 170, BandTrack = 4, BandKnob = 14, BandGap = 4, BandScaleW = 28;
-        static const int VideoRowGap = 20;
         static const int SyncRowPad = 14, SyncRowGap = 12, SyncRowRadius = 8;
         static const int StepperButton = 30, StepperGlyph = 18;
         static const int DisabledAlpha = 102; /* 0.4: bands with the equalizer off */

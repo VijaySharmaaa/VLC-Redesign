@@ -101,7 +101,7 @@ Q_DECLARE_METATYPE(QMargins)
  * Windows 10 (untested with a custom caption) keeps the native caption and
  * gets the menu row under it. */
 MainInterfaceWin32::MainInterfaceWin32( intf_thread_t *_p_intf )
-    : MainInterface( _p_intf, WinTheme::build() >= 22000 )
+    : MainInterface( _p_intf, WinTheme::isWin11() )
     , himl( NULL )
     , p_taskbl( NULL )
 {

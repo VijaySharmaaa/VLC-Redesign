@@ -91,9 +91,9 @@ namespace SpectrumAnalysis
         fft( mono, im, n );
 
         const float ratio = HighHz / LowHz, binHz = rate / n;
+        const float step = count > 1 ? 1.f / ( count - 1 ) : 0.f; /* one bar: LowHz */
         for( unsigned b = 0; b < count; b++ )
         {
-            const float step = 1.f / ( count - 1 );
             const float centre = LowHz * powf( ratio, b * step );
             out[b] = 0.f;
             if( centre >= rate / 2.f )

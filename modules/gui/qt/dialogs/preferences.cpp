@@ -158,7 +158,6 @@ void PrefsDialog::setAdvanced()
     if ( !tree_filter )
     {
         tree_filter = new SearchLineEdit( simple_tree_panel );
-        tree_filter->setMinimumHeight( 26 );
 
         connect( tree_filter, &SearchLineEdit::textChanged,
                 this, &PrefsDialog::advancedTreeFilterChanged );

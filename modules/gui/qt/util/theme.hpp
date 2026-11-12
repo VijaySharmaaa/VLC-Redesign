@@ -48,8 +48,8 @@ public:
     enum ColorRole
     {
         /* per theme (RedesignTokens::Palette) */
-        Page, Chrome, Bg, Panel, Surface, Raised, Hover, Hover2,
-        Text, Text2, Mute, Dim, AccentText, Ink, Glass, FxBg, Stripe1, Stripe2,
+        Chrome, Bg, Panel, Surface, Raised, Hover, Hover2,
+        Text, Text2, Mute, Dim, AccentText, Glass, FxBg, Stripe1, Stripe2,
         /* AccentFill: progress and "on" fills, the accent in both themes
          * (I1-1); ControlLine: a field's only boundary */
         AccentFill, OnAccentFill, VolumeBoost, DestructiveText, ControlLine,
@@ -59,7 +59,7 @@ public:
         Accent, AccentHover, OnAccent, AccentTint12, AccentTint14, AccentBorder50,
         AccentFocusRing, AccentKnobHalo, SeekKnobFill,
         Error, ErrorTint, WindowCloseHover, WindowCloseGlyph,
-        VideoSurface, PausedBadgeBg, SubtitleBox, OnVideo,
+        VideoSurface, PausedBadgeBg, OnVideo,
         ColorRoleCount
     };
 
@@ -69,19 +69,18 @@ public:
     {
         TitleBar, CaptionButtonW, MenuTitleH, MenuItemH, MenuMinW,
         SidebarItemH, SidebarOpenBtnH, IconButton, IconGlyph,
-        PlayDeck, PlayNowBar, PausedBadge, NowPlayingBarH,
+        PlayDeck, PausedBadge, NowPlayingBarH,
         SeekTrack, SeekTrackHover, SeekKnob, SeekKnobHover, VolumeW,
         PlaylistRowH, PlaylistL, PlaylistM, PlaylistS,
-        ButtonH, InputH, UrlInputH, SelectH, ToggleW, ToggleH, ChipH,
+        InputH, UrlInputH, SelectH, ToggleW, ToggleH, ChipH,
         RadiusXs, RadiusSm, RadiusMd, RadiusLg, RadiusXl, RadiusTile,
         SizeRoleCount
     };
 
     enum MotionRole
     {
-        MenuDrop, Popover, ContextMenu, DialogBackdrop, Dialog, PanelSlide,
-        ViewChange, Toast, ToastHold, PausedBadgeFade, MiniPlayer, DropTarget,
-        SeekTick, VolumeFill, EqBand, Toggle, PlayPress, ImmersiveIdle, ImmersiveFade,
+        Popover, PanelSlide, ViewChange, Toast, PausedBadgeFade, MiniPlayer, DropTarget,
+        Toggle, PlayPress, ImmersiveFade,
         Spinner,    /* one turn of the buffering ring */
         Spectrum,
         SeekLoading,
@@ -130,8 +129,10 @@ public:
     /* an empty size means the IconGlyph token */
     QIcon icon(const QString &name, ColorRole, const QSize &size = QSize());
     /* The same icon at any size, tinted with the colour the role has when
-     * it is drawn: for menus and actions that outlive a theme change. */
-    static QIcon themedIcon(const char *name, ColorRole);
+     * it is drawn: for menus and actions that outlive a theme change.
+     * glyphPx > 0: the glyph keeps that token size, centred in a bigger
+     * box (a line edit's action icons are 32 px in a tall field). */
+    static QIcon themedIcon(const char *name, ColorRole, int glyphPx = 0);
     /* A menu entry that removes or clears: drawn in DestructiveText */
     static void setDestructive(QAction *);
     /* Whether the widget, which has focus, shows its focus ring: only for

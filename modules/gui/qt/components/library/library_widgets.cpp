@@ -43,7 +43,6 @@
 #include <QAction>
 #include <QApplication>
 #include <QHBoxLayout>
-#include <QIconEngine>
 #include <QImageReader>
 #include <QKeyEvent>
 #include <QKeySequence>
@@ -1033,89 +1032,4 @@ void LibraryNotice::showMessage( const char *icon, Theme::ColorRole role, const 
     secondary->setText( secondaryText );
     secondary->setVisible( !secondaryText.isEmpty() );
     setAccessibleName( _title );
-}
-
-/**********************************************************************
- * Search fields
- **********************************************************************/
-namespace {
-/* A themed glyph at the token size, centred in the box QLineEdit gives
- * its action icons: Qt 5.6 makes that 32 px in a field 34 px or taller,
- * 16 px below, so the plain icon was twice as big in the library's field */
-class FieldIconEngine : public QIconEngine
-{
-public:
-    FieldIconEngine( const char *_name, Theme::ColorRole _role ) : name( _name ), role( _role ) {}
-
-    QPixmap pixmap( const QSize &size, QIcon::Mode mode, QIcon::State state ) Q_DECL_OVERRIDE
-    {
-        /* size is in device pixels: QIcon asked for the window's ratio */
-        QPixmap canvas( size );
-        canvas.fill( Qt::transparent );
-        QPainter p( &canvas );
-        const int px = qMin( qRound( Theme::instance()->px( Library::FieldGlyph )
-                                     * qApp->devicePixelRatio() ),
-                             qMin( size.width(), size.height() ) );
-        QRect glyph( 0, 0, px, px );
-        glyph.moveCenter( canvas.rect().center() );
-        Theme::themedIcon( name, role ).paint( &p, glyph, Qt::AlignCenter, mode, state );
-        return canvas;
-    }
-    void paint( QPainter *p, const QRect &rect, QIcon::Mode mode, QIcon::State state ) Q_DECL_OVERRIDE
-    {
-        const int px = qMin( Theme::instance()->px( Library::FieldGlyph ),
-                             qMin( rect.width(), rect.height() ) );
-        QRect glyph( 0, 0, px, px );
-        glyph.moveCenter( rect.center() );
-        Theme::themedIcon( name, role ).paint( p, glyph, Qt::AlignCenter, mode, state );
-    }
-    QIconEngine *clone() const Q_DECL_OVERRIDE { return new FieldIconEngine( *this ); }
-
-private:
-    const char *name;
-    Theme::ColorRole role;
-};
-
-/* Esc empties the field when it has text, else goes on (a page's back,
- * a panel's close) */
-class EscClears : public QObject
-{
-public:
-    explicit EscClears( QLineEdit *edit ) : QObject( edit ) { edit->installEventFilter( this ); }
-
-protected:
-    bool eventFilter( QObject *o, QEvent *e ) Q_DECL_OVERRIDE
-    {
-        QLineEdit *edit = static_cast<QLineEdit *>( o );
-        if( ( e->type() != QEvent::KeyPress && e->type() != QEvent::ShortcutOverride )
-         || static_cast<QKeyEvent *>( e )->key() != Qt::Key_Escape
-         || static_cast<QKeyEvent *>( e )->modifiers() != Qt::NoModifier || edit->text().isEmpty() )
-            return false;
-        /* before an Esc shortcut of the window can take it */
-        if( e->type() == QEvent::KeyPress )
-            edit->clear();
-        e->accept();
-        return true;
-    }
-};
-}
-
-void setupSearchField( QLineEdit *edit, const QString &searchName, const QString &clearName )
-{
-    edit->setClearButtonEnabled( false );   /* Qt's own X is not themed */
-    edit->addAction( QIcon( new FieldIconEngine( RedesignIcons::IconSearch, Theme::Dim ) ),
-                     QLineEdit::LeadingPosition )->setText( searchName );
-    QAction *clear = new QAction( QIcon( new FieldIconEngine( RedesignIcons::IconClose, Theme::Text2 ) ),
-                                  clearName, edit );
-    clear->setToolTip( withHotkey( NULL, clearName, "Esc" ) );
-    QObject::connect( clear, &QAction::triggered, edit, &QLineEdit::clear );
-    /* shown only with text: added and taken away, as Qt 5.6 keeps the
-     * button of a hidden action */
-    QObject::connect( edit, &QLineEdit::textChanged, clear, [edit, clear]( const QString &text ) {
-        if( text.isEmpty() )
-            edit->removeAction( clear );
-        else if( !edit->actions().contains( clear ) )
-            edit->addAction( clear, QLineEdit::TrailingPosition );
-    } );
-    new EscClears( edit );
 }

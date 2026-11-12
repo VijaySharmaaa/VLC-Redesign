@@ -543,7 +543,7 @@ void InfoPanel::update( input_item_t *p_item)
             child_item->setText( 1, value );
             current_item->addChild(child_item);
         }
-        current_item->setText( 0, heading.toUpper() );
+        current_item->setText( 0, heading );
         current_item->setExpanded(true);
     }
 }
