@@ -61,6 +61,7 @@
 #include <QStyleFactory>
 #include <QStyleOptionMenuItem>
 #include <QTextEdit>
+#include <QtMath>
 #include <QVariantAnimation>
 #include <QWidget>
 
@@ -80,17 +81,17 @@ namespace
 {
     /* Same order as Theme::ColorRole */
     QRgb Palette::* const paletteFields[] = {
-        &Palette::page, &Palette::chrome, &Palette::bg, &Palette::panel,
+        &Palette::chrome, &Palette::bg, &Palette::panel,
         &Palette::surface, &Palette::raised, &Palette::hover, &Palette::hover2,
         &Palette::tx, &Palette::tx2, &Palette::mute, &Palette::dim, &Palette::accTx,
-        &Palette::ink, &Palette::glass, &Palette::fxbg, &Palette::stripe1, &Palette::stripe2,
+        &Palette::glass, &Palette::fxbg, &Palette::stripe1, &Palette::stripe2,
         &Palette::fill, &Palette::onFill, &Palette::boost, &Palette::danger, &Palette::line,
     };
     const QRgb fixedColors[] = {
         Accent, AccentHover, OnAccent, AccentTint12, AccentTint14, AccentBorder50,
         AccentFocusRing, AccentKnobHalo, SeekKnobFill,
         Error, ErrorTint, WindowCloseHover, WindowCloseGlyph,
-        VideoSurface, PausedBadgeBg, SubtitleBox, OnVideo,
+        VideoSurface, PausedBadgeBg, OnVideo,
     };
     const int paletteCount = sizeof(paletteFields) / sizeof(paletteFields[0]);
     static_assert(paletteCount + sizeof(fixedColors) / sizeof(fixedColors[0])
@@ -101,10 +102,10 @@ namespace
     const int sizes[] = {
         Size::TitleBar, Size::CaptionButtonW, Size::MenuTitleH, Size::MenuItemH, Size::MenuMinW,
         Size::SidebarItemH, Size::SidebarOpenBtnH, Size::IconButton, Size::IconGlyph,
-        Size::PlayDeck, Size::PlayNowBar, Size::PausedBadge, Size::NowPlayingBarH,
+        Size::PlayDeck, Size::PausedBadge, Size::NowPlayingBarH,
         Size::SeekTrack, Size::SeekTrackHover, Size::SeekKnob, Size::SeekKnobHover, Size::VolumeW,
         Size::PlaylistRowH, Size::PlaylistL, Size::PlaylistM, Size::PlaylistS,
-        Size::ButtonH, Size::InputH, Size::UrlInputH, Size::SelectH,
+        Size::InputH, Size::UrlInputH, Size::SelectH,
         Size::ToggleW, Size::ToggleH, Size::ChipH,
         Size::RadiusXs, Size::RadiusSm, Size::RadiusMd, Size::RadiusLg, Size::RadiusXl, Size::RadiusTile,
     };
@@ -113,11 +114,9 @@ namespace
 
     /* Same order as Theme::MotionRole */
     const int durations[] = {
-        Motion::MenuDrop, Motion::Popover, Motion::ContextMenu, Motion::DialogBackdrop,
-        Motion::Dialog, Motion::PanelSlide, Motion::ViewChange, Motion::Toast, Motion::ToastHold,
-        Motion::PausedBadge, Motion::MiniPlayer, Motion::DropTarget, Motion::SeekTick,
-        Motion::VolumeFill, Motion::EqBand, Motion::Toggle, Motion::PlayPress,
-        Motion::ImmersiveIdle, Motion::ImmersiveFade,
+        Motion::Popover, Motion::PanelSlide, Motion::ViewChange, Motion::Toast,
+        Motion::PausedBadge, Motion::MiniPlayer, Motion::DropTarget,
+        Motion::Toggle, Motion::PlayPress, Motion::ImmersiveFade,
         VideoOverlay::RingTurn, NowPlaying::SpectrumMotion, Motion::SeekLoading,
     };
     static_assert(sizeof(durations) / sizeof(durations[0]) == Theme::MotionRoleCount,
@@ -166,21 +165,24 @@ namespace
         return pixmap;
     }
 
-    /* Stylesheet `image:` needs a file: write the tinted icon, at twice the
-     * glyph size so it stays sharp at 200 %, to the temporary directory. The
-     * colour is in the name, so a theme change gets a new url, not a stale
-     * cached image; the version too, so another version's file is not reused. */
+    /* Stylesheet `image:` needs a file: write the tinted icon, at the glyph's
+     * size in device pixels of the sharpest screen, to the temporary
+     * directory. The colour and size are in the name, so a theme or scale
+     * change gets a new url, not a stale cached image; the version too, so
+     * another version's file is not reused. */
+    const char tintedIconPrefix[] = "vlc-qt-";
     QString tintedIconFile(intf_thread_t *p_intf, const char *name,
-                           const QColor &tint, int rotation)
+                           const QColor &tint, int rotation, int glyphPx)
     {
+        const int px = qCeil(glyphPx * qApp->devicePixelRatio());
         const QString path = QDir::temp().filePath(
-            QString("vlc-qt-%1-%2-%3-%4.png").arg(QLatin1String(PACKAGE_VERSION))
-                .arg(QLatin1String(name))
-                .arg(rotation).arg(tint.rgba(), 8, 16, QLatin1Char('0')));
+            QString("%1%2-%3-%4-%5-%6.png").arg(QLatin1String(tintedIconPrefix))
+                .arg(QLatin1String(PACKAGE_VERSION)).arg(QLatin1String(name))
+                .arg(rotation).arg(tint.rgba(), 8, 16, QLatin1Char('0')).arg(px));
         if (QFile::exists(path))
             return path;
-        const int px = 2 * Size::IconGlyph;
-        QImage image = tintedIcon(QLatin1String(name), tint, QSize(px, px)).toImage();
+        /* logical size: tintedIcon renders it at the same device ratio */
+        QImage image = tintedIcon(QLatin1String(name), tint, QSize(glyphPx, glyphPx)).toImage();
         if (rotation)
             image = image.transformed(QTransform().rotate(rotation));
         QSaveFile file(path);  /* atomic: another VLC may read it meanwhile */
@@ -393,7 +395,7 @@ namespace
             p->save();
             p->setRenderHint(QPainter::Antialiasing);
             if (!(opt->state & State_Enabled))
-                p->setOpacity(0.35);  /* DESIGN_SPEC 3: disabled controls */
+                p->setOpacity(Deck::DisabledOpacityPercent / 100.);  /* DESIGN_SPEC 3: disabled controls */
             /* unchecked: the control outline, at least 3:1 against the window */
             p->setPen(t->color(on ? Theme::AccentFill : Theme::ControlLine));
             p->setBrush(t->color(on ? Theme::AccentFill : Theme::Surface));
@@ -412,7 +414,7 @@ namespace
                 p->drawRoundedRect(r, t->metric(Theme::RadiusXs), t->metric(Theme::RadiusXs));
                 if (opt->state & State_NoChange)
                 {
-                    p->setPen(QPen(t->color(Theme::OnAccentFill), 2));
+                    p->setPen(QPen(t->color(Theme::OnAccentFill), t->px(Size::FocusRing)));  /* scales with the box */
                     p->drawLine(QPointF(r.left() + r.width() / 4, r.center().y()),
                                 QPointF(r.right() - r.width() / 4, r.center().y()));
                 }
@@ -534,7 +536,7 @@ namespace
             if ((opt->state & State_HasFocus) && Theme::showsFocus(w))
                 Theme::paintFocusRing(p, box, (box.height() - Size::FocusRing) / 2);
             if (!(opt->state & State_Enabled))
-                p->setOpacity(0.35);  /* DESIGN_SPEC 3: disabled controls */
+                p->setOpacity(Deck::DisabledOpacityPercent / 100.);  /* DESIGN_SPEC 3: disabled controls */
             p->setPen(t->color(on ? Theme::AccentFill : Theme::ControlLine));
             p->setBrush(on ? t->color(Theme::AccentFill) : QColor(Qt::transparent));
             p->drawRoundedRect(track, track.height() / 2, track.height() / 2);
@@ -601,6 +603,14 @@ void Theme::apply(QApplication &app)
         scale = screen->logicalDotsPerInchY() / 96.;
     msg_Dbg(p_intf, "theme: logical dpi %.0f, device pixel ratio %.2f, scale %.3f",
             screen ? screen->logicalDotsPerInchY() : 0., app.devicePixelRatio(), scale);
+    /* the stylesheet arrows other versions wrote (tintedIconFile); this
+     * version's stay, another instance may be showing them */
+    const QString mine = QLatin1String(tintedIconPrefix) + QLatin1String(PACKAGE_VERSION) + QLatin1Char('-');
+    QDir temp = QDir::temp();
+    foreach (const QString &file, temp.entryList(QStringList(QLatin1String(tintedIconPrefix) + QLatin1String("*.png")),
+                                                 QDir::Files))
+        if (!file.startsWith(mine))
+            temp.remove(file);
     uiFamily = firstInstalled(Type::UiFamilies);
     monoFamily = firstInstalled(Type::MonoFamilies);
 
@@ -619,9 +629,7 @@ void Theme::apply(QApplication &app)
         app.setFont(font(Body));
         msg_Dbg(p_intf, "theme: %s, font %s", dark ? "dark" : "light", qtu(uiFamily));
     }
-#ifdef _WIN32
     app.installEventFilter(this);
-#endif
 }
 
 void Theme::setBaseStyle(const QString &name)
@@ -859,7 +867,7 @@ QColor Theme::color(ColorRole role) const
     QPalette::ColorRole sys;
     switch (role)
     {
-    case Text: case Text2: case Ink:
+    case Text: case Text2:
     /* no system colour means "error": the text and icon carry it */
     case Error: case ErrorTint: case DestructiveText:
         sys = QPalette::WindowText; break;
@@ -876,9 +884,9 @@ QColor Theme::color(ColorRole role) const
     case OnAccent: case OnAccentFill: case SeekKnobFill:  /* they sit on the accent */
         sys = QPalette::HighlightedText; break;
     case WindowCloseHover: case WindowCloseGlyph:
-    case VideoSurface: case PausedBadgeBg: case SubtitleBox: case OnVideo:
+    case VideoSurface: case PausedBadgeBg: case OnVideo:
         return c;  /* the close button and video colours keep their meaning */
-    default:       /* the backgrounds: Page .. Hover2, Glass, FxBg, stripes */
+    default:       /* the backgrounds: Chrome .. Hover2, Glass, FxBg, stripes */
         sys = QPalette::Window; break;
     }
     QColor s = QApplication::palette().color(group, sys);
@@ -951,20 +959,26 @@ namespace
     class ThemedIconEngine : public QIconEngine
     {
     public:
-        ThemedIconEngine(const char *_name, Theme::ColorRole _role)
-            : name(QLatin1String(_name)), role(_role) {}
+        ThemedIconEngine(const char *_name, Theme::ColorRole _role, int _glyph)
+            : name(QLatin1String(_name)), role(_role), glyph(_glyph) {}
 
         QPixmap pixmap(const QSize &size, QIcon::Mode mode, QIcon::State state) Q_DECL_OVERRIDE
         {
             Theme *t = Theme::instance();
-            return t ? t->icon(name, role, size).pixmap(size, mode, state) : QPixmap();
+            if (!t)
+                return QPixmap();
+            if (glyph <= 0)
+                return t->icon(name, role, size).pixmap(size, mode, state);
+            /* size is in device pixels: QIcon asked for the window's ratio */
+            QPixmap canvas(size);
+            canvas.fill(Qt::transparent);
+            QPainter p(&canvas);
+            draw(&p, glyphRect(canvas.rect(), qApp->devicePixelRatio()), mode, state);
+            return canvas;
         }
         void paint(QPainter *p, const QRect &rect, QIcon::Mode mode, QIcon::State state) Q_DECL_OVERRIDE
         {
-            const qreal dpr = p->device()->devicePixelRatioF();
-            QPixmap pix = pixmap(rect.size() * dpr, mode, state);
-            pix.setDevicePixelRatio(dpr);
-            p->drawPixmap(rect, pix);
+            draw(p, glyphRect(rect, 1), mode, state);
         }
         QIconEngine *clone() const Q_DECL_OVERRIDE
         {
@@ -972,14 +986,34 @@ namespace
         }
 
     private:
+        /* the whole box, or the glyph's token size (ratio: px per px) centred in it */
+        QRect glyphRect(const QRect &box, qreal ratio) const
+        {
+            const Theme *t = Theme::instance();
+            if (glyph <= 0 || !t)
+                return box;
+            const int side = qMin(qRound(t->px(glyph) * ratio), qMin(box.width(), box.height()));
+            QRect r(0, 0, side, side);
+            r.moveCenter(box.center());
+            return r;
+        }
+        /* rendered at r's logical size: Theme::icon adds the device ratio */
+        void draw(QPainter *p, const QRect &r, QIcon::Mode mode, QIcon::State state)
+        {
+            Theme *t = Theme::instance();
+            if (t)
+                p->drawPixmap(r, t->icon(name, role, r.size()).pixmap(r.size(), mode, state));
+        }
+
         QString name;
         Theme::ColorRole role;
+        int glyph;
     };
 }
 
-QIcon Theme::themedIcon(const char *name, ColorRole role)
+QIcon Theme::themedIcon(const char *name, ColorRole role, int glyphPx)
 {
-    return QIcon(new ThemedIconEngine(name, role));
+    return QIcon(new ThemedIconEngine(name, role, glyphPx));
 }
 
 bool Theme::showsFocus(const QWidget *w)
@@ -1112,7 +1146,7 @@ QHeaderView::section { background: @panel@; color: @mute@; border: none; border-
 
 QScrollBar:vertical { background: transparent; width: @scrollW@px; margin: 0; }
 QScrollBar:horizontal { background: transparent; height: @scrollW@px; margin: 0; }
-QScrollBar::handle { background: @toggleOff@; border-radius: @radiusXs@px; margin: 2px; }
+QScrollBar::handle { background: @toggleOff@; border-radius: @radiusXs@px; margin: @scrollPad@px; }
 QScrollBar::handle:hover { background: @mute@; }
 QScrollBar::handle:vertical { min-height: @iconGlyph@px; }
 QScrollBar::handle:horizontal { min-width: @iconGlyph@px; }
@@ -1165,14 +1199,14 @@ QListView[np="tracks"], QListView[np="tracks"][keyFocus="true"]:focus { backgrou
 QToolButton[role="deck"], QToolButton[role="speed"] { background: transparent; border: @ring@px solid transparent; border-radius: @radiusMd@px; padding: 0; }
 QToolButton[role="deck"]:hover, QToolButton[role="speed"]:hover { background: @hoverFill@; }
 QToolButton[role="deck"]:pressed, QToolButton[role="speed"]:pressed { background: @openFill@; }
-QToolButton[role="deck"] { color: @tx@; font-weight: 600; }
+QToolButton[role="deck"] { color: @tx@; font-weight: @semibold@; }
 QToolButton[role="deck"]:disabled { color: @dim@; }
 QToolButton[role="deck"]:checked { background: transparent; color: @accTx@; }
 QToolButton[role="deck"][record="true"]:checked { background: @errorTint@; }
 QToolButton[role="deck"]:checked:hover { background: @hoverFill@; }
 QToolButton[role="deck"][open="true"], QToolButton[role="speed"][open="true"] { background: @openFill@; }
 QToolButton[role="deck"][keyFocus="true"]:focus, QToolButton[role="speed"][keyFocus="true"]:focus { border-color: @focusRing@; }
-QToolButton[role="speed"] { color: @tx2@; font-weight: 600; padding: 0 @speedPadX@px; }
+QToolButton[role="speed"] { color: @tx2@; font-weight: @semibold@; padding: 0 @speedPadX@px; }
 QToolButton[role="speed"][on="true"], QToolButton[role="speed"][open="true"] { color: @accTx@; }
 QToolButton[role="speed"]:disabled { color: @dim@; }
 QToolButton[role="speed"]::menu-indicator { image: none; width: 0; }
@@ -1196,7 +1230,7 @@ QTreeView[role="homeRecent"]::item { padding: 0 @homeCellPad@px; border-bottom: 
 QTreeView[role="homeRecent"]::item:first { padding-left: @homeRowPad@px; }
 QTreeView[role="homeRecent"]::item:last { padding-right: @homeRowPad@px; }
 /* not :default, which also names the button "... Enter" to screen readers */
-QPushButton[role="primary"] { background: @accent@; color: @onAccent@; border-color: @accent@; font-weight: 600; }
+QPushButton[role="primary"] { background: @accent@; color: @onAccent@; border-color: @accent@; font-weight: @semibold@; }
 QPushButton[role="primary"]:hover { background: @accentHover@; }
 /* like role="play": @focusRing@ is the accent fill itself in the dark theme */
 QPushButton[role="primary"][keyFocus="true"]:focus { border-color: @tx@; }
@@ -1237,7 +1271,7 @@ QToolButton[role="openTile"][keyFocus="true"]:focus { border: @ring@px solid @fo
 #OpenDisk QRadioButton:hover { background: @hover@; }
 #OpenDisk QRadioButton:checked { background: @accentTint@; color: @accTx@; border-color: @accentBorder@; }
 #OpenDisk QRadioButton[keyFocus="true"]:focus { border-color: @focusRing@; }
-QToolButton[role="split"] { background: @accent@; color: @onAccent@; font-weight: 600; padding: @menuPad@px @buttonPadX@px; }
+QToolButton[role="split"] { background: @accent@; color: @onAccent@; font-weight: @semibold@; padding: @menuPad@px @buttonPadX@px; }
 QToolButton[role="split"][popupMode="1"] { padding-right: @splitPadR@px; }
 QToolButton[role="split"]:hover { background: @accentHover@; }
 QToolButton[role="split"][keyFocus="true"]:focus { border-color: @onAccent@; }
@@ -1279,11 +1313,14 @@ PrefsPage QComboBox { min-height: @prefsSelectInner@px; }
 #ifdef _WIN32
     /* DWM rounds and outlines pop-ups from Windows 11 (applyWindowFrame):
      * a square border would be clipped at the corners there */
-    const bool dwmRounds = WinTheme::build() >= 22000;
+    const bool dwmRounds = WinTheme::isWin11();
 #else
     const bool dwmRounds = false;
 #endif
     const int lineH = QFontMetrics(font(Body)).height();
+    const auto arrow = [this](const QColor &tint, int rotation) {
+        return tintedIconFile(p_intf, RedesignIcons::IconExpandMore, tint, rotation, px(Size::IconGlyph));
+    };
     /* the tab's ring takes 2 px at the top and the bottom: the padding
      * shares the rest evenly, the tab keeps its height */
     const int tabPadY = qMax(0, 2 * qMax(0, (px(Size::MenuItemH) - lineH) / 2) - Size::FocusRing);
@@ -1344,12 +1381,14 @@ PrefsPage QComboBox { min-height: @prefsSelectInner@px; }
         { "groupTitleHalf", QString::number(lineH / 2) },
         { "groupPadTop", QString::number(lineH - lineH / 2 - 1 + px(Size::MenuPanelPadding)) },
         { "scrollW", QString::number(px(Size::ScrollBarW)) },
+        { "scrollPad", QString::number(px(Size::ScrollBarPad)) },
+        { "semibold", QString::number(Type::WeightSemibold) },
         { "iconGlyph", QString::number(px(Size::IconGlyph)) },
         { "halfGlyph", QString::number(px(Size::IconGlyph) / 2) },
-        { "arrowDown", tintedIconFile(p_intf, RedesignIcons::IconExpandMore, QColor::fromRgb(p.tx2), 0) },
-        { "arrowUp", tintedIconFile(p_intf, RedesignIcons::IconExpandMore, QColor::fromRgb(p.tx2), 180) },
-        { "arrowDownDim", tintedIconFile(p_intf, RedesignIcons::IconExpandMore, QColor::fromRgb(p.dim), 0) },
-        { "arrowUpDim", tintedIconFile(p_intf, RedesignIcons::IconExpandMore, QColor::fromRgb(p.dim), 180) },
+        { "arrowDown", arrow(QColor::fromRgb(p.tx2), 0) },
+        { "arrowUp", arrow(QColor::fromRgb(p.tx2), 180) },
+        { "arrowDownDim", arrow(QColor::fromRgb(p.dim), 0) },
+        { "arrowUpDim", arrow(QColor::fromRgb(p.dim), 180) },
         { "track", QString::number(px(Size::SeekTrack)) },
         { "trackRadius", QString::number(px(Size::SeekTrack) / 2) },
         { "knob", QString::number(px(Size::SeekKnob)) },
@@ -1392,7 +1431,7 @@ PrefsPage QComboBox { min-height: @prefsSelectInner@px; }
         { "stepperHover", css(ink(InkAlpha::StepperHover)) },
         /* Phase 5: dialogs */
         { "splitPadR", QString::number(px(Size::IconGlyph) + px(Size::MenuPanelPadding)) },
-        { "arrowDownOnAccent", tintedIconFile(p_intf, RedesignIcons::IconExpandMore, color(OnAccent), 0) },
+        { "arrowDownOnAccent", arrow(color(OnAccent), 0) },
         { "errorIconR", QString::number(px(Dialogs::ErrorIcon) / 2) },
         /* Phase 5: preferences */
         { "prefsCardR", QString::number(px(Prefs::CardRadius)) },

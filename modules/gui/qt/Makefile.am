@@ -501,13 +501,11 @@ libqt_plugin_la_RES = \
 	gui/qt/pixmaps/redesign/call_to_action.svg \
 	gui/qt/pixmaps/redesign/cast.svg \
 	gui/qt/pixmaps/redesign/check.svg \
-	gui/qt/pixmaps/redesign/check_box_outline_blank.svg \
 	gui/qt/pixmaps/redesign/chevron_left.svg \
 	gui/qt/pixmaps/redesign/chevron_right.svg \
 	gui/qt/pixmaps/redesign/close.svg \
 	gui/qt/pixmaps/redesign/code.svg \
 	gui/qt/pixmaps/redesign/compress.svg \
-	gui/qt/pixmaps/redesign/computer.svg \
 	gui/qt/pixmaps/redesign/cone.svg \
 	gui/qt/pixmaps/redesign/construction.svg \
 	gui/qt/pixmaps/redesign/content_copy.svg \
@@ -554,7 +552,6 @@ libqt_plugin_la_RES = \
 	gui/qt/pixmaps/redesign/laps.svg \
 	gui/qt/pixmaps/redesign/last_page.svg \
 	gui/qt/pixmaps/redesign/layers.svg \
-	gui/qt/pixmaps/redesign/library_music.svg \
 	gui/qt/pixmaps/redesign/library_music_fill.svg \
 	gui/qt/pixmaps/redesign/live_tv.svg \
 	gui/qt/pixmaps/redesign/logout.svg \
@@ -582,10 +579,8 @@ libqt_plugin_la_RES = \
 	gui/qt/pixmaps/redesign/remove.svg \
 	gui/qt/pixmaps/redesign/repeat.svg \
 	gui/qt/pixmaps/redesign/repeat_one.svg \
-	gui/qt/pixmaps/redesign/replay.svg \
 	gui/qt/pixmaps/redesign/replay_10.svg \
 	gui/qt/pixmaps/redesign/rss_feed.svg \
-	gui/qt/pixmaps/redesign/save.svg \
 	gui/qt/pixmaps/redesign/schedule.svg \
 	gui/qt/pixmaps/redesign/search.svg \
 	gui/qt/pixmaps/redesign/settings.svg \
@@ -609,8 +604,6 @@ libqt_plugin_la_RES = \
 	gui/qt/pixmaps/redesign/transform.svg \
 	gui/qt/pixmaps/redesign/tune.svg \
 	gui/qt/pixmaps/redesign/update.svg \
-	gui/qt/pixmaps/redesign/upload_file.svg \
-	gui/qt/pixmaps/redesign/video_library.svg \
 	gui/qt/pixmaps/redesign/videocam.svg \
 	gui/qt/pixmaps/redesign/view_list.svg \
 	gui/qt/pixmaps/redesign/visibility.svg \

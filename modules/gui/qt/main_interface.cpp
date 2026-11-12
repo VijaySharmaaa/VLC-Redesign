@@ -805,7 +805,6 @@ void MainInterface::createMainWidget( QSettings *creationSettings )
     stackCentralW->setCurrentWidget( sidebar->page( Sidebar::Home ) );
 
     breakpoints = new BreakpointWatcher( this );
-    breakpoints->addTarget( sidebar );
     sidebar->setBreakpoint( breakpoints->current() );
     connect( breakpoints, &BreakpointWatcher::changed, sidebar, &Sidebar::setBreakpoint );
     audioPage->setBreakpoint( breakpoints->current() );

@@ -33,27 +33,20 @@
 #include "util/timetooltip.hpp"
 #include "adapters/seekpoints.hpp"
 #include "input_manager.hpp"
-#include "imagehelper.hpp"
 #include "customwidgets.hpp"
 #include "util/theme.hpp"
 #include <vlc_actions.h>
 
 #include <QPaintEvent>
 #include <QPainter>
-#include <QBitmap>
 #include <QStyleOptionSlider>
 #include <QLinearGradient>
 #include <QTimer>
-#include <QRadialGradient>
-#include <QLinearGradient>
 #include <QSize>
-#include <QPalette>
 #include <QColor>
 #include <QPoint>
 #include <QPropertyAnimation>
 #include <QApplication>
-#include <QDebug>
-#include <QScreen>
 #include <QSequentialAnimationGroup>
 
 namespace {
@@ -71,7 +64,7 @@ SeekSlider::SeekSlider( intf_thread_t *p_intf, Qt::Orientation q, QWidget *_pare
     f_buffering = 0.0;
     mLoading = 0.0;
     chapters = NULL;
-    mHandleLength = -1;
+    inputLength = 0;
     b_seekable = true;
     alternativeStyle = NULL;
 
@@ -372,7 +365,7 @@ void SeekSlider::mouseMoveEvent( QMouseEvent *event )
 
         QString chapterLabel;
 
-        if ( orientation() == Qt::Horizontal ) /* TODO: vertical */
+        if ( chapters && orientation() == Qt::Horizontal ) /* TODO: vertical */
         {
             QList<SeekPoint> points = chapters->getPoints();
             int i_selected = -1;
@@ -515,14 +508,11 @@ void SeekSlider::setLoading(qreal loading)
 
 inline int SeekSlider::handleLength()
 {
-    if ( mHandleLength > 0 )
-        return mHandleLength;
-
-    /* Ask for the length of the handle to the underlying style */
+    /* Ask for the length of the handle to the underlying style: not
+     * cached, it follows the height, which a screen's scale changes */
     QStyleOptionSlider option;
     initStyleOption( &option );
-    mHandleLength = style()->pixelMetric( QStyle::PM_SliderLength, &option );
-    return mHandleLength;
+    return style()->pixelMetric( QStyle::PM_SliderLength, &option );
 }
 
 inline int SeekSlider::getValueFromXPos( int posX )
@@ -704,7 +694,8 @@ void SoundSlider::mouseMoveEvent( QMouseEvent *event )
     if( isSliding )
     {
         /* dragging far away from the track restores the old level */
-        QRect rect( track.left() - 15, -1, track.width() + 15 * 2, width() + 5 );
+        const int slop = Theme::instance()->px( RedesignTokens::Deck::VolumeDragSlop );
+        QRect rect( track.left() - slop, -slop, track.width() + 2 * slop, height() + 2 * slop );
         if( !rect.contains( event->pos() ) )
         { /* We are outside */
             if ( !b_mouseOutside )
@@ -722,7 +713,7 @@ void SoundSlider::mouseMoveEvent( QMouseEvent *event )
     {
         int i = ( ( event->x() - track.left() ) * maximum() ) / track.width();
         i = __MIN( __MAX( 0, i ), maximum() );
-        setToolTip( QString("%1  %" ).arg( i ) );
+        setToolTip( qtr( "%1%" ).arg( i ) );
     }
 }
 
@@ -784,6 +775,6 @@ void SoundSlider::paintEvent( QPaintEvent *e )
     painter.setFont( theme->font( Theme::Meta ) );
     painter.drawText( QRect( track.right() + 1, -theme->textNudge( painter.font() ),
                              width() - track.right() - 1, height() ),
-                      Qt::AlignRight | Qt::AlignVCenter, QString::number( i_level ) + '%' );
+                      Qt::AlignRight | Qt::AlignVCenter, qtr( "%1%" ).arg( i_level ) );
     e->accept();
 }

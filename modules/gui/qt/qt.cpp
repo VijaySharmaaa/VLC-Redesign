@@ -220,7 +220,7 @@ static const char *const psz_continue_list_text[] =
     { N_("Never"), N_("Ask"), N_("Always") };
 
 static const int i_theme_list[] =
-    { 0, 1, 2 };
+    { Theme::FollowSystem, Theme::Dark, Theme::Light };
 
 static const char *const psz_theme_list_text[] =
     { N_("Follow the system"), N_("Dark"), N_("Light") };
@@ -281,7 +281,7 @@ vlc_module_begin ()
             change_integer_list(i_continue_list, psz_continue_list_text )
     add_bool( "qt-dark-palette", false, QT_DARK_TEXT,
                   QT_DARK_LONGTEXT, false )
-    add_integer( "qt-redesign-theme", 0, QT_THEME_TEXT, QT_THEME_LONGTEXT, false )
+    add_integer( "qt-redesign-theme", Theme::FollowSystem, QT_THEME_TEXT, QT_THEME_LONGTEXT, false )
             change_integer_list( i_theme_list, psz_theme_list_text )
 
 #ifdef UPDATE_CHECK

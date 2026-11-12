@@ -20,22 +20,17 @@
 # include "config.h"
 #endif
 
+
 #include "util/breakpoints.hpp"
 #include "util/theme.hpp"
-#include "util/customwidgets.hpp"   /* setStyleProperty */
 
 #include <QEvent>
-#include <QStyle>
-#include <QVariant>
-
-static const char * const names[] = { "XS", "S", "M", "L" };
 
 BreakpointWatcher::BreakpointWatcher( QWidget *_window )
     : QObject( _window ), window( _window ), size( fromWidth( _window->width() ) )
 {
-    apply( window );
     window->installEventFilter( this );
-    /* another screen's scale moves the breakpoints */
+    /* another screen's scale moves the breakpoints and the listeners' sizes */
     connect( Theme::instance(), &Theme::changed, this, [this]() { update( true ); } );
 }
 
@@ -46,17 +41,6 @@ BreakpointWatcher::Size BreakpointWatcher::fromWidth( int width )
     if( width >= t->px( RedesignTokens::Breakpoint::M ) ) return M;
     if( width >= t->px( RedesignTokens::Breakpoint::S ) ) return S;
     return XS;
-}
-
-void BreakpointWatcher::addTarget( QWidget *w )
-{
-    targets.append( w );
-    apply( w );
-}
-
-void BreakpointWatcher::apply( QWidget *w ) const
-{
-    setStyleProperty( w, "breakpoint", QString::fromLatin1( names[size] ) );
 }
 
 bool BreakpointWatcher::eventFilter( QObject *obj, QEvent *event )
@@ -72,9 +56,5 @@ void BreakpointWatcher::update( bool always )
     if( now == size && !always )
         return;
     size = now;
-    apply( window );
-    for( const QPointer<QWidget> &w : targets )
-        if( w )
-            apply( w );
     emit changed( size );
 }

@@ -20,15 +20,13 @@
 #define VLC_QT_BREAKPOINTS_HPP_
 
 #include <QObject>
-#include <QList>
-#include <QPointer>
 #include <QWidget>
 
 /* Watches the width of a window and sorts it into the design's breakpoints
- * (RedesignTokens::Breakpoint). On a change it sets the dynamic property
- * `breakpoint` ("XS", "S", "M" or "L") on the window and on every target,
- * re-polishes them so stylesheet selectors like [breakpoint="S"] apply,
- * then emits changed(); after a theme change always, the sizes may differ. */
+ * (RedesignTokens::Breakpoint). Emits changed() when the breakpoint changes,
+ * and after every theme change (another scale moves the breakpoints and the
+ * sizes the listeners take with Theme::px). Widgets connect to changed() and
+ * read current() once. */
 class BreakpointWatcher : public QObject
 {
     Q_OBJECT
@@ -36,9 +34,6 @@ public:
     enum Size { XS, S, M, L };
 
     explicit BreakpointWatcher( QWidget *window );
-    /* Also gets the property; widgets that only need the value connect to
-     * changed() and read current() once. */
-    void addTarget( QWidget * );
     Size current() const { return size; }
     /* width in device-independent px; the breakpoints scale like Theme::px */
     static Size fromWidth( int );
@@ -50,11 +45,9 @@ protected:
     bool eventFilter( QObject *, QEvent * ) Q_DECL_OVERRIDE;
 
 private:
-    void apply( QWidget * ) const;
     void update( bool always );
 
     QWidget *window;
-    QList< QPointer<QWidget> > targets;
     Size size;
 };
 

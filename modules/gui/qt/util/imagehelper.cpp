@@ -28,7 +28,6 @@
 #include "qt.hpp"
 #include <QApplication>
 #include <QPainter>
-#include <QScreen>
 #include <QSvgRenderer>
 #include "imagehelper.hpp"
 
@@ -36,7 +35,8 @@
 QPixmap ImageHelper::loadSvgToPixmap( const QString &path, qint32 i_width, qint32 i_height )
 {
 #if HAS_QT56
-    qreal ratio = QApplication::primaryScreen()->devicePixelRatio();
+    /* the highest ratio of all screens: sharp on the sharpest one */
+    qreal ratio = qApp->devicePixelRatio();
 
     QPixmap pixmap( QSize( i_width, i_height ) * ratio );
 #else
