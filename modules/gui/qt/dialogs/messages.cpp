@@ -42,6 +42,7 @@
 #include <vlc_input_item.h>
 
 #include "dialogs/messages.hpp"
+#include "util/theme.hpp"
 
 enum {
     MsgEvent_Type = QEvent::User + MsgEventTypeOffset + 1,
@@ -83,6 +84,9 @@ MessagesDialog::MessagesDialog( intf_thread_t *_p_intf)
 
     /* Modules tree */
     ui.modulesTree->setHeaderHidden( true );
+    ui.messages->setAccessibleName( qtr( "Messages" ) );
+    /* the log takes the keys: the tab bar's focus ring boxed its tab */
+    ui.messages->setFocus();
 
     /* Buttons and general layout */
     ui.saveLogButton->setToolTip( qtr( "Saves all the displayed logs to a file" ) );
@@ -207,22 +211,30 @@ void MessagesDialog::sinkMessage( const MsgEvent *msg )
     /* Start a new logic block so we can hide it on-demand */
     messages->textCursor().insertBlock();
 
-    QString buf = QString( "<i><font color='darkblue'>%1</font>" ).arg( msg->module );
+    /* shortcut: the colours are the theme's when the line arrives; a theme
+     * switch leaves earlier lines as they were, rebuild them if it shows */
+    const Theme *t = Theme::instance();
+    QString buf = QString( "<i><font color='%1'>%2</font>" )
+                      .arg( t->color( Theme::Text2 ).name(), msg->module );
 
     switch ( msg->priority )
     {
         case VLC_MSG_INFO:
-            buf += "<font color='blue'> info: </font>";
+            buf += QString( "<font color='%1'> info: </font>" )
+                       .arg( t->color( Theme::AccentText ).name() );
             break;
         case VLC_MSG_ERR:
-            buf += "<font color='red'> error: </font>";
+            buf += QString( "<font color='%1'><b> error: </b></font>" )
+                       .arg( t->color( Theme::DestructiveText ).name() );
             break;
         case VLC_MSG_WARN:
-            buf += "<font color='green'> warning: </font>";
+            buf += QString( "<font color='%1'> warning: </font>" )
+                       .arg( t->color( Theme::DestructiveText ).name() );
             break;
         case VLC_MSG_DBG:
         default:
-            buf += "<font color='grey'> debug: </font>";
+            buf += QString( "<font color='%1'> debug: </font>" )
+                       .arg( t->color( Theme::Mute ).name() );
             break;
     }
 
@@ -330,6 +342,7 @@ void MessagesDialog::tabChanged( int i )
     updateButton->setIcon( i != 0 ? QIcon(":/update.svg") : QIcon(":/toolbar/clear.svg") );
     updateButton->setToolTip( i != 0 ? qtr("Update the tree")
                                      : qtr("Clear the messages") );
+    updateButton->setAccessibleName( updateButton->toolTip() );
 }
 
 void MessagesDialog::MsgCallback( void *self, int type, const vlc_log_t *item,
