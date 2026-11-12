@@ -833,7 +833,8 @@ void LibraryBrowser::cancelExpand()
 void LibraryBrowser::goBack()
 {
     emit aboutToBrowse();
-    if( ( expandTimer->isActive() || expandFailed ) && expandingIndex != top )
+    if( ( expandTimer->isActive() || expandFailed )
+        && ( !expandingIndex.isValid() || expandingIndex != top ) )
     {
         /* gives up on the folder being opened: back to its parent's cards */
         cancelExpand();
