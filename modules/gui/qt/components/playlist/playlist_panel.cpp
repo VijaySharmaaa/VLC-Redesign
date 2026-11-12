@@ -97,15 +97,7 @@ void RowDelegate::paint( QPainter *p, const QStyleOptionViewItem &option,
         p->drawRoundedRect( r, radius, radius );
     }
     if( ( option.state & QStyle::State_HasFocus ) && Theme::showsFocus( option.widget ) )
-    {
-        /* the accent is 2.4:1 on light surfaces */
-        const qreal inset = Size::FocusRing / 2.;
-        p->setPen( QPen( t->color( t->isDark() ? Theme::Accent : Theme::AccentText ),
-                         Size::FocusRing ) );
-        p->setBrush( Qt::NoBrush );
-        p->drawRoundedRect( QRectF( r ).adjusted( inset, inset, -inset, -inset ),
-                            radius - inset, radius - inset );
-    }
+        Theme::paintFocusRing( p, r, radius - Size::FocusRing / 2. );
 
     const Qt::LayoutDirection dir = option.direction;
     const int padX = t->px( Playlist::RowPadX );

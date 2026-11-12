@@ -780,15 +780,7 @@ void SoundSlider::paintEvent( QPaintEvent *e )
                           theme->ink( RedesignTokens::InkAlpha::VolumeTick ) );
     }
     if( Theme::showsFocus( this ) )
-    {
-        /* the accent is 2.4:1 on light surfaces: rings take the accent text there */
-        const qreal inset = RedesignTokens::Size::FocusRing / 2.;
-        painter.setPen( QPen( theme->color( theme->isDark() ? Theme::Accent : Theme::AccentText ),
-                              RedesignTokens::Size::FocusRing ) );
-        painter.setBrush( Qt::NoBrush );
-        painter.drawRoundedRect( QRectF( rect() ).adjusted( inset, inset, -inset, -inset ),
-                                 theme->metric( Theme::RadiusSm ), theme->metric( Theme::RadiusSm ) );
-    }
+        Theme::paintFocusRing( &painter, rect(), theme->metric( Theme::RadiusSm ) );
 
     painter.setPen( theme->color( Theme::Text2 ) );
     painter.setFont( theme->font( Theme::Meta ) );

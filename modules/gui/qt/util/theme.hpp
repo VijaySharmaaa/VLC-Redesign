@@ -30,6 +30,8 @@
 
 class QAction;
 class QApplication;
+class QPainter;
+class QRectF;
 class QScreen;
 class QWidget;
 
@@ -51,7 +53,9 @@ public:
         /* AccentFill: progress and "on" fills, the accent in both themes
          * (I1-1); ControlLine: a field's only boundary */
         AccentFill, OnAccentFill, VolumeBoost, DestructiveText, ControlLine,
-        /* same in both themes */
+        /* same in both themes, except AccentFocusRing: focus rings and
+         * accent marks, Accent in dark and AccentText in light (the accent
+         * is 2.4:1 on light surfaces, AccentText >= 3:1) */
         Accent, AccentHover, OnAccent, AccentTint12, AccentTint14, AccentBorder50,
         AccentFocusRing, AccentKnobHalo, SeekKnobFill,
         Error, ErrorTint, WindowCloseHover, WindowCloseGlyph,
@@ -135,6 +139,10 @@ public:
      * in a text field, as CSS :focus-visible. In place of hasFocus() where
      * a widget or delegate paints its own ring. */
     static bool showsFocus(const QWidget *);
+    /* The keyboard focus ring: an AccentFocusRing line FocusRing px wide,
+     * inside r, its centre line rounded by radius. Leaves that pen and no
+     * brush set. */
+    static void paintFocusRing(QPainter *, const QRectF &r, qreal radius);
 
 signals:
     void changed();

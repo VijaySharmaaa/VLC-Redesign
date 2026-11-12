@@ -149,13 +149,6 @@ QString whenText( const QDateTime &utc )
     return locale.toString( local.date(), QLocale::ShortFormat );
 }
 
-QColor focusRingColor()
-{
-    /* the accent is 2.4:1 on light surfaces */
-    const Theme *t = Theme::instance();
-    return t->color( t->isDark() ? Theme::Accent : Theme::AccentText );
-}
-
 /* Rows of DESIGN_SPEC 4 "Recent media": 44 px, the path elided in the
  * middle, and one focus ring around the current row */
 class RecentDelegate : public QStyledItemDelegate
@@ -183,7 +176,7 @@ public:
             return;
         const int w = Size::FocusRing;
         const QRect r = option.rect;
-        const QColor c = focusRingColor();
+        const QColor c = Theme::instance()->color( Theme::AccentFocusRing );
         p->fillRect( r.left(), r.top(), r.width(), w, c );
         p->fillRect( r.left(), r.bottom() - w + 1, r.width(), w, c );
         const bool first = option.viewItemPosition == QStyleOptionViewItem::Beginning
@@ -362,7 +355,8 @@ void ResumeCard::paintEvent( QPaintEvent * )
      * ring stays at full strength on a missing file */
     if( Theme::showsFocus( this ) )
         p.setOpacity( 1 );
-    const QPen pen = Theme::showsFocus( this ) ? QPen( focusRingColor(), Size::FocusRing )
+    const QPen pen = Theme::showsFocus( this )
+                   ? QPen( t->color( Theme::AccentFocusRing ), Size::FocusRing )
                    : QPen( underMouse() ? t->color( Theme::Accent ) : t->ink( InkAlpha::Divider ),
                            Size::Hairline );
     const qreal inset = pen.widthF() / 2;

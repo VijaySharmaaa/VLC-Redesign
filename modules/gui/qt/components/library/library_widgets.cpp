@@ -363,15 +363,6 @@ void CardDelegate::paint( QPainter *p, const QStyleOptionViewItem &option,
     p->restore();
 }
 
-static void paintFocusRing( QPainter *p, const QRectF &r, qreal radius )
-{
-    const Theme *t = Theme::instance();
-    const qreal inset = Size::FocusRing / 2.;
-    p->setPen( QPen( t->color( t->isDark() ? Theme::Accent : Theme::AccentText ), Size::FocusRing ) );
-    p->setBrush( Qt::NoBrush );
-    p->drawRoundedRect( r.adjusted( inset, inset, -inset, -inset ), radius - inset, radius - inset );
-}
-
 /* An icon at a device-independent size, tinted, centred in r */
 static void paintGlyph( QPainter *p, const char *name, Theme::ColorRole role,
                         int sizePx, const QRectF &r )
@@ -433,7 +424,7 @@ void CardDelegate::paintCard( QPainter *p, const QStyleOptionViewItem &option,
     p->setBrush( Qt::NoBrush );
     p->drawRoundedRect( thumb, radius, radius );
     if( ( option.state & QStyle::State_HasFocus ) && Theme::showsFocus( option.widget ) )
-        paintFocusRing( p, thumb, radius );
+        Theme::paintFocusRing( p, thumb, radius - Size::FocusRing / 2. );
 
     /* duration badge */
     const int64_t duration = folder ? -1 : input_item_GetDuration( input );
@@ -492,7 +483,7 @@ void CardDelegate::paintRow( QPainter *p, const QStyleOptionViewItem &option,
         p->drawRoundedRect( r, radius, radius );
     }
     if( ( option.state & QStyle::State_HasFocus ) && Theme::showsFocus( option.widget ) )
-        paintFocusRing( p, r, radius );
+        Theme::paintFocusRing( p, r, radius - Size::FocusRing / 2. );
 
     const int padX = t->px( Playlist::RowPadX ), gap = t->px( Playlist::RowGap );
     const int iconPx = t->px( Playlist::RowIcon );

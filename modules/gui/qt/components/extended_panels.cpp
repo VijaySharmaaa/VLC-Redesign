@@ -1311,9 +1311,7 @@ void EqBandSlider::paintEvent( QPaintEvent * )
                        track / 2, track / 2 );
     if( Theme::showsFocus( this ) )
     {
-        /* the accent is 2.4:1 on light surfaces */
-        p.setPen( QPen( t->color( t->isDark() ? Theme::Accent : Theme::AccentText ),
-                        Size::FocusRing ) );
+        p.setPen( QPen( t->color( Theme::AccentFocusRing ), Size::FocusRing ) );
         p.setBrush( Qt::NoBrush );
         p.drawEllipse( QPointF( cx, y ), radius + Size::FocusRing, radius + Size::FocusRing );
     }

@@ -91,9 +91,7 @@ namespace
                 /* the check column is on the leading side (right in RTL) */
                 const QRect box = QStyle::visualRect( opt.direction, opt.rect,
                     QRect( r.left() + ( col - check ) / 2, r.center().y() - check / 2 + 1, check, check ) );
-                /* the accent is 2.4:1 on light surfaces: marks take the accent text there */
-                p->drawPixmap( box, t->icon( RedesignIcons::IconCheck,
-                                             t->isDark() ? Theme::Accent : Theme::AccentText,
+                p->drawPixmap( box, t->icon( RedesignIcons::IconCheck, Theme::AccentFocusRing,
                                              box.size() ).pixmap( box.size() ) );
             }
             const QRect text = QStyle::visualRect( opt.direction, opt.rect,

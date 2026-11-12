@@ -140,15 +140,7 @@ void SidebarButton::paintEvent( QPaintEvent * )
                        radius - ringOut, radius - ringOut );
 
     if( Theme::showsFocus( this ) )
-    {
-        /* the accent is 2.4:1 on light surfaces */
-        const Theme::ColorRole ring = t->isDark() ? Theme::Accent : Theme::AccentText;
-        const qreal inset = Size::FocusRing / 2.;
-        p.setPen( QPen( t->color( ring ), Size::FocusRing ) );
-        p.setBrush( Qt::NoBrush );
-        p.drawRoundedRect( QRectF( rect() ).adjusted( inset, inset, -inset, -inset ),
-                           radius - inset, radius - inset );
-    }
+        Theme::paintFocusRing( &p, rect(), radius - Size::FocusRing / 2. );
 
     const Theme::ColorRole ink = primary ? Theme::OnAccent
                                : isChecked() ? Theme::AccentText

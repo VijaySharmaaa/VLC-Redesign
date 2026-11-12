@@ -327,14 +327,7 @@ void ThinSeekBar::paintEvent( QPaintEvent * )
         p.drawRoundedRect( done, h / 2, h / 2 );
     }
     if( Theme::showsFocus( this ) )
-    {
-        const qreal inset = Size::FocusRing / 2.;
-        p.setPen( QPen( t->color( t->isDark() ? Theme::Accent : Theme::AccentText ),
-                        Size::FocusRing ) );
-        p.setBrush( Qt::NoBrush );
-        p.drawRoundedRect( QRectF( rect() ).adjusted( inset, inset, -inset, -inset ),
-                           t->metric( Theme::RadiusXs ), t->metric( Theme::RadiusXs ) );
-    }
+        Theme::paintFocusRing( &p, rect(), t->metric( Theme::RadiusXs ) );
 }
 
 /**********************************************************************
@@ -625,14 +618,7 @@ public:
             p->setBrush( Qt::NoBrush );
         p->drawRoundedRect( r, radius, radius );
         if( ( opt.state & QStyle::State_HasFocus ) && Theme::showsFocus( opt.widget ) )
-        {
-            const qreal inset = Size::FocusRing / 2.;
-            p->setPen( QPen( t->color( t->isDark() ? Theme::Accent : Theme::AccentText ),
-                             Size::FocusRing ) );
-            p->setBrush( Qt::NoBrush );
-            p->drawRoundedRect( QRectF( r ).adjusted( inset, inset, -inset, -inset ),
-                                radius, radius );
-        }
+            Theme::paintFocusRing( p, r, radius );
 
         const int padX = t->px( NowPlaying::TrackPadX ), gap = t->px( NowPlaying::TrackGap );
         const QRect num = QStyle::visualRect( opt.direction, r,

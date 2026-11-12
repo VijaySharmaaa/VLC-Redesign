@@ -80,12 +80,7 @@ void NetworkTile::paintEvent( QPaintEvent * )
     p.setBrush( t->color( underMouse() ? Theme::Raised : Theme::Surface ) );
     p.drawRoundedRect( r, radius, radius );
     if( Theme::showsFocus( this ) )
-    {
-        const qreal inset = Size::FocusRing / 2.;
-        p.setPen( QPen( t->color( t->isDark() ? Theme::Accent : Theme::AccentText ), Size::FocusRing ) );
-        p.setBrush( Qt::NoBrush );
-        p.drawRoundedRect( r.adjusted( inset, inset, -inset, -inset ), radius - inset, radius - inset );
-    }
+        Theme::paintFocusRing( &p, r, radius - Size::FocusRing / 2. );
 
     const int pad = t->px( Library::TilePad ), iconPx = t->px( Library::TileIcon );
     const QRect iconBox( pad, ( height() - iconPx ) / 2, iconPx, iconPx );
@@ -94,8 +89,7 @@ void NetworkTile::paintEvent( QPaintEvent * )
     p.drawRoundedRect( iconBox, radius, radius );
     const int glyph = t->px( Library::TileGlyph );
     const int devicePx = qRound( glyph * devicePixelRatioF() );
-    t->icon( QLatin1String( icon ), t->isDark() ? Theme::Accent : Theme::AccentText,
-             QSize( devicePx, devicePx ) )
+    t->icon( QLatin1String( icon ), Theme::AccentFocusRing, QSize( devicePx, devicePx ) )
         .paint( &p, QRect( iconBox.x() + ( iconPx - glyph ) / 2, iconBox.y() + ( iconPx - glyph ) / 2,
                            glyph, glyph ) );
 

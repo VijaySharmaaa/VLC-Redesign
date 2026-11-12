@@ -86,11 +86,10 @@ namespace
             Theme *t = Theme::instance();
             if( !t )
                 return QPixmap();
-            /* on = accent glyph; the accent is 2.4:1 on light surfaces, so
-             * the light theme takes the accent text colour (>= 3:1) */
+            /* on = accent glyph */
             const Theme::ColorRole role = fixedRole >= 0 ? static_cast<Theme::ColorRole>( fixedRole )
                 : onAccent ? Theme::OnAccent
-                : state == QIcon::On ? ( t->isDark() ? Theme::Accent : Theme::AccentText )
+                : state == QIcon::On ? Theme::AccentFocusRing
                 : Theme::Text2;
             /* square glyphs, centred in a wider box (the toolbar editor's list) */
             const int side = qMin( size.width(), size.height() );

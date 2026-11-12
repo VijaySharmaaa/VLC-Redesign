@@ -280,7 +280,7 @@ namespace
             const QSize iconSize(iconPx, iconPx);
             QPixmap pix;
             if (mi->checkType != QStyleOptionMenuItem::NotCheckable && mi->checked)
-                pix = t->icon(RedesignIcons::IconCheck, enabled ? strongAccent(t) : Theme::Dim,
+                pix = t->icon(RedesignIcons::IconCheck, enabled ? Theme::AccentFocusRing : Theme::Dim,
                               iconSize).pixmap(iconSize);
             else if (!mi->icon.isNull())
                 pix = mi->icon.pixmap(iconSize, !enabled ? QIcon::Disabled
@@ -378,11 +378,7 @@ namespace
                 /* a 2 px accent ring like the other controls, not Fusion's faint box */
                 p->save();
                 p->setRenderHint(QPainter::Antialiasing);
-                const qreal inset = Size::FocusRing / 2.;
-                p->setPen(QPen(t->color(strongAccent(t)), Size::FocusRing));
-                p->setBrush(Qt::NoBrush);
-                p->drawRoundedRect(QRectF(opt->rect).adjusted(inset, inset, -inset, -inset),
-                                   t->metric(Theme::RadiusXs), t->metric(Theme::RadiusXs));
+                Theme::paintFocusRing(p, opt->rect, t->metric(Theme::RadiusXs));
                 p->restore();
                 return;
             }
@@ -530,18 +526,12 @@ namespace
             QRectF box(opt->rect);
             if (w && w->rect().contains(opt->rect))
                 box.moveCenter(QPointF(box.center().x(), w->height() / 2.));
-            const QRectF ring = box.adjusted(Size::FocusRing / 2., Size::FocusRing / 2.,
-                                             -Size::FocusRing / 2., -Size::FocusRing / 2.);
             const QRectF track = box.adjusted(2 * Size::FocusRing + .5, 2 * Size::FocusRing + .5,
                                               -2 * Size::FocusRing - .5, -2 * Size::FocusRing - .5);
             p->save();
             p->setRenderHint(QPainter::Antialiasing);
             if ((opt->state & State_HasFocus) && Theme::showsFocus(w))
-            {
-                p->setPen(QPen(t->color(strongAccent(t)), Size::FocusRing));
-                p->setBrush(Qt::NoBrush);
-                p->drawRoundedRect(ring, ring.height() / 2, ring.height() / 2);
-            }
+                Theme::paintFocusRing(p, box, (box.height() - Size::FocusRing) / 2);
             if (!(opt->state & State_Enabled))
                 p->setOpacity(0.35);  /* DESIGN_SPEC 3: disabled controls */
             p->setPen(t->color(on ? Theme::AccentFill : Theme::ControlLine));
@@ -556,12 +546,6 @@ namespace
             p->restore();
         }
 
-        /* The accent is 2.4:1 on the light theme's white: marks and focus
-         * rings take the darker accent text colour there (>= 3:1). */
-        static Theme::ColorRole strongAccent(const Theme *t)
-        {
-            return t->isDark() ? Theme::Accent : Theme::AccentText;
-        }
         /* the label starts after the 22 px icon column */
         static int labelX(const Theme *t)
         {
@@ -859,6 +843,8 @@ const Palette &Theme::palette() const
 
 QColor Theme::color(ColorRole role) const
 {
+    if (role == AccentFocusRing)
+        return color(dark ? Accent : AccentText);
     QColor c;
     if (role < paletteCount)
         c = QColor::fromRgba(palette().*paletteFields[role]);
@@ -883,7 +869,7 @@ QColor Theme::color(ColorRole role) const
     case Surface:
         sys = QPalette::Base; break;
     case AccentText: case Accent: case AccentHover: case AccentTint12: case AccentTint14:
-    case AccentBorder50: case AccentFocusRing: case AccentKnobHalo:
+    case AccentBorder50: case AccentKnobHalo:
     case AccentFill: case VolumeBoost:
         sys = QPalette::Highlight; break;
     case OnAccent: case OnAccentFill: case SeekKnobFill:  /* they sit on the accent */
@@ -999,6 +985,16 @@ bool Theme::showsFocus(const QWidget *w)
 {
     const QWidget *focus = QApplication::focusWidget();  /* a focus proxy's target */
     return w && focus && w->hasFocus() && focus->property(keyFocusProperty).toBool();
+}
+
+void Theme::paintFocusRing(QPainter *p, const QRectF &r, qreal radius)
+{
+    if (!s_instance)
+        return;
+    const qreal inset = Size::FocusRing / 2.;
+    p->setPen(QPen(s_instance->color(AccentFocusRing), Size::FocusRing));
+    p->setBrush(Qt::NoBrush);
+    p->drawRoundedRect(r.adjusted(inset, inset, -inset, -inset), radius, radius);
 }
 
 void Theme::setDestructive(QAction *action)
@@ -1309,8 +1305,7 @@ PrefsPage QComboBox { min-height: @prefsSelectInner@px; }
            the corners look beaded. Border colours are opaque, flattened on
            the background they sit on. */
         { "controlLine", css(over(color(ControlLine), p.surface)) },
-        /* the accent is 2.4:1 on light surfaces: focus rings need >= 3:1 */
-        { "focusRing", css(color(dark ? Accent : AccentText)) },
+        { "focusRing", css(color(AccentFocusRing)) },
         { "onAccent", css(color(OnAccent)) },
         { "closeHover", css(color(WindowCloseHover)) },
         { "accentTint", css(color(AccentTint14)) },
