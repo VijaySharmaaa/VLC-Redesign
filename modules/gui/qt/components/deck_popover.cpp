@@ -50,6 +50,18 @@
 
 using namespace RedesignTokens;
 
+QPoint popupPos( QWidget *anchor, const QSize &size )
+{
+    const QRect a( anchor->mapToGlobal( QPoint( 0, 0 ) ), anchor->size() );
+    const QRect screen = QApplication::desktop()->availableGeometry( anchor );
+    const int gap = Theme::instance()->px( Deck::PopoverGap );
+    QPoint pos( a.center().x() - size.width() / 2, a.top() - gap - size.height() );
+    if( pos.y() < screen.top() )
+        pos.setY( a.bottom() + 1 + gap );
+    pos.setX( qBound( screen.left(), pos.x(), screen.right() + 1 - size.width() ) );
+    return pos;
+}
+
 namespace
 {
     enum { DetailRole = Qt::UserRole + 1, CheckedRole };
@@ -143,17 +155,10 @@ namespace
         {
             const Theme *t = Theme::instance();
             adjustSize();
-            const QRect a( anchor->mapToGlobal( QPoint( 0, 0 ) ), anchor->size() );
-            const QRect screen = QApplication::desktop()->availableGeometry( anchor );
-            const int gap = t->px( Deck::PopoverGap );
-            QPoint pos( a.center().x() - width() / 2, a.top() - gap - height() );
+            const QPoint pos = popupPos( anchor, size() );
             int rise = t->px( Motion::RiseOffset );
-            if( pos.y() < screen.top() )
-            {
-                pos.setY( a.bottom() + 1 + gap );
-                rise = -rise;
-            }
-            pos.setX( qBound( screen.left(), pos.x(), screen.right() + 1 - width() ) );
+            if( pos.y() > anchor->mapToGlobal( QPoint( 0, 0 ) ).y() )
+                rise = -rise;   /* below the button: it drops into place */
             const int ms = t->duration( Theme::Popover );
             move( ms ? pos + QPoint( 0, rise ) : pos );
             show();

@@ -938,9 +938,7 @@ void AbstractController::addMoreButton( QBoxLayout *row )
     QMenu *menu = new QMenu( moreButton );
     connect( moreButton, &QToolButton::clicked, this, [this, menu]() {
         buildMoreMenu( menu );
-        const QSize size = menu->sizeHint();
-        menu->exec( moreButton->mapToGlobal( QPoint( moreButton->width() - size.width(),
-                                                     -size.height() ) ) );
+        menu->exec( popupPos( moreButton, menu->sizeHint() ) );
     } );
     moreButton->hide();
     row->addWidget( moreButton );

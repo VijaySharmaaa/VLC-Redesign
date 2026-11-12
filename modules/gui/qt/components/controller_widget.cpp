@@ -33,6 +33,7 @@
 #include "components/overlay_host.hpp"   /* enterCurve */
 #include "util/theme.hpp"
 #include "util/customwidgets.hpp"   /* setStyleProperty */
+#include "components/deck_popover.hpp"   /* popupPos */
 
 #include <vlc_input_item.h>
 
@@ -40,6 +41,7 @@
 
 #include <QHBoxLayout>
 #include <QMenu>
+#include <QPointer>
 #include <QStyle>
 #include <QStyleOptionToolButton>
 #include <QStylePainter>
@@ -193,8 +195,7 @@ void SoundWidget::muteClicked()
         return;
     }
     volumeMenu->setFixedHeight( volumeMenu->sizeHint().height() );
-    volumeMenu->exec( mapToGlobal( QPoint( width(), height() / 2 ) )
-                      - QPoint( 0, volumeMenu->height() / 2 ) );
+    volumeMenu->exec( popupPos( this, volumeMenu->sizeHint() ) );
 }
 
 void SoundWidget::setMuted( bool mute )
@@ -313,9 +314,12 @@ AspectRatioBadge::AspectRatioBadge( intf_thread_t *_p_intf )
     connect( this, &QToolButton::clicked, this, [this]() {
         setChecked( property( "on" ).toBool() );
         setStyleProperty( this, "open", true );
-        const QSize size = menu->sizeHint();
-        menu->exec( mapToGlobal( QPoint( 0, -size.height() ) ) );
-        setStyleProperty( this, "open", false );
+        /* a toolbar rebuild (a posted event, run inside exec) can delete
+         * the badge while its menu is open */
+        QPointer<AspectRatioBadge> self( this );
+        menu->exec( popupPos( this, menu->sizeHint() ) );
+        if( self )
+            setStyleProperty( this, "open", false );
     } );
     connect( THEMIM->getIM(), &InputManager::voutChanged, this, &AspectRatioBadge::setVout );
     setVout();

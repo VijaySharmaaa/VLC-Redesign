@@ -25,8 +25,15 @@
 
 #include "qt.hpp"
 
+#include <QPoint>
+#include <QSize>
+
 class QAbstractButton;
 class QWidget;
+
+/* Where a pop-up of this size opens: centred above the anchor, below it
+ * when there is no room, kept on the anchor's screen */
+QPoint popupPos( QWidget *anchor, const QSize & );
 
 /* DESIGN_SPEC 7: pop-up windows built afresh on every opening, rising above
  * their button, which shows as open ([open="true"]) meanwhile. Esc, a click
