@@ -355,8 +355,9 @@ bool PrefsDialog::resetConfig( QWidget *parent, intf_thread_t *p_intf )
         return false;
 
     config_ResetAll( p_intf );
-    config_SaveConfigFile( p_intf );
     getSettings()->clear();
+    /* saves, then applies the defaults to the window and the theme */
+    saveConfig( p_intf );
 
 #ifdef _WIN32
     /* static: the Interface panel may never have been built */
