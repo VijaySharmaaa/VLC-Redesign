@@ -24,6 +24,7 @@
 #include "components/spectrum.hpp"
 #include "components/overlay_host.hpp"         /* enterCurve */
 #include "components/controller_widget.hpp"      /* SoundWidget */
+#include "components/library/library_widgets.hpp" /* metaSeparator */
 #include "components/playlist/playlist_model.hpp"
 #include "components/playlist/sorting.h"
 #include "input_manager.hpp"
@@ -57,9 +58,6 @@
 using namespace RedesignTokens;
 
 namespace {
-/* Name-separating dot of the meta lines: not a translatable string */
-QString dot() { return QString::fromUtf8( " · " ); }
-
 /* Draws an icon flipped left to right */
 class MirroredIconEngine : public QIconEngine
 {
@@ -391,9 +389,9 @@ void NowPlayingInfo::readItem( input_item_t *p_item )
         const double khz = rate.toDouble() / 1000.;
         const QString k = QString::number( khz, 'g', 3 );
         if( khz > 0 && bits.toInt() > 0 )
-            format += dot() + QString( "%1/%2" ).arg( bits, k );
+            format += metaSeparator() + QString( "%1/%2" ).arg( bits, k );
         else if( khz > 0 )
-            format += dot() + qtr( "%1 kHz" ).arg( k );
+            format += metaSeparator() + qtr( "%1 kHz" ).arg( k );
     }
     emit changed();
 }
@@ -405,7 +403,7 @@ QString NowPlayingInfo::metaLine() const
         parts << artist;
     if( !album.isEmpty() )
         parts << album;
-    return parts.isEmpty() ? format : parts.join( dot() );
+    return parts.isEmpty() ? format : parts.join( metaSeparator() );
 }
 
 /**********************************************************************
@@ -839,7 +837,7 @@ void AudioModePage::refresh()
         parts << info->artist;
     if( !info->album.isEmpty() )
         parts << info->album;
-    meta->setText( parts.join( dot() ) );
+    meta->setText( parts.join( metaSeparator() ) );
     meta->setVisible( !parts.isEmpty() );
     formatChip->setText( info->format );
     formatChip->setVisible( !info->format.isEmpty() );
