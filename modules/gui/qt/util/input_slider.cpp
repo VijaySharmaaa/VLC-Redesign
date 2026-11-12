@@ -199,9 +199,7 @@ void SeekSlider::setPosition( float pos, int64_t time, int length )
 {
     /* screen readers: the time, not the raw 0..10000 value (only on a new
      * second, each change is an accessibility event) */
-    const QString where = pos < 0.f ? QString()
-        : length > 0 ? qtr( "%1 of %2" ).arg( timeString( time / CLOCK_FREQ ), timeString( length ) )
-                     : timeString( time / CLOCK_FREQ );
+    const QString where = positionText( pos, time, length, qtr( "%1 of %2" ) );
     if( where != accessibleDescription() )
         setAccessibleDescription( where );
 

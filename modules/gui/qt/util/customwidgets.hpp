@@ -164,6 +164,12 @@ void watchHotkey( intf_thread_t *, QWidget *w );
 void setStyleProperty( QWidget *w, const char *name, const QVariant &value );
 /* "9:36" under an hour, "1:02:03" above: no leading zero (DESIGN_SPEC 3) */
 QString timeString( int64_t secs );
+/* The position as InputManager::positionUpdated gives it: pattern ("%1 of
+ * %2") with the time and the length, the time alone when the length is
+ * unknown, empty without a position */
+QString positionText( float pos, int64_t time, int length, const QString &pattern );
+/* The playback speed: "1.50×" */
+QString rateText( float rate );
 /* Call once the widgets under root are built: see customwidgets.cpp */
 void dropEarlyAccessibles( QWidget *root );
 

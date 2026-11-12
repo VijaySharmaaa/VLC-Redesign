@@ -239,10 +239,7 @@ ThinSeekBar::ThinSeekBar( intf_thread_t *_p_i, QWidget *parent )
 
     connect( THEMIM->getIM(), &InputManager::positionUpdated, this,
              [this]( float pos, int64_t time, int len ) {
-                 timeText = pos < 0.f ? QString()
-                          : len > 0 ? qtr( "%1 of %2" ).arg( timeString( time / CLOCK_FREQ ),
-                                                             timeString( len ) )
-                          : timeString( time / CLOCK_FREQ );
+                 timeText = positionText( pos, time, len, qtr( "%1 of %2" ) );
                  if( !isSliderDown() )
                      setValue( pos < 0.f ? 0 : qRound( pos * maximum() ) );
              } );
@@ -894,10 +891,7 @@ MiniPlayer::MiniPlayer( intf_thread_t *_p_i, NowPlayingInfo *_info, QWidget *par
 
     connect( THEMIM->getIM(), &InputManager::positionUpdated, this,
              [this]( float pos, int64_t us, int len ) {
-                 time->setText( pos < 0.f ? QString()
-                              : len > 0 ? qtr( "%1 / %2" ).arg( timeString( us / CLOCK_FREQ ),
-                                                                timeString( len ) )
-                              : timeString( us / CLOCK_FREQ ) );
+                 time->setText( positionText( pos, us, len, qtr( "%1 / %2" ) ) );
              } );
     connect( info, &NowPlayingInfo::changed, this, &MiniPlayer::refresh );
     refresh();

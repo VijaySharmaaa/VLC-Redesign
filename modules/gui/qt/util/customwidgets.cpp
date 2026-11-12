@@ -41,6 +41,7 @@
 #include <QHelpEvent>
 #include <QToolTip>
 #include <QStyle>
+#include <QLocale>
 #include <vlc_actions.h>
 
 #define SPINNER_SIZE 32
@@ -333,6 +334,19 @@ QString timeString( int64_t secs )
     const int64_t h = secs / 3600;
     return h ? QString( "%1:%2:%3" ).arg( h ).arg( m, 2, 10, QChar( '0' ) ).arg( s, 2, 10, QChar( '0' ) )
              : QString( "%1:%2" ).arg( m ).arg( s, 2, 10, QChar( '0' ) );
+}
+
+QString positionText( float pos, int64_t time, int length, const QString &pattern )
+{
+    if( pos < 0.f )
+        return QString();
+    const QString now = timeString( time / CLOCK_FREQ );
+    return length > 0 ? pattern.arg( now, timeString( length ) ) : now;
+}
+
+QString rateText( float rate )
+{
+    return QLocale().toString( rate, 'f', 2 ) + QChar( 0x00D7 );
 }
 
 QString VLCKeyToString( unsigned val, bool locale )

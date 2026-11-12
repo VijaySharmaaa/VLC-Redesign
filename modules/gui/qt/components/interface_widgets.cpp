@@ -797,7 +797,7 @@ SpeedLabel::SpeedLabel( intf_thread_t *_p_intf, QWidget *parent )
 
 void SpeedLabel::setRate( float rate )
 {
-    const QString str = QLocale().toString( rate, 'f', 2 ) + QChar( 0x00D7 );
+    const QString str = rateText( rate );
     setText( str );
     setToolTip( qtr( "Current playback speed: %1\nClick to adjust" ).arg( str ) );
     setStyleProperty( this, "on", qAbs( rate - 1.f ) > .001f );

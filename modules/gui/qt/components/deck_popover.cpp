@@ -28,7 +28,7 @@
 #include "menus.hpp"
 #include "util/redesign_icons.hpp"
 #include "util/theme.hpp"
-#include "util/customwidgets.hpp"   /* setStyleProperty */
+#include "util/customwidgets.hpp"   /* setStyleProperty, rateText */
 
 #include <vlc_input_item.h>
 
@@ -380,7 +380,7 @@ QWidget *showSpeedPopover( intf_thread_t *p_intf, QAbstractButton *anchor )
     QListWidget *list = makeList( pop, qtr( "Playback speed" ) );
     const float rate = var_GetFloat( THEPL, "rate" );
     for( size_t i = 0; i < sizeof( rates ) / sizeof( rates[0] ); i++ )
-        addRow( list, QLocale().toString( rates[i], 'f', 2 ) + QChar( 0x00D7 ), QString(),
+        addRow( list, rateText( rates[i] ), QString(),
                 qAbs( rates[i] - rate ) < .001f );
     fitRows( list );
     layout->addWidget( list );
