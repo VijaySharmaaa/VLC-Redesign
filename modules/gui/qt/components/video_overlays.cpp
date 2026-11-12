@@ -53,9 +53,6 @@ namespace V = RedesignTokens::VideoOverlay;
 
 namespace
 {
-    /* a poll rate, not a motion: about a frame after the cursor moves */
-    const int MoveCheckMs = 50;
-
     /* The badge itself: a real button, for the click and screen readers */
     class BadgeButton : public QAbstractButton
     {
@@ -122,22 +119,40 @@ namespace
 
 /* shortcut: ignores crop and zoom (the picture is then larger than this),
  * upgrade if overlays must follow them */
+bool currentVideoFormat( intf_thread_t *p_intf, video_format_t *fmt )
+{
+    input_thread_t *input = THEMIM->getInput();
+    if( !input )
+        return false;
+    const int64_t id = var_GetInteger( input, "video-es" );
+    input_item_t *item = input_GetItem( input );
+    bool found = false;
+    vlc_mutex_lock( &item->lock );
+    for( int i = 0; i < item->i_es; i++ )
+    {
+        const es_format_t *es = item->es[i];
+        if( es->i_cat != VIDEO_ES || ( found && es->i_id != id ) )
+            continue;
+        *fmt = es->video;
+        fmt->p_palette = NULL;
+        found = true;
+        if( es->i_id == id )
+            break;
+    }
+    vlc_mutex_unlock( &item->lock );
+    return found;
+}
+
 QRect videoPictureRect( intf_thread_t *p_intf, const QRect &area )
 {
     input_thread_t *input = THEMIM->getInput();
     if( !input || area.isEmpty() )
         return area;
     double dar = 0.;
-    input_item_t *item = input_GetItem( input );
-    vlc_mutex_lock( &item->lock );
-    for( int i = 0; i < item->i_es && dar == 0.; i++ )
-    {
-        const video_format_t &v = item->es[i]->video;
-        if( item->es[i]->i_cat == VIDEO_ES && v.i_visible_width && v.i_visible_height )
-            dar = double( v.i_visible_width ) / v.i_visible_height
-                * ( v.i_sar_num && v.i_sar_den ? double( v.i_sar_num ) / v.i_sar_den : 1. );
-    }
-    vlc_mutex_unlock( &item->lock );
+    video_format_t v;
+    if( currentVideoFormat( p_intf, &v ) && v.i_visible_width && v.i_visible_height )
+        dar = double( v.i_visible_width ) / v.i_visible_height
+            * ( v.i_sar_num && v.i_sar_den ? double( v.i_sar_num ) / v.i_sar_den : 1. );
     vout_thread_t *vout = input_GetVout( input );
     if( vout )
     {
@@ -198,12 +213,15 @@ void PausedBadge::refresh()
         return;
     wanted = now;
     /* the hotkeys module put its play or pause icon on the video (OSD
-     * channel) just before this change; the badge says it instead.
+     * channel) just before this change; the badge says it instead, when
+     * its video shows (not in the mini player).
      * shortcut: the icon may show for a frame before the flush, upgrade
      * with a core option to skip the play/pause OSD icon */
+    const bool shown = host->targetShown();
     foreach( vout_thread_t *vout, THEMIM->getVouts() )
     {
-        vout_FlushSubpictureChannel( vout, VOUT_SPU_CHANNEL_OSD );
+        if( shown )
+            vout_FlushSubpictureChannel( vout, VOUT_SPU_CHANNEL_OSD );
         vlc_object_release( vout );
     }
     pop->stop();
@@ -510,17 +528,10 @@ void ImmersiveBar::liftSubtitles()
         px = over;
         const qreal dpr = devicePixelRatioF();
         const QSize shown = pic.size() * dpr;
-        input_thread_t *input = THEMIM->getInput();
         QSize video;
-        if( input )
-        {
-            input_item_t *item = input_GetItem( input );
-            vlc_mutex_lock( &item->lock );
-            for( int i = 0; i < item->i_es && video.isEmpty(); i++ )
-                if( item->es[i]->i_cat == VIDEO_ES )
-                    video = QSize( item->es[i]->video.i_visible_width, item->es[i]->video.i_visible_height );
-            vlc_mutex_unlock( &item->lock );
-        }
+        video_format_t v;
+        if( currentVideoFormat( p_intf, &v ) )
+            video = QSize( v.i_visible_width, v.i_visible_height );
         units = qRound( over * dpr );
         if( !video.isEmpty() && shown.height() > 0
          && qint64( video.width() ) * video.height() >= qint64( shown.width() ) * shown.height() )
@@ -587,10 +598,8 @@ bool ImmersiveBar::takeFocus()
     if( !active )
         return false;
     wake();
-    QWidget *w = nextInFocusChain();
-    while( w != this && !( w->isVisible() && w->isEnabled() && ( w->focusPolicy() & Qt::TabFocus ) ) )
-        w = w->nextInFocusChain();
-    if( w == this )
+    QWidget *w = isVisible() ? firstTabStop( this ) : NULL;
+    if( !w )
         return false;
     w->setFocus( Qt::TabFocusReason );
     activateWindow();
@@ -753,7 +762,7 @@ PlayerHeader::PlayerHeader( intf_thread_t *_p_intf, QWidget *owner, QWidget *_vi
      * shortcut: polls QCursor::pos() (Qt sees no moves over the native video)
      * until the cursor moves or VLC hides it again; upgrade if the vout ever
      * reports real moves only */
-    moveCheck.setInterval( MoveCheckMs );
+    moveCheck.setInterval( V::MoveCheck );
     connect( &moveCheck, &QTimer::timeout, this, [this]() {
         if( QCursor::pos() != hiddenAt )
             forgetCursor();

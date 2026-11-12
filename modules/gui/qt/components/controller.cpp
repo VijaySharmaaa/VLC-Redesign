@@ -209,8 +209,7 @@ void AbstractController::setStatus( int status )
                             var_GetBool( THEMIM->getInput(), "can-rewind" ) );
 }
 
-/* Generic button setup: a deck icon button (DESIGN_SPEC 3) */
-void AbstractController::setupButton( QAbstractButton *aButton )
+void setupDeckButton( intf_thread_t *p_intf, QAbstractButton *aButton )
 {
     static QSizePolicy sizePolicy( QSizePolicy::Fixed, QSizePolicy::Fixed );
     sizePolicy.setHorizontalStretch( 0 );
@@ -524,10 +523,7 @@ QWidget *AbstractController::createWidget( buttonType_e button, int options )
         b_special = true;
     case VOLUME:
         {
-            SoundWidget *snd = new SoundWidget( this, p_intf, b_shiny, b_special );
-            foreach( QToolButton *mute, snd->findChildren<QToolButton *>() )
-                setupButton( mute );
-            widget = snd;
+            widget = new SoundWidget( this, p_intf, b_shiny, b_special );
         }
         break;
     case TIME_LABEL:
@@ -759,13 +755,13 @@ QFrame *AbstractController::discFrame()
 
     QToolButton *prevSectionButton = new QToolButton( chapFrame );
     setupButton( prevSectionButton );
-    BUTTON_SET_BAR2( prevSectionButton, toolbar/dvd_prev,
+    BUTTON_SET_BAR2( prevSectionButton, IconPrevSection,
             qtr("Previous Chapter/Title" ) );
     chapLayout->addWidget( prevSectionButton );
 
     QToolButton *nextSectionButton = new QToolButton( chapFrame );
     setupButton( nextSectionButton );
-    BUTTON_SET_BAR2( nextSectionButton, toolbar/dvd_next,
+    BUTTON_SET_BAR2( nextSectionButton, IconNextSection,
             qtr("Next Chapter/Title" ) );
     chapLayout->addWidget( nextSectionButton );
 
@@ -779,7 +775,7 @@ QFrame *AbstractController::discFrame()
     QToolButton *menuButton = new QToolButton( menuFrame );
     setupButton( menuButton );
     menuLayout->addWidget( menuButton );
-    BUTTON_SET_BAR2( menuButton, toolbar/dvd_menu, qtr( "Menu" ) );
+    BUTTON_SET_BAR2( menuButton, IconDiscMenu, qtr( "Menu" ) );
 
     discLayout->addWidget( menuFrame );
     menuFrame->hide();
@@ -810,7 +806,7 @@ QFrame *AbstractController::telexFrame()
     /* On/Off button */
     QToolButton *telexOn = new QToolButton;
     setupButton( telexOn );
-    BUTTON_SET_BAR2( telexOn, toolbar/tv, qtr( "Teletext Activation" ) );
+    BUTTON_SET_BAR2( telexOn, IconTeletext, qtr( "Teletext Activation" ) );
     telexOn->setEnabled( false );
     telexOn->setCheckable( true );
 
@@ -823,7 +819,7 @@ QFrame *AbstractController::telexFrame()
     /* Transparency button */
     QToolButton *telexTransparent = new QToolButton;
     setupButton( telexTransparent );
-    BUTTON_SET_BAR2( telexTransparent, toolbar/tvtelx,
+    BUTTON_SET_BAR2( telexTransparent, IconTeletextTransparent,
                      qtr( "Toggle Transparency" ) );
     telexTransparent->setEnabled( false );
     telexTransparent->setCheckable( true );
@@ -1622,11 +1618,8 @@ bool FullscreenControllerWidget::takeFocus()
     vlc_mutex_unlock( &lock );
     if ( !b_fs )
         return false;
-    QWidget *w = nextInFocusChain();
-    while ( w != this && !( isAncestorOf( w ) && w->isEnabled() && w->isVisibleTo( this )
-                            && ( w->focusPolicy() & Qt::TabFocus ) ) )
-        w = w->nextInFocusChain();
-    if ( w == this )
+    QWidget *w = firstTabStop( this );
+    if ( !w )
         return false;
     /* no hide while it has the keys: the mouse plans one again */
     p_hideTimer->stop();

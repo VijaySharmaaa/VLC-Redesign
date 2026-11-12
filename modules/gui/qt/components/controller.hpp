@@ -168,6 +168,10 @@ static const char* const hotkeyL[BUTTON_MAX] = {
  * the on-accent glyph of the play circle with onAccent. Follows the theme. */
 QIcon deckIcon( const char *name, bool onAccent = false );
 
+/* A deck icon button (DESIGN_SPEC 3): the token sizes, the deck role, Tab
+ * focus and the hotkey property's shortcut in its tooltip */
+void setupDeckButton( intf_thread_t *, QAbstractButton * );
+
 enum
 {
    WIDGET_NORMAL = 0x0,
@@ -209,7 +213,7 @@ protected:
     QList<QWidget *> rankedItems() const;   /* lowest rank first */
     QToolButton *moreButton;                /* NULL without addMoreButton */
 private:
-    void setupButton( QAbstractButton * );
+    void setupButton( QAbstractButton *b ) { setupDeckButton( p_intf, b ); }
     QFrame *discFrame();
     QFrame *telexFrame();
     void applyAttributes( QToolButton *, bool b_flat, bool b_big );

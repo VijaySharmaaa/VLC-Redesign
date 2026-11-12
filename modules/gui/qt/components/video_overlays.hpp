@@ -45,6 +45,11 @@ class PlayerHeader;
  * area itself when no video size is known. */
 QRect videoPictureRect( intf_thread_t *, const QRect &area );
 
+/* The playing video track's format as the demuxer reported it: the
+ * selected track ("video-es"), else the first; false without one.
+ * p_palette is not copied. */
+bool currentVideoFormat( intf_thread_t *, video_format_t * );
+
 /* The floating decks' glass (the immersive bar, the fullscreen controller):
  * fill and border over the whole widget, rounded by radius */
 void paintDeckGlass( QWidget *, int radius );

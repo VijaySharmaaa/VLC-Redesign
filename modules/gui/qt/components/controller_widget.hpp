@@ -109,6 +109,9 @@ public:
     SoundWidget( QWidget *parent, intf_thread_t  *_p_i, bool,
                  bool b_special = false );
     void setMuted( bool );
+    /* room (px) narrower than the slider and its level text: the text goes,
+     * then the slider; the mute button stays */
+    void fitWidth( int room );
 
 private:
     intf_thread_t       *p_intf;

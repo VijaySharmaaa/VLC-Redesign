@@ -30,7 +30,7 @@
  * Record and the library sidebar are filled; everything else, including
  * the same glyphs in menus and context menus, is outlined.
  *
- * Toolbar buttons (buttonType_e, components/controller.hpp iconL):
+ * Toolbar buttons (buttonType_e, components/controller.hpp deckIconL):
  *   PLAY_BUTTON          IconPlay / IconPause (playing)
  *   STOP_BUTTON          IconStop
  *   OPEN_BUTTON          IconOpen
@@ -61,6 +61,8 @@
  *   new: mini player     IconMiniPlayer
  *   VOLUME (mute button) IconVolumeOff / IconVolumeDown / IconVolumeUp
  *   ASPECT_RATIO_COMBOBOX IconAspectRatio
+ *   TELETEXT_BUTTONS     IconTeletext, IconTeletextTransparent
+ *   MENU_BUTTONS         IconPrevSection, IconNextSection, IconDiscMenu
  */
 
 /* A namespace, because some names (MenuHelp) are also Win32 functions. */
@@ -105,6 +107,11 @@ static const char * const IconOpen           = "file_open";
 static const char * const IconAddSubtitle    = "note_add";
 static const char * const IconQuit           = "logout";
 static const char * const IconDockController = "dock_to_bottom";
+static const char * const IconTeletext       = "live_tv";
+static const char * const IconTeletextTransparent = "layers";
+static const char * const IconPrevSection    = "first_page";
+static const char * const IconNextSection    = "last_page";
+static const char * const IconDiscMenu       = "menu";
 
 /* Title bar */
 static const char * const IconCone           = "cone"; /* full colour, not tinted */

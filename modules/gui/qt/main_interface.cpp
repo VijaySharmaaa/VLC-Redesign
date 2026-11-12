@@ -35,7 +35,6 @@
 
 #include "util/customwidgets.hpp"               // qtEventToVLCKey, QVLCStackedWidget
 #include "util/qt_dirs.hpp"                     // toNativeSeparators
-#include "util/imagehelper.hpp"
 #include "util/theme.hpp"
 
 #include "components/interface_widgets.hpp"     // bgWidget, videoWidget
@@ -337,6 +336,7 @@ MainInterface::MainInterface( intf_thread_t *_p_intf, bool customFrame ) : QVLCM
 
     /* VideoWidget connects for asynchronous calls */
     b_videoFullScreen = false;
+    b_miniAfterFullScreen = false;
     connect( this, &MainInterface::askGetVideo,
              this, &MainInterface::getVideoSlot,
              Qt::BlockingQueuedConnection );
@@ -382,10 +382,7 @@ MainInterface::MainInterface( intf_thread_t *_p_intf, bool customFrame ) : QVLCM
     buffering = new BufferingOverlay( p_intf, this, stackCentralW );
     createVideoOverlays();
     if( var_InheritBool( p_intf, "qt-immersive" ) )
-        immersiveBar = new ImmersiveBar( p_intf, this, stackCentralW,
-                                         getControlsVisibilityStatus() & CONTROLS_ADVANCED );
-    if( immersiveBar )
-        immersiveBar->setHeader( playerHeader );
+        createImmersiveBar();
     connect( stackCentralW, &QStackedWidget::currentChanged,
              this, &MainInterface::updateDeckPlacement );
     updateDeckPlacement();
@@ -544,30 +541,47 @@ void MainInterface::recreateToolbars()
 
     delete controls;
     delete inputC;
-
-    /* the seek row first: the tab order is creation order */
-    inputC = new InputControlsWidget( p_intf, this );
-    controls = new ControlsWidget( p_intf, b_adv, this );
-    /* below the stack and the now-playing bar, or controls on top */
-    const int deckRow = mainLayout->indexOf( nowPlayingBar ) + 1;
-    mainLayout->insertWidget( deckRow, inputC );
-    mainLayout->insertWidget( settings->value( "MainWindow/ToolbarPos", false ).toBool() ? 0: deckRow + 1,
-                              controls );
+    createDecks( b_adv );
     if( immersiveBar )
         immersiveBar->rebuild( b_adv );
 
     if( fullscreenControls )
     {
         delete fullscreenControls;
-        fullscreenControls = new FullscreenControllerWidget( p_intf, this );
-        connect( fullscreenControls, &FullscreenControllerWidget::keyPressed,
-                 this, &MainInterface::handleKeyPress );
+        createFSC();
         THEMIM->requestVoutUpdate();
     }
 
     setMinimalView( b_minimalView );
     /* the new seek rows know nothing of a paused input */
     THEMIM->getIM()->resendPosition();
+}
+
+/* The seek row and the deck below the stack and the now-playing bar, or
+ * the deck on top (MainWindow/ToolbarPos); the seek row first: the tab
+ * order is creation order */
+void MainInterface::createDecks( bool adv )
+{
+    inputC = new InputControlsWidget( p_intf, this );
+    controls = new ControlsWidget( p_intf, adv, this );
+    const int deckRow = mainLayout->indexOf( nowPlayingBar ) + 1;
+    mainLayout->insertWidget( deckRow, inputC );
+    mainLayout->insertWidget( settings->value( "MainWindow/ToolbarPos", false ).toBool() ? 0 : deckRow + 1,
+                              controls );
+}
+
+void MainInterface::createFSC()
+{
+    fullscreenControls = new FullscreenControllerWidget( p_intf, this );
+    connect( fullscreenControls, &FullscreenControllerWidget::keyPressed,
+             this, &MainInterface::handleKeyPress );
+}
+
+void MainInterface::createImmersiveBar()
+{
+    immersiveBar = new ImmersiveBar( p_intf, this, stackCentralW,
+                                     getControlsVisibilityStatus() & CONTROLS_ADVANCED );
+    immersiveBar->setHeader( playerHeader );
 }
 
 void MainInterface::reloadPrefs()
@@ -589,14 +603,23 @@ void MainInterface::createResumePanel( QWidget *w )
     resumePanelLayout->setSpacing( 0 ); resumePanelLayout->setContentsMargins( 0, 0, 0, 0 );
 
     QLabel *continuePixmapLabel = new QLabel();
-    continuePixmapLabel->setPixmap( ImageHelper::loadSvgToPixmap( ":/menu/help.svg" , fontMetrics().height(), fontMetrics().height()) );
-    continuePixmapLabel->setContentsMargins( 5, 0, 5, 0 );
+    auto tint = [this, continuePixmapLabel]() {
+        const int h = fontMetrics().height();
+        continuePixmapLabel->setPixmap( Theme::instance()->icon( RedesignIcons::IconHistory,
+                                            Theme::Text2, QSize( h, h ) ).pixmap( h, h ) );
+        const int pad = Theme::instance()->px( RedesignTokens::Resume::PadX );
+        continuePixmapLabel->setContentsMargins( pad, 0, pad, 0 );
+    };
+    tint();
+    connect( Theme::instance(), &Theme::changed, continuePixmapLabel, tint );
 
     QLabel *continueLabel = new QLabel( qtr( "Do you want to restart the playback where left off?") );
 
     QToolButton *cancel = new QToolButton( resumePanel );
-    cancel->setAutoRaise( true );
-    cancel->setText( "X" );
+    setupDeckButton( p_intf, cancel );
+    cancel->setIcon( deckIcon( RedesignIcons::IconClose ) );
+    cancel->setAccessibleName( qtr( "Close" ) );
+    cancel->setToolTip( qtr( "Close" ) );
 
     QPushButton *ok = new QPushButton( qtr( "&Continue" )  );
 
@@ -608,7 +631,7 @@ void MainInterface::createResumePanel( QWidget *w )
 
     resumeTimer = new QTimer( resumePanel );
     resumeTimer->setSingleShot( true );
-    resumeTimer->setInterval( 6000 );
+    resumeTimer->setInterval( RedesignTokens::Resume::Hold );
 
     connect( resumeTimer, &QTimer::timeout, this, &MainInterface::hideResumePanel );
     connect( cancel, &QToolButton::clicked, this, &MainInterface::hideResumePanel );
@@ -815,17 +838,7 @@ void MainInterface::createMainWidget( QSettings *creationSettings )
     /* Resize even if no-auto-resize, because we are at creation */
     resizeStack( stackWidgetsSizes[bgWidget].width(), stackWidgetsSizes[bgWidget].height() );
 
-    /* Create the CONTROLS Widget; the seek row first: the tab order is
-     * creation order */
-    inputC = new InputControlsWidget( p_intf, this );
-    controls = new ControlsWidget( p_intf,
-        creationSettings->value( "MainWindow/adv-controls", false ).toBool(), this );
-
-    const int deckRow = mainLayout->indexOf( nowPlayingBar ) + 1;
-    mainLayout->insertWidget( deckRow, inputC );
-    mainLayout->insertWidget(
-        creationSettings->value( "MainWindow/ToolbarPos", false ).toBool() ? 0: deckRow + 1,
-        controls );
+    createDecks( creationSettings->value( "MainWindow/adv-controls", false ).toBool() );
 
     /* Visualisation, disabled for now, they SUCK */
     #if 0
@@ -843,11 +856,7 @@ void MainInterface::createMainWidget( QSettings *creationSettings )
     if ( depth() > 8 ) /* 8bit depth has too many issues with opacity */
         /* Create the FULLSCREEN CONTROLS Widget */
         if( var_InheritBool( p_intf, "qt-fs-controller" ) )
-        {
-            fullscreenControls = new FullscreenControllerWidget( p_intf, this );
-            connect( fullscreenControls, &FullscreenControllerWidget::keyPressed,
-                     this, &MainInterface::handleKeyPress );
-        }
+            createFSC();
 
     if ( b_interfaceOnTop )
         setWindowFlags( windowFlags() | Qt::WindowStaysOnTopHint );
@@ -891,25 +900,7 @@ inline void MainInterface::createStatusBar()
     /* Styling those labels */
     timeLabel->setFrameStyle( QFrame::Sunken | QFrame::Panel );
     nameLabel->setFrameStyle( QFrame::Sunken | QFrame::StyledPanel);
-    auto updateStyle = [=]() {
-        const Theme *theme = Theme::instance();
-        const QColor fill = theme->ink( RedesignTokens::InkAlpha::HoverFill );
-        const QString hover = QString( "QLabel:hover { color: %1; background-color: rgba(%2,%3,%4,%5) }" )
-            .arg( theme->color( Theme::Text ).name() )
-            .arg( fill.red() ).arg( fill.green() ).arg( fill.blue() ).arg( fill.alpha() );
-        timeLabel->setStyleSheet( hover );
-        /* pad both label and its tooltip */
-        nameLabel->setStyleSheet( "padding-left: 5px; padding-right: 5px;" );
-
-    };
-    updateStyle();
-    connect( Theme::instance(), &Theme::changed, this, updateStyle );
-//same as Qt::AA_UseStyleSheetPropagationInWidgetStyles
-#if !HAS_QT57
-    connect(qApp, &QApplication::paletteChanged, this, [updateStyle](){
-        updateStyle();
-    });
-#endif
+    /* their hover and padding: the theme's style sheet (QStatusBar) */
 
     /* and adding those */
     statusBarr->addWidget( nameLabel, 8 );
@@ -1229,7 +1220,7 @@ void MainInterface::setVideoSize( unsigned int w, unsigned int h )
          */
         if (b_autoresize)
         {
-            QRect screen = QGuiApplication::primaryScreen()->availableGeometry();
+            const QRect screen = QApplication::desktop()->availableGeometry( this );
 #if HAS_QT56
             float factor = videoWidget->devicePixelRatioF();
 #else
@@ -1340,6 +1331,12 @@ void MainInterface::setVideoFullScreen( bool fs )
     }
     videoWidget->sync();
     updateDeckPlacement();
+    if( b_miniAfterFullScreen )
+    {
+        b_miniAfterFullScreen = false;
+        if( !fs )
+            toggleMiniPlayer();
+    }
 }
 
 void MainInterface::setHideMouse( bool hide )
@@ -1423,9 +1420,7 @@ void MainInterface::setImmersive( bool on )
     {
         if( playerHeader )
             playerHeader->forgetCursor();
-        immersiveBar = new ImmersiveBar( p_intf, this, stackCentralW,
-                                         getControlsVisibilityStatus() & CONTROLS_ADVANCED );
-        immersiveBar->setHeader( playerHeader );
+        createImmersiveBar();
     }
     else
     {
@@ -1844,6 +1839,20 @@ void MainInterface::toggleMiniPlayer()
         } );
     }
     const bool b_mini = !miniPlayer->isVisible();
+    /* the video lives in this window: leave its full screen first, as the
+     * hotkey does; setVideoFullScreen( false ) then comes back here */
+    if( b_mini && b_videoFullScreen )
+    {
+        b_miniAfterFullScreen = true;
+        var_SetBool( THEPL, "fullscreen", false );
+        vout_thread_t *p_vout = THEMIM->getVout();
+        if( p_vout )
+        {
+            var_SetBool( p_vout, "fullscreen", false );
+            vlc_object_release( p_vout );
+        }
+        return;
+    }
     if( b_mini )
     {
         miniPlayer->popIn();
