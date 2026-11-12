@@ -209,8 +209,7 @@ PlaylistPanel::PlaylistPanel( intf_thread_t *_p_intf, QBoxLayout *_dock, QWidget
     const int glyphPx = t->px( Playlist::HeadButtonGlyph );
     QToolButton *add = new QToolButton( content );
     QToolButton *close = new QToolButton( content );
-    const QString closeTip = QString( "%1 (%2)" ).arg( qtr( "Close playlist" ),
-        QKeySequence( qtr( MENU_KEY_PLAYLIST ) ).toString( QKeySequence::NativeText ) );
+    const QString closeTip = withHotkey( p_intf, qtr( "Close playlist" ), MENU_KEY_PLAYLIST );
     const struct { QToolButton *button; const char *icon; QString name, tip; } buttons[] = {
         { add, RedesignIcons::IconAdd, qtr( I_PL_ADDF ), qtr( I_PL_ADDF ) },
         { close, RedesignIcons::IconClose, qtr( "Close playlist" ), closeTip },

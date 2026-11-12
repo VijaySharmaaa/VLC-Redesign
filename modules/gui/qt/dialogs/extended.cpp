@@ -34,9 +34,9 @@
 #include "dialogs_provider.hpp"
 #include "actions_manager.hpp"   /* EXTENDED_ACTION, PLAYLIST_ACTION */
 #include "components/overlay_host.hpp"
-#include "components/controller.hpp"   /* hotkeyL */
+#include "menus.hpp"                    /* MENU_KEY_EFFECTS */
 #include "components/playlist/playlist_panel.hpp"
-#include "util/customwidgets.hpp"      /* hotkeyText */
+#include "util/customwidgets.hpp"      /* withHotkey */
 #include "util/theme.hpp"
 #include "util/redesign_icons.hpp"
 
@@ -239,8 +239,7 @@ ExtendedDialog::ExtendedDialog( intf_thread_t *_p_intf )
     close->setFixedSize( t->px( Effects::CloseButton ), t->px( Effects::CloseButton ) );
     close->setAccessibleName( qtr( "Close effects" ) );
     /* the deck's Effects button names the same shortcut */
-    close->setToolTip( qtr( "%1 (%2)" ).arg( qtr( "Close effects" ),
-        hotkeyText( p_intf, hotkeyL[EXTENDED_BUTTON] ) ) );
+    close->setToolTip( withHotkey( p_intf, qtr( "Close effects" ), MENU_KEY_EFFECTS ) );
     connect( close, &QToolButton::clicked, this, &QWidget::hide );
     head->addWidget( close );
     layout->addLayout( head );

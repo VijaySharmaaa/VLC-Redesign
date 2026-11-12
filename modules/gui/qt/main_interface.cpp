@@ -404,7 +404,7 @@ MainInterface::MainInterface( intf_thread_t *_p_intf, bool customFrame ) : QVLCM
 
     /* A->B loop: one shortcut for the window, not one per deck button (the
      * deck, the immersive bar and the FSC each have one, often hidden) */
-    QShortcut *atob = new QShortcut( QKeySequence( qtr( "Shift+L" ) ), this );
+    QShortcut *atob = new QShortcut( QKeySequence( qtr( MENU_KEY_ATOB ) ), this );
     qApp->installEventFilter( new ButtonKeys( this ) );
     connect( atob, &QShortcut::activated, THEMIM->getIM(), &InputManager::setAtoB );
 

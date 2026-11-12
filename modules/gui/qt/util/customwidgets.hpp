@@ -149,8 +149,16 @@ int qtEventToVLCKey( const QKeyEvent *e );
 int qtWheelEventToVLCKey( const QWheelEvent *e );
 QString VLCKeyToString( unsigned val, bool );
 /* The text of a shortcut: a key-* hotkey's first binding, or a Qt key
- * sequence such as a menu's "Ctrl+E"; empty when unbound or NULL */
+ * sequence such as a menu's "Ctrl+E" (MENU_KEY_*, translated as the menu
+ * does); empty when unbound or NULL. p_intf may be NULL for a sequence. */
 QString hotkeyText( intf_thread_t *, const char *id );
+/* "Label (key)" with hotkeyText(), the bare label when there is no key */
+QString withHotkey( intf_thread_t *, const QString &label, const char *id );
+/* Keeps the shortcut of w's "hotkey" property (an id as hotkeyText takes)
+ * current: added to its tooltip, which holds the bare label, when the
+ * tooltip shows, and its accessible description on focus and hover, so a
+ * rebound key shows without a restart */
+void watchHotkey( intf_thread_t *, QWidget *w );
 /* "9:36" under an hour, "1:02:03" above: no leading zero (DESIGN_SPEC 3) */
 QString timeString( int64_t secs );
 /* Call once the widgets under root are built: see customwidgets.cpp */

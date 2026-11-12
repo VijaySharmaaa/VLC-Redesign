@@ -31,11 +31,16 @@
 #include <QMenu>
 #include <QVector>
 
-/* Keys of the menu entries that other widgets name in their tooltips */
+/* Keys of the menu entries that other widgets name in their tooltips;
+ * hotkeyText() takes them as they are */
+#define MENU_KEY_OPEN_FILE   "Ctrl+O"
 #define MENU_KEY_OPEN_MEDIA  "Ctrl+Shift+O"
 #define MENU_KEY_OPEN_FOLDER "Ctrl+F"
 #define MENU_KEY_PREFERENCES "Ctrl+P"
+#define MENU_KEY_EFFECTS     "Ctrl+E"
+#define MENU_KEY_MEDIA_INFO  "Ctrl+I"
 #define MENU_KEY_PLAYLIST    N_( "Ctrl+L" )  /* translated: qtr() it */
+#define MENU_KEY_ATOB        N_( "Shift+L" ) /* the window's A->B shortcut, translated */
 
 class MenuItemData : public QObject
 {

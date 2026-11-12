@@ -27,6 +27,7 @@
 #include "dialogs/open.hpp"
 #include "dialogs_provider.hpp"
 #include "recents.hpp"
+#include "util/customwidgets.hpp"     /* withHotkey */
 #include "util/qt_dirs.hpp"
 #include "util/redesign_icons.hpp"
 #include "util/theme.hpp"
@@ -239,8 +240,7 @@ OpenDialog::OpenDialog( QWidget *parent,
         const QKeySequence key = QKeySequence::mnemonic( label );
         tile->setText( QString( label ).remove( QLatin1Char( '&' ) ) );
         tile->setShortcut( key );
-        tile->setToolTip( qtr( "%1 (%2)" ).arg( tile->text(),
-                                               key.toString( QKeySequence::NativeText ) ) );
+        tile->setToolTip( withHotkey( p_intf, tile->text(), key.toString().toUtf8().constData() ) );
         tile->setIcon( Theme::themedIcon( tileIcons[i], Theme::Text2 ) );
         tile->setIconSize( QSize( glyph, glyph ) );
         tile->setToolButtonStyle( Qt::ToolButtonTextUnderIcon );

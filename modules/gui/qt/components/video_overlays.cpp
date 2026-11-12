@@ -25,6 +25,7 @@
 #include "components/now_playing.hpp"
 #include "components/library/library_widgets.hpp"
 #include "input_manager.hpp"
+#include "util/customwidgets.hpp"                /* watchHotkey */
 #include "util/theme.hpp"
 #include "util/redesign_icons.hpp"
 
@@ -167,12 +168,9 @@ PausedBadge::PausedBadge( intf_thread_t *_p_intf, QWidget *owner, QWidget *video
     button = badge;
     button->setFocusPolicy( Qt::NoFocus );
     button->setAccessibleName( qtr( "Play" ) );
-    /* the play/pause hotkey, as the preferences store it (first binding) */
-    char *key = var_InheritString( p_intf, "key-play-pause" );
-    const QString keyName = qfu( key ).section( '\t', 0, 0 );
-    free( key );
-    button->setToolTip( keyName.isEmpty() ? qtr( "Play" )
-                                          : qtr( "Play" ) + " (" + keyName + ")" );
+    button->setToolTip( qtr( "Play" ) );
+    button->setProperty( "hotkey", QByteArray( "key-play-pause" ) );
+    watchHotkey( p_intf, button );
     connect( button, &QAbstractButton::clicked, THEMIM, &MainInputManager::play );
 
     pop = new QVariantAnimation( this );

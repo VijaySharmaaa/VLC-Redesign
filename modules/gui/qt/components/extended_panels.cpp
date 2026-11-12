@@ -1697,12 +1697,6 @@ protected:
     }
 };
 
-/* "Decrease (G)", or the bare label when the action has no key */
-QString withHotkey( const QString &label, const QString &key )
-{
-    return key.isEmpty() ? label : qtr( "%1 (%2)" ).arg( label, key );
-}
-
 /* One card of the Synchronization tab: title and description, the control */
 QFrame *syncRow( const QString &title, const QString &desc, QWidget *control )
 {
@@ -1736,8 +1730,8 @@ QFrame *syncRow( const QString &title, const QString &desc, QWidget *control )
 
 }
 
-SyncWidget::SyncWidget( QWidget *_parent, const QString &name,
-                        const QString &downKey, const QString &upKey )
+SyncWidget::SyncWidget( intf_thread_t *p_intf, QWidget *_parent, const QString &name,
+                        const char *downKey, const char *upKey )
     : QWidget( _parent )
 {
     using namespace RedesignTokens;
@@ -1761,7 +1755,7 @@ SyncWidget::SyncWidget( QWidget *_parent, const QString &name,
 
     const int buttonPx = t->px( Effects::StepperButton );
     const int glyphPx = t->px( Effects::StepperGlyph );
-    const struct { const char *icon; QString label, key; int step; } steps[] = {
+    const struct { const char *icon; QString label; const char *key; int step; } steps[] = {
         { RedesignIcons::IconRemove, qtr( "Decrease %1" ).arg( name ), downKey, -1 },
         { RedesignIcons::IconAdd, qtr( "Increase %1" ).arg( name ), upKey, 1 },
     };
@@ -1774,7 +1768,7 @@ SyncWidget::SyncWidget( QWidget *_parent, const QString &name,
         b->setFixedSize( buttonPx, buttonPx );
         b->setAutoRepeat( true );
         b->setAccessibleName( steps[i].label );
-        b->setToolTip( withHotkey( steps[i].label, steps[i].key ) );
+        b->setToolTip( withHotkey( p_intf, steps[i].label, steps[i].key ) );
         const int step = steps[i].step;
         connect( b, &QToolButton::clicked, spinBox, [this, step]() { spinBox->stepBy( step ); } );
         if( i == 0 )
@@ -1820,12 +1814,14 @@ SyncControls::SyncControls( intf_thread_t *_p_intf, QWidget *_parent ) :
     };
 
     /* AV sync */
-    AVSpin = new SyncWidget( this, qtr( "Audio track" ), audioDown, audioUp );
+    AVSpin = new SyncWidget( p_intf, this, qtr( "Audio track" ),
+                             "key-audiodelay-down", "key-audiodelay-up" );
     mainLayout->addWidget( syncRow( qtr( "Audio track" ),
         keysHint( qtr( "Positive delays audio behind video" ), audioDown, audioUp ), AVSpin ) );
 
     /* Subs */
-    subsSpin = new SyncWidget( this, qtr( "Subtitle track" ), subsDown, subsUp );
+    subsSpin = new SyncWidget( p_intf, this, qtr( "Subtitle track" ),
+                               "key-subdelay-down", "key-subdelay-up" );
     mainLayout->addWidget( syncRow( qtr( "Subtitle track" ),
         keysHint( qtr( "Positive shows subtitles later" ), subsDown, subsUp ), subsSpin ) );
 

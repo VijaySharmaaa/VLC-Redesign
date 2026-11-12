@@ -382,7 +382,7 @@ QMenu *VLCMenuBar::FileMenu( intf_thread_t *p_intf, QWidget *parent, MainInterfa
     QAction *action;
 
     addDPStaticEntry( menu, qtr( "Open &File..." ),
-        RedesignIcons::MenuOpenFile, SLOT( simpleOpenDialog() ), "Ctrl+O" );
+        RedesignIcons::MenuOpenFile, SLOT( simpleOpenDialog() ), MENU_KEY_OPEN_FILE );
     addDPStaticEntry( menu, qtr( "&Open Multiple Files..." ),
         RedesignIcons::MenuOpenFiles, SLOT( openFileDialog() ), MENU_KEY_OPEN_MEDIA );
     addDPStaticEntry( menu, qtr( I_OP_OPDIR ),
@@ -446,13 +446,13 @@ QMenu *VLCMenuBar::FileMenu( intf_thread_t *p_intf, QWidget *parent, MainInterfa
 QMenu *VLCMenuBar::ToolsMenu( intf_thread_t *p_intf, QMenu *menu )
 {
     addDPStaticEntry( menu, qtr( "&Effects and Filters"), RedesignIcons::MenuEffects,
-            SLOT( extendedDialog() ), "Ctrl+E" );
+            SLOT( extendedDialog() ), MENU_KEY_EFFECTS );
 
     addDPStaticEntry( menu, qtr( "&Track Synchronization"), RedesignIcons::MenuTrackSync,
             SLOT( synchroDialog() ), "" );
 
     addDPStaticEntry( menu, qtr( I_MENU_INFO ) , RedesignIcons::MenuMediaInfo,
-        SLOT( mediaInfoDialog() ), "Ctrl+I" );
+        SLOT( mediaInfoDialog() ), MENU_KEY_MEDIA_INFO );
     addDPStaticEntry( menu, qtr( I_MENU_CODECINFO ) ,
         RedesignIcons::MenuCodecInfo, SLOT( mediaCodecDialog() ), "Ctrl+J" );
 

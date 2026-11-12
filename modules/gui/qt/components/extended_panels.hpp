@@ -235,9 +235,9 @@ class SyncWidget : public QWidget
 {
     Q_OBJECT
 public:
-    /* the keys are the hotkeys' texts for the buttons' tooltips */
-    SyncWidget( QWidget *, const QString &name,
-                const QString &downKey, const QString &upKey );
+    /* the keys are the hotkeys (key-*) of the buttons' tooltips */
+    SyncWidget( intf_thread_t *, QWidget *, const QString &name,
+                const char *downKey, const char *upKey );
     void setValue( double d );
 signals:
     void valueChanged( double );

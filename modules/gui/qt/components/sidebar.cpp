@@ -29,7 +29,7 @@
 #include "dialogs_provider.hpp"
 #include "menus.hpp"                    /* MENU_KEY_* */
 #include "util/theme.hpp"
-#include "util/customwidgets.hpp"     /* hotkeyText */
+#include "util/customwidgets.hpp"     /* withHotkey */
 #include "util/redesign_icons.hpp"
 
 #include <QAbstractButton>
@@ -221,11 +221,6 @@ static QWidget *createPage( const QString &title )
     return page;
 }
 
-/* "Label (shortcut)" */
-static QString tip( const QString &label, const QString &key )
-{
-    return qtr( "%1 (%2)" ).arg( label, key );
-}
 
 /* The sidebar's padding and gap, again when the scale changes */
 static void padNav( QLayout *layout, int spacing )
@@ -270,7 +265,7 @@ Sidebar::Sidebar( intf_thread_t *p_intf, QWidget *parent )
 
     SidebarButton *open = new SidebarButton( qtr( "Open media" ), RedesignIcons::IconOpenMedia,
                                              SidebarButton::Open, this );
-    open->setToolTip( tip( qtr( "Open media" ), hotkeyText( p_intf, MENU_KEY_OPEN_MEDIA ) ) );
+    open->setToolTip( withHotkey( p_intf, qtr( "Open media" ), MENU_KEY_OPEN_MEDIA ) );
     connect( open, &QAbstractButton::clicked, this, []() { THEDP->openDialog(); } );
     layout->addWidget( open );
     openGap = gapBelow( NULL, Size::SidebarOpenBelow );
@@ -310,7 +305,7 @@ Sidebar::Sidebar( intf_thread_t *p_intf, QWidget *parent )
     layout->addStretch( 1 );
     SidebarButton *prefs = new SidebarButton( qtr( "Preferences" ), RedesignIcons::IconSettings,
                                               SidebarButton::Nav, this );
-    prefs->setToolTip( tip( qtr( "Preferences" ), hotkeyText( p_intf, MENU_KEY_PREFERENCES ) ) );
+    prefs->setToolTip( withHotkey( p_intf, qtr( "Preferences" ), MENU_KEY_PREFERENCES ) );
     prefs->setCheckable( true );
     prefs->setAutoExclusive( true );
     group->addButton( prefs, Preferences );
@@ -415,7 +410,7 @@ void Sidebar::setBackLabel( bool library )
     const QString label = library ? qtr( "Back to library" ) : qtr( "Back to player" );
     back->setText( label );
     back->setAccessibleName( label );
-    back->setToolTip( tip( label, QKeySequence( Qt::Key_Escape ).toString( QKeySequence::NativeText ) ) );
+    back->setToolTip( withHotkey( NULL, label, "Esc" ) );
 }
 
 int Sidebar::widthAt( BreakpointWatcher::Size bp )

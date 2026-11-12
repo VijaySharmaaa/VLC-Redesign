@@ -52,8 +52,6 @@
 #include <QToolButton>
 #include <QMenu>
 #include <QStyle>
-#include <QToolTip>
-#include <QHelpEvent>
 #include <QIconEngine>
 #include <QHBoxLayout>
 #include <QRegion>
@@ -230,43 +228,9 @@ void AbstractController::setupButton( QAbstractButton *aButton )
     /* Tab reaches it; Space stays the play/pause hotkey (ButtonKeys) */
     aButton->setFocusPolicy( Qt::TabFocus );
     aButton->setProperty( "role", "deck" );
-    aButton->installEventFilter( this );
-}
-
-bool AbstractController::eventFilter( QObject *obj, QEvent *e )
-{
-    QAbstractButton *button = qobject_cast<QAbstractButton *>( obj );
-    if( !button || button->property( "role" ).isNull() )
-        return QFrame::eventFilter( obj, e );
-
-    /* Space and Enter: MainInterface's ButtonKeys, for every button */
-    switch( e->type() )
-    {
-    case QEvent::Polish:
-    case QEvent::FocusIn:
-    case QEvent::Enter:
-    {
-        /* the shortcut for screen readers, as the tooltip shows it; again
-         * on focus and hover, before it is read, so a rebound hotkey shows */
-        const QString key = hotkeyText( p_intf, button->property( "hotkey" ).toByteArray().constData() );
-        if( button->accessibleDescription() != key )
-            button->setAccessibleDescription( key );
-        break;
-    }
-    case QEvent::ToolTip:
-    {
-        /* read when shown, so a changed hotkey shows at once */
-        const QString key = hotkeyText( p_intf, button->property( "hotkey" ).toByteArray().constData() );
-        if( key.isEmpty() || button->toolTip().isEmpty() )
-            break;
-        QToolTip::showText( static_cast<QHelpEvent *>( e )->globalPos(),
-                            QString( "%1 (%2)" ).arg( button->toolTip(), key ), button );
-        return true;
-    }
-    default:
-        break;
-    }
-    return QFrame::eventFilter( obj, e );
+    /* the tooltip gets the hotkey property's shortcut; Space and Enter are
+     * MainInterface's ButtonKeys */
+    watchHotkey( p_intf, aButton );
 }
 
 /* Open the generic config line for the toolbar, parse it
@@ -680,7 +644,6 @@ QWidget *AbstractController::createWidget( buttonType_e button, int options )
             SpeedLabel *speedLabel = new SpeedLabel( p_intf, this );
             speedLabel->setFixedHeight( Theme::instance()->metric( Theme::IconButton ) );
             speedLabel->setFocusPolicy( Qt::TabFocus );
-            speedLabel->installEventFilter( this );
             widget = speedLabel;
         }
         break;

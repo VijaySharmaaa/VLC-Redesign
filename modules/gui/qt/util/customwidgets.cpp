@@ -38,6 +38,8 @@
 #include <QWheelEvent>
 #include <QApplication>
 #include <QKeySequence>
+#include <QHelpEvent>
+#include <QToolTip>
 #include <vlc_actions.h>
 
 #define SPINNER_SIZE 32
@@ -349,7 +351,14 @@ QString hotkeyText( intf_thread_t *p_intf, const char *id )
     if( !id || !*id )
         return QString();
     if( strncmp( id, "key-", 4 ) )
-        return QKeySequence( QString::fromLatin1( id ) ).toString( QKeySequence::NativeText );
+    {
+        /* translated as the menu does (qtr( MENU_KEY_PLAYLIST )); a key
+         * name's own translation (French "Esc") does not parse: as is */
+        QKeySequence seq( qtr( id ) );
+        if( seq.isEmpty() || seq[0] == Qt::Key_unknown )
+            seq = QKeySequence( QString::fromUtf8( id ) );
+        return seq.toString( QKeySequence::NativeText );
+    }
     QString text;
     char *psz = var_InheritString( p_intf, id );
     if( psz )
@@ -364,6 +373,57 @@ QString hotkeyText( intf_thread_t *p_intf, const char *id )
     }
     /* "J", as on the key */
     return text.length() == 1 ? text.toUpper() : text;
+}
+
+QString withHotkey( intf_thread_t *p_intf, const QString &label, const char *id )
+{
+    const QString key = hotkeyText( p_intf, id );
+    return key.isEmpty() ? label : qtr( "%1 (%2)" ).arg( label, key );
+}
+
+namespace {
+class HotkeyFilter : public QObject
+{
+public:
+    HotkeyFilter( intf_thread_t *_p_intf, QWidget *w ) : QObject( w ), p_intf( _p_intf ) {}
+
+    bool eventFilter( QObject *obj, QEvent *e ) Q_DECL_OVERRIDE
+    {
+        QWidget *w = static_cast<QWidget *>( obj );
+        switch( e->type() )
+        {
+        case QEvent::Polish:
+        case QEvent::FocusIn:
+        case QEvent::Enter:
+        {
+            /* for screen readers, as the tooltip shows it; again on focus
+             * and hover, before it is read */
+            const QString key = hotkeyText( p_intf, id( w ).constData() );
+            if( w->accessibleDescription() != key )
+                w->setAccessibleDescription( key );
+            break;
+        }
+        case QEvent::ToolTip:
+            if( w->toolTip().isEmpty() )
+                break;
+            QToolTip::showText( static_cast<QHelpEvent *>( e )->globalPos(),
+                                withHotkey( p_intf, w->toolTip(), id( w ).constData() ), w );
+            return true;
+        default:
+            break;
+        }
+        return false;
+    }
+
+private:
+    static QByteArray id( const QWidget *w ) { return w->property( "hotkey" ).toByteArray(); }
+    intf_thread_t *p_intf;
+};
+}
+
+void watchHotkey( intf_thread_t *p_intf, QWidget *w )
+{
+    w->installEventFilter( new HotkeyFilter( p_intf, w ) );
 }
 
 /* Animated Icon implementation */

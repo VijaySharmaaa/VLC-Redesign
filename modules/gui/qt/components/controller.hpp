@@ -31,6 +31,7 @@
 #include "qt.hpp"
 
 #include "util/redesign_icons.hpp"
+#include "menus.hpp"                                    /* MENU_KEY_* */
 
 #include <QFrame>
 #include <QIcon>
@@ -155,10 +156,11 @@ static const char* const deckIconL[BUTTON_MAX] = {
 /* The shortcut a button's tooltip shows: a key-* hotkey variable, or the
  * Qt sequence of the menu entry it mirrors (menus.cpp); NULL for none */
 static const char* const hotkeyL[BUTTON_MAX] = {
-    "key-play-pause", "key-stop", "Ctrl+O", "key-prev", "key-next", "key-slower",
-    "key-faster", "key-toggle-fullscreen", "key-leave-fullscreen", "Ctrl+E", "Ctrl+L",
-    "key-snapshot", "key-record", "Shift+L", "key-frame-next", NULL, "key-jump-short",
-    "key-jump+short", "key-quit", "key-random", "key-loop", "Ctrl+I", "key-prev", "key-next",
+    "key-play-pause", "key-stop", MENU_KEY_OPEN_FILE, "key-prev", "key-next", "key-slower",
+    "key-faster", "key-toggle-fullscreen", "key-leave-fullscreen", MENU_KEY_EFFECTS,
+    MENU_KEY_PLAYLIST, "key-snapshot", "key-record", MENU_KEY_ATOB, "key-frame-next", NULL,
+    "key-jump-short", "key-jump+short", "key-quit", "key-random", "key-loop",
+    MENU_KEY_MEDIA_INFO, "key-prev", "key-next",
     NULL, NULL, NULL, NULL
 };
 
@@ -206,9 +208,6 @@ protected:
     void fitDeck( int room );
     QList<QWidget *> rankedItems() const;   /* lowest rank first */
     QToolButton *moreButton;                /* NULL without addMoreButton */
-    /* deck buttons: the tooltip gets the button's shortcut (hotkey
-     * property); Space and Enter are MainInterface's ButtonKeys */
-    bool eventFilter( QObject *, QEvent * ) Q_DECL_OVERRIDE;
 private:
     void setupButton( QAbstractButton * );
     QFrame *discFrame();

@@ -56,14 +56,6 @@
 using namespace RedesignTokens;
 
 namespace {
-/* "Play/Pause (Space)": the label and the first key bound to the hotkey
- * (a key-* name) or a Qt key such as "Esc", in this language */
-QString withKey( intf_thread_t *p_intf, const QString &label, const char *hotkey )
-{
-    const QString key = hotkeyText( p_intf, hotkey );
-    return key.isEmpty() ? label : qtr( "%1 (%2)" ).arg( label, key );
-}
-
 /* Name-separating dot of the meta lines: not a translatable string */
 QString dot() { return QString::fromUtf8( " · " ); }
 
@@ -422,7 +414,9 @@ QToolButton *makeIconButton( intf_thread_t *p_intf, const char *icon, const QStr
     b->setIconSize( QSize( t->metric( Theme::IconGlyph ), t->metric( Theme::IconGlyph ) ) );
     b->setFixedSize( t->px( size ), t->px( size ) );
     b->setAccessibleName( name );
-    b->setToolTip( withKey( p_intf, name, hotkey ) );
+    b->setToolTip( name );
+    b->setProperty( "hotkey", QByteArray( hotkey ) );
+    watchHotkey( p_intf, b );
     b->setFocusPolicy( Qt::TabFocus );
     return b;
 }
@@ -434,13 +428,13 @@ QToolButton *makePlayButton( intf_thread_t *p_intf, int size, QWidget *parent )
                                      "key-play-pause", size, parent );
     b->setProperty( "np", "play" );
     QObject::connect( b, &QToolButton::clicked, THEMIM, &MainInputManager::togglePlayPause );
-    auto sync = [b, p_intf]( int state ) {
+    auto sync = [b]( int state ) {
         const bool playing = state == PLAYING_S;
         b->setIcon( Theme::themedIcon( playing ? RedesignIcons::IconPause
                                                : RedesignIcons::IconPlay, Theme::OnAccent ) );
         const QString name = playing ? qtr( "Pause" ) : qtr( "Play" );
         b->setAccessibleName( name );
-        b->setToolTip( withKey( p_intf, name, "key-play-pause" ) );
+        b->setToolTip( name );
     };
     QObject::connect( THEMIM->getIM(), &InputManager::playingStatusChanged, b, sync );
     sync( THEMIM->getIM()->playingStatus() );

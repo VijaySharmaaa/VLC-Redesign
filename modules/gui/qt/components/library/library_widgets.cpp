@@ -721,13 +721,6 @@ void CardView::keyPressEvent( QKeyEvent *e )
     QListView::keyPressEvent( e );
 }
 
-/* "Label (Ctrl+F)" in the platform's spelling */
-static QString withShortcut( const QString &label, const char *keys )
-{
-    return qtr( "%1 (%2)" ).arg( label,
-        QKeySequence( QLatin1String( keys ) ).toString( QKeySequence::NativeText ) );
-}
-
 /**********************************************************************
  * LibraryHeader
  **********************************************************************/
@@ -744,7 +737,7 @@ LibraryHeader::LibraryHeader( const QString &_title, QWidget *parent )
     back->setIconSize( QSize( t->metric( Theme::IconGlyph ), t->metric( Theme::IconGlyph ) ) );
     back->setFixedSize( t->metric( Theme::IconButton ), t->metric( Theme::IconButton ) );
     back->setAccessibleName( qtr( "Back" ) );
-    back->setToolTip( withShortcut( qtr( "Back" ), "Backspace" ) );
+    back->setToolTip( withHotkey( NULL, qtr( "Back" ), "Backspace" ) );
     back->setFocusPolicy( Qt::TabFocus );
     back->hide();
     connect( back, &QToolButton::clicked, this, &LibraryHeader::backRequested );
@@ -843,11 +836,12 @@ LibraryEmptyState::LibraryEmptyState( const QString &text, const QString &note, 
     QPushButton *add = new QPushButton( qtr( "Add a folder" ), this );
     add->setProperty( "role", "primary" );
     add->setIcon( t->icon( RedesignIcons::IconAddFolder, Theme::OnAccent ) );
-    add->setToolTip( withShortcut( qtr( "Add a folder to the playlist and play it" ), MENU_KEY_OPEN_FOLDER ) );
+    add->setToolTip( withHotkey( NULL, qtr( "Add a folder to the playlist and play it" ),
+                                MENU_KEY_OPEN_FOLDER ) );
     connect( add, &QPushButton::clicked, []() { THEDP->PLOpenDir(); } );
     QPushButton *open = new QPushButton( qtr( "Open media..." ), this );
     open->setProperty( "role", "outline" );
-    open->setToolTip( withShortcut( qtr( "Open media" ), MENU_KEY_OPEN_MEDIA ) );
+    open->setToolTip( withHotkey( NULL, qtr( "Open media" ), MENU_KEY_OPEN_MEDIA ) );
     connect( open, &QPushButton::clicked, []() { THEDP->openDialog(); } );
     const int iconPx = t->px( Library::EmptyButtonIcon );
     foreach( QPushButton *b, QList<QPushButton *>() << add << open )
@@ -1113,8 +1107,7 @@ void setupSearchField( QLineEdit *edit, const QString &searchName, const QString
                      QLineEdit::LeadingPosition )->setText( searchName );
     QAction *clear = new QAction( QIcon( new FieldIconEngine( RedesignIcons::IconClose, Theme::Text2 ) ),
                                   clearName, edit );
-    clear->setToolTip( QString( "%1 (%2)" ).arg( clearName,
-        QKeySequence( Qt::Key_Escape ).toString( QKeySequence::NativeText ) ) );
+    clear->setToolTip( withHotkey( NULL, clearName, "Esc" ) );
     QObject::connect( clear, &QAction::triggered, edit, &QLineEdit::clear );
     /* shown only with text: added and taken away, as Qt 5.6 keeps the
      * button of a hidden action */
