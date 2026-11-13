@@ -79,6 +79,11 @@ void QElidingLabel::paintEvent( QPaintEvent * )
     QPainter p( this );
     int space = frameWidth() + margin();
     QRect r = rect().adjusted( space, space, -space, -space );
+    /* centred on the capitals, not the line box (whose descender room put
+     * the text low beside an icon), as every other label (ThemeStyle) */
+    const Theme *t = Theme::instance();
+    if( t && ( alignment() & Qt::AlignVCenter ) )
+        r.translate( 0, -t->textNudge( font() ) );
     p.drawText( r, fontMetrics().elidedText( text(), elideMode, r.width() ), alignment() );
 }
 

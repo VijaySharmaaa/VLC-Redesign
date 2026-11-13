@@ -28,6 +28,8 @@
 #include <cassert>
 
 #include <QAbstractItemView>
+#include <QAbstractScrollArea>
+#include <QAbstractSlider>
 #include <QAbstractSpinBox>
 #include <QAction>
 #include <QApplication>
@@ -47,6 +49,7 @@
 #include <QKeyEvent>
 #include <QLineEdit>
 #include <QMenu>
+#include <QMenuBar>
 #include <QPainter>
 #include <QPalette>
 #include <QPlainTextEdit>
@@ -57,6 +60,7 @@
 #include <QSettings>
 #include <QSpacerItem>
 #include <QStringList>
+#include <QTimer>
 #include <QStyle>
 #include <QStyleFactory>
 #include <QStyleOptionMenuItem>
@@ -225,6 +229,25 @@ namespace
             && w->property("role").toString() == QLatin1String("toggle");
     }
 
+    /* Scrolling a page must not change the value under the pointer: a combo
+     * box, spin box or a page's slider takes the wheel only once it has the
+     * focus (a click or Tab); until then the wheel scrolls the page. */
+    class WheelGuard : public QObject
+    {
+    public:
+        explicit WheelGuard(QObject *parent) : QObject(parent) {}
+        bool eventFilter(QObject *o, QEvent *e) Q_DECL_OVERRIDE
+        {
+            if (e->type() == QEvent::Wheel && !static_cast<QWidget *>(o)->hasFocus())
+            {
+                e->ignore();    /* QApplication hands an ignored wheel to the parent: the page scrolls */
+                return true;
+            }
+            return false;
+        }
+    };
+    const char wheelGuardProperty[] = "redesignWheelGuard";
+
     /* What the stylesheet cannot do (DESIGN_SPEC 7, 11): menu items whose
      * check is the accent `check` icon and whose shortcut column is dimmed,
      * and check boxes and radio buttons with an outline that stays visible
@@ -348,6 +371,13 @@ namespace
             QRect at = rect;
             if (t && (flags & Qt::AlignVCenter))
                 at.translate(0, -t->textNudge(p->font()));
+            /* the accent buttons' labels (Save, Play): grayscale, no ClearType fringes */
+            const QColor ink = textRole == QPalette::NoRole ? p->pen().color() : pal.color(textRole);
+            if (t && enabled && ink == t->color(Theme::OnAccent))
+            {
+                Theme::drawGrayText(p, at, flags, text, ink);
+                return;
+            }
             QProxyStyle::drawItemText(p, at, flags, pal, enabled, text, textRole);
         }
 
@@ -467,6 +497,31 @@ namespace
              * and the shortcut column wide */
             if (qobject_cast<QMenu *>(w) && Theme::instance())
                 w->setMinimumWidth(Theme::instance()->metric(Theme::MenuMinW));
+            /* tooltips: one inset here. A stylesheet padding is counted twice
+             * (Qt's tooltip also adds it as PM_ToolTipLabelFrameWidth): far
+             * too much room round the text */
+            if (w->inherits("QTipLabel") && Theme::instance())
+            {
+                const Theme *t = Theme::instance();
+                w->setContentsMargins(t->px(Size::TooltipPadX), t->px(Size::TooltipPadY),
+                                      t->px(Size::TooltipPadX), t->px(Size::TooltipPadY));
+            }
+            /* the player's own sliders (seek, volume) keep the wheel: only
+             * sliders on a scrolling page are guarded */
+            bool onPage = false;
+            if (qobject_cast<QAbstractSlider *>(w))
+                for (QWidget *a = w->parentWidget(); a && !onPage; a = a->parentWidget())
+                    onPage = qobject_cast<QAbstractScrollArea *>(a) != NULL;
+            if ((qobject_cast<QComboBox *>(w) || qobject_cast<QAbstractSpinBox *>(w) || onPage)
+                && !w->property(wheelGuardProperty).toBool())
+            {
+                w->setProperty(wheelGuardProperty, true);
+                static WheelGuard *guard = new WheelGuard(qApp);
+                w->installEventFilter(guard);
+                /* wheel focus would hand it the focus first, and the value with it */
+                if (w->focusPolicy() == Qt::WheelFocus)
+                    w->setFocusPolicy(Qt::StrongFocus);
+            }
             QLineEdit *edit = qobject_cast<QLineEdit *>(w);
             /* not an item view's editor: it is as tall as its row, the
              * nudge cut the descenders and put the capitals on the frame */
@@ -1035,6 +1090,28 @@ void Theme::paintFocusRing(QPainter *p, const QRectF &r, qreal radius)
     p->drawRoundedRect(r.adjusted(inset, inset, -inset, -inset), radius, radius);
 }
 
+/* Qt 5.6 has no per-font switch for ClearType (QFont::NoSubpixelAntialias
+ * is 5.8) but draws grayscale glyphs into any image that is not
+ * ARGB32_Premultiplied or RGB32 (QRasterPaintEngine::begin): draw the text
+ * there, at the device's pixel ratio, then onto the widget. */
+void Theme::drawGrayText(QPainter *p, const QRect &r, int flags, const QString &text, const QColor &c)
+{
+    const qreal dpr = p->device() ? p->device()->devicePixelRatioF() : 1.0;
+    const QSize size = (QSizeF(r.size()) * dpr).toSize();
+    if (size.isEmpty())
+        return;
+    QImage img(size, QImage::Format_RGBA8888_Premultiplied);
+    img.setDevicePixelRatio(dpr);
+    img.fill(Qt::transparent);
+    QPainter ip(&img);
+    ip.setFont(p->font());
+    ip.setPen(c);
+    ip.setRenderHints(p->renderHints());
+    ip.drawText(QRect(QPoint(0, 0), r.size()), flags, text);
+    ip.end();
+    p->drawImage(r.topLeft(), img);
+}
+
 void Theme::setDestructive(QAction *action)
 {
     action->setProperty(destructiveProperty, true);
@@ -1081,7 +1158,7 @@ QMenu { background: @raised@; color: @tx@; border: @popupBorder@; padding: @menu
     -qt-style-features: background-color; }
 QMenu::separator { height: 1px; background: @border@; margin: @menuPad@px @menuSepX@px; }
 
-QToolTip { background: @raised@; color: @tx@; border: @popupBorder@; padding: @menuPad@px @menuTitlePadX@px; }
+QToolTip { background: @raised@; color: @tx@; border: @popupBorder@; padding: 0; }
 
 QPushButton { background: @raised@; color: @tx@; border: 1px solid @outline@; border-radius: @radiusMd@px; padding: @menuPad@px @buttonPadX@px; }
 QPushButton:hover { background: @hover@; }
@@ -1483,6 +1560,18 @@ void Theme::applyWindowFrame(QWidget *w) const
 }
 #endif
 
+#ifdef _WIN32
+/* The window's access-key underlines on or off (ThemeStyle::styleHint) */
+static void showAccessKeys(QWidget *window, bool on)
+{
+    if (window->property(altSeenProperty).toBool() == on)
+        return;
+    window->setProperty(altSeenProperty, on);
+    foreach (QWidget *child, window->findChildren<QWidget *>())
+        child->update();
+}
+#endif
+
 bool Theme::eventFilter(QObject *o, QEvent *e)
 {
     /* focus rings for keyboard focus only: what moved the focus last */
@@ -1530,17 +1619,44 @@ bool Theme::eventFilter(QObject *o, QEvent *e)
         if (w->isWindow())
             applyWindowFrame(w);
     }
-    else if (e->type() == QEvent::KeyPress && o->isWidgetType()
+    else if (o->isWidgetType()
+          && (e->type() == QEvent::KeyPress || e->type() == QEvent::KeyRelease)
           && static_cast<QKeyEvent *>(e)->key() == Qt::Key_Alt)
     {
-        /* from now on this window shows its access keys (ThemeStyle) */
+        /* access keys show while Alt is down and while the menu bar is
+         * driven from the keys (an Alt tap, Alt+letter); released with no
+         * menu open they hide again, as in Windows (ThemeStyle) */
         QWidget *window = static_cast<QWidget *>(o)->window();
-        if (!window->property(altSeenProperty).toBool())
-        {
-            window->setProperty(altSeenProperty, true);
-            foreach (QWidget *child, window->findChildren<QWidget *>())
-                child->update();
-        }
+        if (e->type() == QEvent::KeyPress)
+            showAccessKeys(window, true);
+        else    /* the menu bar takes an Alt tap after this filter: look once it has */
+            QTimer::singleShot(0, window, [window]() {
+                const QMenuBar *bar = window->findChild<QMenuBar *>();
+                showAccessKeys(window, bar && bar->activeAction());
+            });
+    }
+    else if ((e->type() == QEvent::WindowDeactivate && o->isWidgetType() && static_cast<QWidget *>(o)->isWindow())
+          || (e->type() == QEvent::Hide && qobject_cast<QMenu *>(o)))
+    {
+        /* Alt+Tab away, or the keyboard's menu closed: hidden again */
+        QWidget *window = qobject_cast<QMenu *>(o) ? QApplication::activeWindow() : static_cast<QWidget *>(o);
+        const QMenuBar *bar = window ? window->findChild<QMenuBar *>() : NULL;
+        if (window && !(bar && bar->activeAction() && e->type() == QEvent::Hide))
+            showAccessKeys(window, false);
+    }
+    else if (o->isWidgetType()
+          && (e->type() == QEvent::KeyPress || e->type() == QEvent::MouseButtonPress)
+          && !(QApplication::queryKeyboardModifiers() & Qt::AltModifier))
+    {
+        /* Esc or a click that leaves the menu bar's key mode (no menu was
+         * opened, so no Hide above): look once the bar has handled it */
+        QWidget *window = static_cast<QWidget *>(o)->window();
+        if (window && window->property(altSeenProperty).toBool())
+            QTimer::singleShot(0, window, [window]() {
+                const QMenuBar *bar = window->findChild<QMenuBar *>();
+                if (!(bar && bar->activeAction()) && !QApplication::activePopupWidget())
+                    showAccessKeys(window, false);
+            });
     }
 #endif
     return QObject::eventFilter(o, e);

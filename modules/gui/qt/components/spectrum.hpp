@@ -22,6 +22,7 @@
 #include "qt.hpp"
 #include "util/theme_tokens.hpp"
 
+#include <QElapsedTimer>
 #include <QWidget>
 
 class QTimer;
@@ -62,6 +63,7 @@ private:
 
     intf_thread_t *p_intf;
     QTimer *timer;
+    QElapsedTimer clock; /* real time between frames: timer ticks jitter */
     bool playing;
     bool counted;
     float shown[BANDS];

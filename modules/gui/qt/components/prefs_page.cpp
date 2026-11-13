@@ -506,7 +506,7 @@ PrefsPage::PrefsPage( intf_thread_t *_p_intf, QWidget *_tabAnchor )
     /* the section's name, the section, then Cancel and Save */
     QVBoxLayout *right = new QVBoxLayout( this );
     right->setContentsMargins( t->px( Prefs::ContentPadX ), t->px( Prefs::ContentPadY ),
-                               t->px( Prefs::ContentPadX ), t->px( Prefs::ContentPadY ) );
+                               t->px( Prefs::ContentPadX ), t->px( Prefs::FooterBelow ) );
     right->setSpacing( t->px( Prefs::HeaderBelow ) );
     title = new QLabel;
     QFont titleFont = t->font( Theme::PageTitle );
@@ -546,14 +546,15 @@ PrefsPage::PrefsPage( intf_thread_t *_p_intf, QWidget *_tabAnchor )
     buttons->setSpacing( t->px( Prefs::ButtonGap ) );
     buttons->addStretch( 1 );
     cancelButton = new QPushButton( qtr( "&Cancel" ) );
-    cancelButton->setToolTip( qtr( "Discard the changes not saved yet" ) );
-    connect( cancelButton, &QPushButton::clicked, this, &PrefsPage::cancel );
+    cancelButton->setToolTip( qtr( "Discard the changes and close the preferences" ) );
+    /* as the old dialog: Cancel and Save both leave; leaving drops what is not saved */
+    connect( cancelButton, &QPushButton::clicked, this, &PrefsPage::closeRequested );
     buttons->addWidget( cancelButton );
     /* no mnemonic: Alt+S is the Tools menu's */
     saveButton = new QPushButton( qtr( "Save" ) );
     saveButton->setProperty( "role", "primary" );
-    saveButton->setToolTip( qtr( "Save the preferences" ) );
-    connect( saveButton, &QPushButton::clicked, this, &PrefsPage::save );
+    saveButton->setToolTip( qtr( "Save the preferences and close them" ) );
+    connect( saveButton, &QPushButton::clicked, this, [this]() { save(); emit closeRequested(); } );
     buttons->addWidget( saveButton );
     right->addWidget( buttonBar );
 

@@ -41,6 +41,7 @@
 #include <QSignalBlocker>
 #include <QSpacerItem>
 #include <QStackedWidget>
+#include <QtMath>
 #include <QStyle>
 #include <QVBoxLayout>
 
@@ -156,19 +157,43 @@ void SidebarButton::paintEvent( QPaintEvent * )
     const int gap = t->px( primary ? Size::SidebarOpenIconGap
                          : kind == Back ? Size::SidebarBackIconGap : Size::SidebarIconGap );
     const int padX = t->px( Size::SidebarItemPadX );
+    /* QIcon::paint picks the device-pixel size: render the tint at that size */
+    const int devicePx = qRound( iconPx * devicePixelRatioF() );
+    const QIcon glyph = t->icon( QLatin1String( icon ), ink, QSize( devicePx, devicePx ) );
+    QImage glyphImage = glyph.pixmap( devicePx, devicePx ).toImage();
+    /* the glyph's drawn part: the + fills only the middle of its box, and
+     * the box's empty sides read as extra space before it and before the
+     * label (#11). The accent button spaces and centres what is drawn. */
+    int inkLeft = 0, inkW = iconPx;
+    if( primary && !rail )
+    {
+        const QImage scan = glyphImage.convertToFormat( QImage::Format_ARGB32 );
+        int l = scan.width(), r = -1;
+        for( int y = 0; y < scan.height(); y++ )
+        {
+            const QRgb *line = reinterpret_cast<const QRgb *>( scan.constScanLine( y ) );
+            for( int gx = 0; gx < scan.width(); gx++ )
+                if( qAlpha( line[gx] ) > 24 )
+                {
+                    l = qMin( l, gx ); r = qMax( r, gx );
+                }
+        }
+        if( r >= l )
+        {
+            const qreal dprI = devicePixelRatioF();
+            inkLeft = qFloor( l / dprI );
+            inkW = qCeil( ( r + 1 ) / dprI ) - inkLeft;
+        }
+    }
     int x;
     if( rail )
         x = ( width() - iconPx ) / 2;
     else if( primary )
-        x = ( width() - iconPx - gap - fm.width( text() ) ) / 2;
+        x = ( width() - inkW - gap - fm.width( text() ) ) / 2 - inkLeft;
     else
         x = padX;
     const QRect iconRect( x, ( height() - iconPx ) / 2, iconPx, iconPx );
-    /* QIcon::paint picks the device-pixel size: render the tint at that size */
-    const int devicePx = qRound( iconPx * devicePixelRatioF() );
-    const QIcon glyph = t->icon( QLatin1String( icon ), ink, QSize( devicePx, devicePx ) );
     const QRect iconAt = QStyle::visualRect( layoutDirection(), rect(), iconRect );
-    QImage glyphImage = glyph.pixmap( devicePx, devicePx ).toImage();
     if( kind == Back && isRightToLeft() )
         /* the arrow points the way back: to the right in RTL */
         glyphImage = glyphImage.mirrored( true, false );
@@ -196,13 +221,16 @@ void SidebarButton::paintEvent( QPaintEvent * )
     if( rail )
         return;
 
-    const QRect textRect( iconRect.right() + 1 + gap, 0,
-                          width() - iconRect.right() - 1 - gap - padX, height() );
+    const int textX = primary ? x + inkLeft + inkW + gap : iconRect.right() + 1 + gap;
+    const QRect textRect( textX, 0, width() - textX - padX, height() );
     p.setFont( font );
     p.setPen( t->color( ink ) );
-    p.drawText( QStyle::visualRect( layoutDirection(), rect(), textRect ).translated( 0, -t->textNudge( p.font() ) ),
-                Qt::AlignVCenter | Qt::AlignLeft,
-                fm.elidedText( text(), Qt::ElideRight, textRect.width() ) );
+    const QRect textAt = QStyle::visualRect( layoutDirection(), rect(), textRect ).translated( 0, -t->textNudge( p.font() ) );
+    const QString label = fm.elidedText( text(), Qt::ElideRight, textRect.width() );
+    if( primary )   /* on the accent: grayscale, no ClearType fringes */
+        Theme::drawGrayText( &p, textAt, Qt::AlignVCenter | Qt::AlignLeft, label, t->color( ink ) );
+    else
+        p.drawText( textAt, Qt::AlignVCenter | Qt::AlignLeft, label );
 }
 
 /* The sidebar's padding and gap, again when the scale changes */
@@ -338,6 +366,7 @@ Sidebar::Sidebar( intf_thread_t *p_intf, QWidget *parent )
     prefsNav->addStretch( 1 );
     /* Tab goes from the last section into the page */
     pages[Preferences] = prefsPage = new PrefsPage( p_intf, section );
+    connect( prefsPage, &PrefsPage::closeRequested, this, &Sidebar::goBack );
 
     connect( Theme::instance(), &Theme::changed, this, [this]() { update(); } );
 }

@@ -144,6 +144,10 @@ public:
      * inside r, its centre line rounded by radius. Leaves that pen and no
      * brush set. */
     static void paintFocusRing(QPainter *, const QRectF &r, qreal radius);
+    /* Text on a coloured fill (the accent): grayscale antialiasing, as
+     * ClearType's red and green fringes show on anything but grey. Same
+     * arguments as QPainter::drawText, in the painter's current font. */
+    static void drawGrayText(QPainter *, const QRect &r, int flags, const QString &text, const QColor &);
 
 signals:
     void changed();

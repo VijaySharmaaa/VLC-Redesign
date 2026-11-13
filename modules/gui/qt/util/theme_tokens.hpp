@@ -127,6 +127,9 @@ namespace RedesignTokens
         static const int TitlePadX = 16;
         static const int MenuTitleH = 28, MenuItemH = 30, MenuMinW = 290;
         static const int MenuTitlePadX = 9, MenuPanelPadding = 4, MenuIconCol = 22;
+        /* not in tokens.json: a tooltip's text inset, on top of the 2 px
+         * margin and 1 px indent Qt's tooltip label adds itself */
+        static const int TooltipPadX = 6, TooltipPadY = 2;
         static const int ButtonPadX = 16;
         static const int SidebarItemH = 36, SidebarOpenBtnH = 38, SidebarRailBelow = 1200;
         /* not in tokens.json: the prototype's sidebar and library page layout */
@@ -254,11 +257,14 @@ namespace RedesignTokens
         /* not in tokens.json: below this many rows the spectrum makes room */
         static const int TrackMinRows = 3;
 
-        /* spectrum strip: bars rise and fall at full height per 250 ms, linear */
+        /* spectrum strip: bars ease toward each frame's level, quick to rise
+         * and slower to fall (time constants, ms); SpectrumMotion is the
+         * theme's spectrum duration (0 = reduced motion) and the idle re-check */
         static const int SpectrumH = 84, SpectrumGap = 3, SpectrumPadX = 44;
         static const int SpectrumMinBar = 3, SpectrumBarRadius = 2;
         static const int SpectrumAlphaEven = 217, SpectrumAlphaOdd = 140; /* accent 0.85 / 0.55 */
-        static const int SpectrumMotion = 250, SpectrumFrame = 33;        /* ms, ~30 fps */
+        static const int SpectrumMotion = 250, SpectrumFrame = 16;        /* ms, ~60 fps */
+        static const int SpectrumAttack = 40, SpectrumRelease = 180;
     }
 
     /* Phase 3: deck */
@@ -388,6 +394,8 @@ namespace RedesignTokens
     namespace Prefs
     {
         static const int ContentPadY = 28, ContentPadX = 32, HeaderBelow = 16;
+        /* not in tokens.json: below Cancel and Save, as much as above them */
+        static const int FooterBelow = 16;
         static const int ContentMaxW = 720;   /* the prototype's max-width */
         /* the card and its rows */
         static const int CardRadius = 8, RowMinH = 60, RowPadX = 18, RowPadY = 12;
@@ -470,10 +478,10 @@ namespace RedesignTokens
 
         /* not in tokens.json: the spectrum's bar count follows its width,
          * bars = (width - 2 padX + gap) / (SpectrumBarW + gap), clamped. A bar
-         * near 18 px is the 64-bar look of a ~1500 px window; 48 keeps small
+         * near 12 px gives ~90 bars in a ~1500 px window; 48 keeps small
          * windows' bars from turning to hairlines; the decoder thread measures
          * SpectrumMaxBars bands per block whatever is shown (a 4K window) */
-        static const int SpectrumBarW = 18, SpectrumMinBars = 48, SpectrumMaxBars = 160;
+        static const int SpectrumBarW = 12, SpectrumMinBars = 48, SpectrumMaxBars = 160;
     }
 }
 

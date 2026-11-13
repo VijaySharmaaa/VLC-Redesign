@@ -56,6 +56,10 @@ public slots:
     /* fields at the XS width (the window is narrow) */
     void setNarrow( bool );
 
+signals:
+    /* Cancel or Save: back to where the preferences were opened from */
+    void closeRequested();
+
 protected:
     void showEvent( QShowEvent * ) Q_DECL_OVERRIDE;
 

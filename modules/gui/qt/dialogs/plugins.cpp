@@ -1175,11 +1175,10 @@ void AddonItemDelegate::paint( QPainter *painter,
         QPainterPath path;
         path.addRoundedRect( statusRect, 2.0, 2.0 );
         painter->fillPath( path, Theme::instance()->color( Theme::Accent ) );
-        painter->setPen( Theme::instance()->color( Theme::OnAccent ) );
-        painter->drawText(
+        Theme::drawGrayText( painter,
             statusRect.adjusted( statusMargins.left(), statusMargins.top(),
                                  -statusMargins.right(), -statusMargins.bottom() ),
-            qtr("Installed") );
+            Qt::AlignLeft | Qt::AlignTop, qtr("Installed"), Theme::instance()->color( Theme::OnAccent ) );
         painter->restore();
     }
 

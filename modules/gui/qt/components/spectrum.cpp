@@ -34,6 +34,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cmath>
 
 #include <QMutex>
 #include <QPainter>
@@ -136,6 +137,7 @@ SpectrumWidget::SpectrumWidget( intf_thread_t *_p_i, QWidget *parent )
 
     timer = new QTimer( this );
     timer->setInterval( NowPlaying::SpectrumFrame );
+    timer->setTimerType( Qt::PreciseTimer ); /* an even cadence: coarse timers wander 5 % */
     connect( timer, &QTimer::timeout, this, &SpectrumWidget::tick );
     connect( THEMIM->getIM(), &InputManager::playingStatusChanged, this,
              [this]( int state ) {
@@ -210,6 +212,7 @@ void SpectrumWidget::hideEvent( QHideEvent * )
 {
     setCounted( false );
     timer->stop();
+    clock.invalidate();
     memset( shown, 0, sizeof( shown ) ); /* rise from flat when shown again */
 }
 
@@ -224,6 +227,7 @@ void SpectrumWidget::tick()
     setCounted( !idle );
     if( idle )
     {
+        clock.invalidate();
         timer->setInterval( NowPlaying::SpectrumMotion );
         /* stopping while covered: flat, or the bars stay up when it returns */
         if( ( still || !playing ) && std::any_of( shown, shown + BANDS, []( float h ) { return h != 0.f; } ) )
@@ -255,13 +259,19 @@ void SpectrumWidget::tick()
             memcpy( target, best->bands, sizeof( target ) );
     }
 
-    /* Linear approach: full height in SpectrumMotion */
-    const float step = float( timer->interval() ) / NowPlaying::SpectrumMotion;
+    /* Eased approach over the real time since the last frame (capped, so a
+     * stall does not jump): quick to rise, slower to fall */
+    const float dt = clock.isValid() ? float( std::min<qint64>( clock.restart(), NowPlaying::SpectrumMotion ) )
+                                     : float( timer->interval() );
+    if( !clock.isValid() )
+        clock.start();
+    const float rise = 1.f - std::exp( -dt / NowPlaying::SpectrumAttack );
+    const float fall = 1.f - std::exp( -dt / NowPlaying::SpectrumRelease );
     bool settled = true;
     for( unsigned b = 0; b < BANDS; b++ )
     {
         const float d = target[b] - shown[b];
-        shown[b] += std::max( -step, std::min( step, d ) );
+        shown[b] = std::fabs( d ) < 1e-3f ? target[b] : shown[b] + d * ( d > 0.f ? rise : fall );
         settled &= shown[b] == target[b];
     }
     update();

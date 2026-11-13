@@ -109,8 +109,12 @@ void EPGItem::paint( QPainter *painter, const QStyleOptionGraphicsItem *option, 
     mapped.adjust( 6, 6, -6, -6 );
 
     painter->setPen( textColor );
-    /* Draw the title. */
-    painter->drawText( mapped, Qt::AlignTop | Qt::AlignLeft, fm.elidedText( m_name, Qt::ElideRight, mapped.width() ) );
+    /* Draw the title (on the accent when current: grayscale, no ClearType fringes) */
+    const QString name = fm.elidedText( m_name, Qt::ElideRight, mapped.width() );
+    if( program->getCurrent() == this )
+        Theme::drawGrayText( painter, mapped.toAlignedRect(), Qt::AlignTop | Qt::AlignLeft, name, textColor );
+    else
+        painter->drawText( mapped, Qt::AlignTop | Qt::AlignLeft, name );
 
     if ( m_rating > 0 && mapped.width() > 40 )
     {
