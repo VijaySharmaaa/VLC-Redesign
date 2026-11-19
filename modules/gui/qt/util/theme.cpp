@@ -1608,9 +1608,15 @@ bool Theme::eventFilter(QObject *o, QEvent *e)
         case Qt::Key_Control: case Qt::Key_Alt: case Qt::Key_Shift: case Qt::Key_Meta:
             break;  /* a modifier alone: the key it goes with decides */
         default:
-            if (k->modifiers() & (Qt::ControlModifier | Qt::AltModifier))
+        {
+            const Qt::KeyboardModifiers m = k->modifiers() & (Qt::ControlModifier | Qt::AltModifier);
+            /* AltGr arrives as Ctrl+Alt: typing @ { or a euro sign is no shortcut */
+            const bool altGr = m == (Qt::ControlModifier | Qt::AltModifier)
+                && !k->text().isEmpty() && k->text().at(0).isPrint();
+            if (m && !altGr)
                 keyboardInput = true;
             break;
+        }
         }
     }
     else if (e->type() == QEvent::MouseButtonPress || e->type() == QEvent::MouseButtonDblClick)
