@@ -150,11 +150,13 @@ static void pruneCache( const QString &dir )
 }
 
 /* The box of that type in [from, to) of an MP4/MOV file: from and to become
- * its payload; false when there is none (or the file is no such file) */
-static bool findBox( QFile &f, qint64 &from, qint64 &to, const char *type )
+ * its payload; false when there is none (or the file is no such file).
+ * budget: the boxes the whole parse may still read, so another kind of
+ * file, or a crafted one, costs a bounded number of seeks */
+static bool findBox( QFile &f, qint64 &from, qint64 &to, const char *type, int &budget )
 {
-    /* bounded: another kind of file reads as boxes of any size */
-    for( int boxes = 0; from + 8 <= to && boxes < 1024; boxes++ )
+    /* a match counts too: empty traks would otherwise cost nothing */
+    while( from + 8 <= to && budget-- > 0 )
     {
         if( !f.seek( from ) )
             return false;
@@ -197,16 +199,17 @@ static int mp4Turn( const QString &path )
     QFile f( path );
     if( !f.open( QIODevice::ReadOnly ) )
         return 0;
+    int budget = 4096;
     qint64 moov = 0, moovEnd = f.size();
-    if( !findBox( f, moov, moovEnd, "moov" ) )
+    if( !findBox( f, moov, moovEnd, "moov", budget ) )
         return 0;
     for( qint64 at = moov; ; )
     {
         qint64 from = at, to = moovEnd;
-        if( !findBox( f, from, to, "trak" ) )
+        if( !findBox( f, from, to, "trak", budget ) )
             return 0;
         at = to;
-        if( !findBox( f, from, to, "tkhd" ) || !f.seek( from ) )
+        if( !findBox( f, from, to, "tkhd", budget ) || !f.seek( from ) )
             continue;
         const QByteArray box = f.read( qMin<qint64>( to - from, 128 ) );
         if( box.isEmpty() )
