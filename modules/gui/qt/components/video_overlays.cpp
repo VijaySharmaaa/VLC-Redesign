@@ -651,14 +651,21 @@ void ImmersiveBar::wake()
 }
 
 /* Only a playing video hides it; never under the mouse or with one of its
- * menus open. A later mouse move, key or state change restarts the count. */
+ * menus open. Until it can, it looks again after another idle time (nothing
+ * else restarts the count when the mouse leaves or a menu closes); a mouse
+ * move, key or state change also restarts it. */
 void ImmersiveBar::sleepIfIdle()
 {
+    if( !active || asleep )
+        return;
     InputManager *im = THEMIM->getIM();
-    if( !active || asleep || im->playingStatus() != PLAYING_S || !im->hasVideo()
+    if( im->playingStatus() != PLAYING_S || !im->hasVideo()
         || underMouse() || ( header && header->hovered() )
         || QApplication::activePopupWidget() )
+    {
+        idle.start();
         return;
+    }
     giveFocusBack();   /* idle: the keys go back with it */
     setAsleep( true );
     animate( false );
