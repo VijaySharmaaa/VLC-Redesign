@@ -632,3 +632,9 @@ if ENABLE_QT
 gui_LTLIBRARIES += libqt_plugin.la
 BUILT_SOURCES += $(nodist_libqt_plugin_la_SOURCES)
 endif
+
+# header-only, no Qt or VLC; like the other module tests, a cross build
+# runs it only where the host can execute the target (wine binfmt)
+spectrum_analysis_test_SOURCES = gui/qt/util/spectrum_analysis_test.cpp
+check_PROGRAMS += spectrum_analysis_test
+TESTS += spectrum_analysis_test

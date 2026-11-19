@@ -44,14 +44,17 @@
 #include <QGridLayout>
 #include <QHBoxLayout>
 #include <QIconEngine>
+#include <QImageReader>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QListView>
 #include <QPainter>
+#include <QtMath>
 #include <QPropertyAnimation>
 #include <QSettings>
 #include <QStyle>
 #include <QStyledItemDelegate>
+#include <QTimer>
 #include <QToolButton>
 #include <QVBoxLayout>
 
@@ -164,13 +167,12 @@ void ArtView::childEvent( QChildEvent *e )
     QWidget::childEvent( e );
 }
 
-/* every info update calls this: decode the file only when it changes */
-void ArtView::setArt( const QString &url )
+/* every info update calls this: crop again only when the art changes */
+void ArtView::setArt( const QPixmap &pixmap )
 {
-    if( url == artUrl )
+    if( pixmap.cacheKey() == art.cacheKey() )
         return;
-    artUrl = url;
-    art = url.isEmpty() ? QPixmap() : QPixmap( url );
+    art = pixmap;
     scaled = QPixmap();
     QWidget::update();
 }
@@ -252,12 +254,22 @@ ThinSeekBar::ThinSeekBar( intf_thread_t *_p_i, QWidget *parent )
                      setValue( pos < 0.f ? 0 : qRound( pos * maximum() ) );
              } );
     connect( THEMIM->getIM(), &InputManager::inputCanSeek, this, &QWidget::setEnabled );
-    /* keys and wheel: sliderPosition holds the new value already */
+    /* keys: sliderPosition holds the new value already */
     connect( this, &QAbstractSlider::actionTriggered, this, [this]( int action ) {
         if( action != SliderMove )
             seek();
     } );
-    connect( this, &QAbstractSlider::sliderMoved, this, &ThinSeekBar::seek );
+    /* dragging: one seek per SEEK_LIMIT_MS, the last one on release, as
+     * the stock SeekSlider does */
+    enum { SEEK_LIMIT_MS = 150 };
+    seekLimit = new QTimer( this );
+    seekLimit->setSingleShot( true );
+    seekLimit->setInterval( SEEK_LIMIT_MS );
+    connect( seekLimit, &QTimer::timeout, this, &ThinSeekBar::seek );
+    connect( this, &QAbstractSlider::sliderMoved, this, [this]() {
+        if( !seekLimit->isActive() )
+            seekLimit->start();
+    } );
 }
 
 QSize ThinSeekBar::sizeHint() const
@@ -287,7 +299,7 @@ void ThinSeekBar::mousePressEvent( QMouseEvent *e )
     if( e->button() != Qt::LeftButton )
         return QSlider::mousePressEvent( e );
     setSliderDown( true );
-    setSliderPosition( valueAt( e->pos().x() ) );   /* emits sliderMoved: seeks */
+    setSliderPosition( valueAt( e->pos().x() ) );   /* emits sliderMoved */
     e->accept();
 }
 
@@ -300,8 +312,20 @@ void ThinSeekBar::mouseMoveEvent( QMouseEvent *e )
 
 void ThinSeekBar::mouseReleaseEvent( QMouseEvent *e )
 {
+    const bool pending = seekLimit->isActive();
+    seekLimit->stop();
+    if( pending )
+        seek();
     setSliderDown( false );
     e->accept();
+}
+
+/* the wheel does over the bar what it does over the rest of the player
+ * (MainInterface::wheelEvent: the volume); QSlider would move the thumb
+ * with no seek */
+void ThinSeekBar::wheelEvent( QWheelEvent *e )
+{
+    e->ignore();
 }
 
 void ThinSeekBar::paintEvent( QPaintEvent * )
@@ -334,15 +358,55 @@ NowPlayingInfo::NowPlayingInfo( intf_thread_t *_p_i, QObject *parent )
     : QObject( parent ), p_intf( _p_i )
 {
     InputManager *im = THEMIM->getIM();
-    /* a stop sends NULL: the views keep the last item */
+    /* delInput, at a stop and before every next input, clears the name and
+     * the art with no input left: the views keep the last item, and a new
+     * item's own name and art are read when it starts */
     connect( im, QOverload<QString>::of( &InputManager::artChanged ), this,
-             [this]( const QString &url ) { art = url; emit changed(); } );
+             [this]( const QString &url ) {
+                 if( url.isEmpty() && !THEMIM->getIM()->hasInput() )
+                     return;
+                 setArt( url );
+                 emit changed();
+             } );
+    /* the name stock shows: input-title-format, with a stream's now playing */
+    connect( im, &InputManager::nameChanged, this, [this]( const QString &name ) {
+        if( name.isEmpty() && !THEMIM->getIM()->hasInput() )
+            return;
+        title = name;
+        emit changed();
+    } );
     connect( im, &InputManager::currentMetaChanged, this, &NowPlayingInfo::readItem );
     connect( im, &InputManager::infoChanged, this, &NowPlayingInfo::readItem );
     connect( THEMIM, &MainInputManager::inputChanged, this, [this]( bool has ) {
         if( has && THEMIM->getInput() )
+        {
+            title = THEMIM->getIM()->getName();
+            setArt( InputManager::decodeArtURL( input_GetItem( THEMIM->getInput() ) ) );
             readItem( input_GetItem( THEMIM->getInput() ) );
+        }
     } );
+}
+
+/* Decoded once for all the views, no larger than the biggest of them
+ * needs: a 6000 px cover would take 144 MB and freeze the interface */
+void NowPlayingInfo::setArt( const QString &url )
+{
+    if( url == artUrl )
+        return;
+    artUrl = url;
+    art = QPixmap();
+    if( url.isEmpty() )
+        return;
+    /* shortcut: sized for the scale at decode, a later scale change
+     * crops from it until the next item; decode again on Theme::changed
+     * if that blur shows */
+    const int cap = qCeil( Theme::instance()->px( qMax( NowPlaying::ArtL, NowPlaying::MiniW ) )
+                           * qApp->devicePixelRatio() );
+    QImageReader reader( url );
+    const QSize full = reader.size();
+    if( full.isValid() && qMin( full.width(), full.height() ) > cap )
+        reader.setScaledSize( full.scaled( cap, cap, Qt::KeepAspectRatioByExpanding ) );
+    art = QPixmap::fromImage( reader.read() );
 }
 
 void NowPlayingInfo::readItem( input_item_t *p_item )
@@ -350,7 +414,6 @@ void NowPlayingInfo::readItem( input_item_t *p_item )
     if( p_item == NULL )
         return;
     char *psz;
-    psz = input_item_GetTitleFbName( p_item ); title = qfu( psz ).trimmed(); free( psz );
     psz = input_item_GetArtist( p_item ); artist = qfu( psz ).trimmed(); free( psz );
     psz = input_item_GetAlbum( p_item );  album = qfu( psz ).trimmed();  free( psz );
     psz = input_item_GetDate( p_item );   year = qfu( psz ).left( 4 );   free( psz );

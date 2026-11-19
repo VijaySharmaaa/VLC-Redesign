@@ -60,6 +60,16 @@ SpectrumFrame ring[RING];
 unsigned ringHead;
 /* Visible widgets; the filter passes blocks through untouched at 0 */
 std::atomic<int> viewers( 0 );
+/* A pause holds back the blocks measured before it by its length: when it
+ * began (0: not paused) and the ring's head then (under ringLock) */
+mtime_t pausedAt;
+unsigned pausedHead;
+
+void clearRing()
+{
+    QMutexLocker locker( &ringLock );
+    memset( ring, 0, sizeof( ring ) );
+}
 }
 
 static block_t *SpectrumFilter( filter_t *p_filter, block_t *p_block )
@@ -90,6 +100,13 @@ static block_t *SpectrumFilter( filter_t *p_filter, block_t *p_block )
     return p_block;
 }
 
+/* a seek or a stop (aout_FiltersFlush): the blocks measured ahead will
+ * not play */
+static void FlushSpectrum( filter_t * )
+{
+    clearRing();
+}
+
 int OpenSpectrumFilter( vlc_object_t *p_this )
 {
     filter_t *p_filter = (filter_t *)p_this;
@@ -99,18 +116,16 @@ int OpenSpectrumFilter( vlc_object_t *p_this )
     aout_FormatPrepare( &p_filter->fmt_in.audio );
     p_filter->fmt_out.audio = p_filter->fmt_in.audio;
     p_filter->pf_audio_filter = SpectrumFilter;
+    p_filter->pf_flush = FlushSpectrum;
 
-    QMutexLocker locker( &ringLock );
-    memset( ring, 0, sizeof( ring ) ); /* drop the previous track */
+    clearRing(); /* drop the previous track */
     return VLC_SUCCESS;
 }
 
-void SpectrumWidget::setTap( intf_thread_t *p_intf, bool add )
+/* Adds or removes the tap in obj's "audio-filter" */
+static void editTap( vlc_object_t *obj, bool add )
 {
-    audio_output_t *aout = THEMIM->getAout();
-    if( aout == NULL )
-        return;
-    char *psz = var_GetString( aout, "audio-filter" );
+    char *psz = var_GetString( obj, "audio-filter" );
     QStringList list = qfu( psz ).split( ':', QString::SkipEmptyParts );
     free( psz );
     if( list.contains( tapName ) != add )
@@ -119,14 +134,28 @@ void SpectrumWidget::setTap( intf_thread_t *p_intf, bool add )
             list << tapName;
         else
             list.removeAll( tapName );
-        /* the audio output rebuilds its filters (FilterCallback) */
-        var_SetString( aout, "audio-filter", qtu( list.join( ":" ) ) );
+        /* an audio output rebuilds its filters (FilterCallback) */
+        var_SetString( obj, "audio-filter", qtu( list.join( ":" ) ) );
     }
+}
+
+void SpectrumWidget::setTap( intf_thread_t *p_intf, bool add )
+{
+    /* playlist_EnableAudioFilter (Lua, HTTP, the equalizer) copies the
+     * output's list, tap included, into the playlist's: the next output
+     * and any later interface would inherit it */
+    if( !add )
+        editTap( VLC_OBJECT( THEPL ), false );
+    audio_output_t *aout = THEMIM->getAout();
+    if( aout == NULL )
+        return;
+    editTap( VLC_OBJECT( aout ), add );
     vlc_object_release( aout );
 }
 
 SpectrumWidget::SpectrumWidget( intf_thread_t *_p_i, QWidget *parent )
-    : QWidget( parent ), p_intf( _p_i ), playing( false ), counted( false )
+    : QWidget( parent ), p_intf( _p_i ), playing( false ), counted( false ),
+      lastFrame( 0 )
 {
     memset( shown, 0, sizeof( shown ) );
     setAttribute( Qt::WA_TransparentForMouseEvents );
@@ -142,6 +171,7 @@ SpectrumWidget::SpectrumWidget( intf_thread_t *_p_i, QWidget *parent )
     connect( THEMIM->getIM(), &InputManager::playingStatusChanged, this,
              [this]( int state ) {
                  playing = ( state == PLAYING_S );
+                 shiftForPause( state );
                  restart();
              } );
     playing = THEMIM->getIM()->playingStatus() == PLAYING_S;
@@ -164,10 +194,39 @@ QSize SpectrumWidget::sizeHint() const
     return QSize( 0, height() );
 }
 
+/* The blocks measured before a pause play after it, later by its length:
+ * so are their frames. Frames measured since the resume are left alone. */
+void SpectrumWidget::shiftForPause( int state )
+{
+    const mtime_t now = mdate();
+    QMutexLocker locker( &ringLock );
+    if( state == PAUSE_S )
+    {
+        if( pausedAt == 0 )
+        {
+            pausedAt = now;
+            pausedHead = ringHead;
+        }
+        return;
+    }
+    if( state == PLAYING_S && pausedAt != 0 )
+    {
+        const unsigned since = ringHead - pausedHead;
+        for( unsigned k = 1; since < RING && k <= RING - since; k++ )
+        {
+            SpectrumFrame &f = ring[( pausedHead - k ) % RING];
+            if( f.date != 0 )
+                f.date += now - pausedAt;
+        }
+    }
+    pausedAt = 0;
+}
+
 void SpectrumWidget::restart()
 {
+    lastFrame = mdate(); /* give the first frames time to come */
     if( isVisible() )
-        timer->start();
+        timer->start( NowPlaying::SpectrumFrame );
     else
         timer->stop();
 }
@@ -239,13 +298,11 @@ void SpectrumWidget::tick()
             timer->stop();
         return;
     }
-    timer->setInterval( NowPlaying::SpectrumFrame );
-
     float target[BANDS] = { 0.f };
+    const mtime_t now = mdate();
     if( playing )
     {
         /* Newest frame that is due, ignoring stale ones (seek, pause, gaps) */
-        const mtime_t now = mdate();
         QMutexLocker locker( &ringLock );
         const SpectrumFrame *best = NULL;
         for( unsigned i = 0; i < RING; i++ )
@@ -256,7 +313,10 @@ void SpectrumWidget::tick()
                 best = &f;
         }
         if( best != NULL )
+        {
             memcpy( target, best->bands, sizeof( target ) );
+            lastFrame = now;
+        }
     }
 
     /* Eased approach over the real time since the last frame (capped, so a
@@ -267,16 +327,25 @@ void SpectrumWidget::tick()
         clock.start();
     const float rise = 1.f - std::exp( -dt / NowPlaying::SpectrumAttack );
     const float fall = 1.f - std::exp( -dt / NowPlaying::SpectrumRelease );
-    bool settled = true;
+    bool settled = true, moved = false;
     for( unsigned b = 0; b < BANDS; b++ )
     {
         const float d = target[b] - shown[b];
+        const float was = shown[b];
         shown[b] = std::fabs( d ) < 1e-3f ? target[b] : shown[b] + d * ( d > 0.f ? rise : fall );
         settled &= shown[b] == target[b];
+        moved |= shown[b] != was;
     }
-    update();
+    if( moved )
+        update();
     if( !playing && settled )
         timer->stop(); /* paused or stopped: settled flat */
+    /* playing with no frame for a second (passthrough, a filter-less
+     * output, a stall): flat, so check back at the slow rate */
+    const bool starved = settled && now - lastFrame > CLOCK_FREQ;
+    const int interval = starved ? NowPlaying::SpectrumMotion : NowPlaying::SpectrumFrame;
+    if( timer->interval() != interval )
+        timer->setInterval( interval ); /* restarts the timer: only on a change */
 }
 
 void SpectrumWidget::paintEvent( QPaintEvent * )
