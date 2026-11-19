@@ -1531,6 +1531,8 @@ void MainInterface::togglePlaylist()
         /* from what is on screen: full screen hides the panel */
         playlistVisible = !( playlistPanel && playlistPanel->isVisible() );
         showPlaylistPanel( playlistVisible );
+        if( !playlistVisible )   /* closed by the user, not stepped aside */
+            playlistPanel->clearFilter();
     }
     else
     {
@@ -1589,8 +1591,9 @@ void MainInterface::dockPlaylist( bool p_docked )
     else /* Previously undocked */
     {
         playlistVisible = dialog->isVisible();
-        dialog->hide();
+        /* exported first: the hide then is no close, the search stays */
         playlistWidget = dialog->exportPlaylistWidget();
+        dialog->hide();
         stackCentralW->addWidget( playlistWidget );
 
         /* If playlist is invisible don't show it */
