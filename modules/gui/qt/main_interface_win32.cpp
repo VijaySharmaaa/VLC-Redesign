@@ -49,6 +49,10 @@
 #include VLC_QT_WSI_H
 
 #include <windowsx.h>   /* GET_X_LPARAM */
+#include <shellapi.h>   /* APPBARDATA */
+#ifndef ABM_GETAUTOHIDEBAREX
+# define ABM_GETAUTOHIDEBAREX 0x0000000b   /* Windows 8, missing from XP headers */
+#endif
 #ifndef WM_DPICHANGED
 # define WM_DPICHANGED 0x02E0   /* Windows 8.1, missing from XP headers */
 #endif
@@ -160,6 +164,49 @@ void MainInterfaceWin32::updateCustomFrame( bool fullscreen )
         SetWindowPos( hwnd, NULL, before.left, before.top, before.right - before.left,
                       before.bottom - before.top,
                       SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED );
+}
+
+/* A maximised client rect covering the whole monitor reads as full screen
+ * to the shell, which then keeps an auto-hide taskbar down: leave the
+ * edges such a bar slides in from free, as other drawn-caption apps do.
+ * Returns whether one was found. */
+static bool leaveAutoHideEdges( HWND hwnd, RECT &client )
+{
+    typedef UINT_PTR (WINAPI *AppBarFn)( DWORD, APPBARDATA * );
+    /* shell32 is not linked by the module: looked up once */
+    static const AppBarFn appBar = reinterpret_cast<AppBarFn>(
+            GetProcAddress( LoadLibraryW( L"shell32.dll" ), "SHAppBarMessage" ) );
+    MONITORINFO mi;
+    mi.cbSize = sizeof( mi );
+    if( !appBar || !GetMonitorInfo( MonitorFromWindow( hwnd, MONITOR_DEFAULTTONEAREST ), &mi ) )
+        return false;
+    /* the shell's own threshold: a 2 px strip lets the bar see the mouse */
+    const LONG strip = 2;
+    const UINT edges[] = { ABE_LEFT, ABE_TOP, ABE_RIGHT, ABE_BOTTOM };
+    bool found = false;
+    for( size_t i = 0; i < sizeof( edges ) / sizeof( edges[0] ); i++ )
+    {
+        APPBARDATA abd;
+        memset( &abd, 0, sizeof( abd ) );
+        abd.cbSize = sizeof( abd );
+        abd.uEdge = edges[i];
+        abd.rc = mi.rcMonitor;
+        /* per monitor from Windows 8; before, the primary monitor's only */
+        bool bar = appBar( ABM_GETAUTOHIDEBAREX, &abd ) != 0;
+        if( !bar && ( mi.dwFlags & MONITORINFOF_PRIMARY ) )
+            bar = appBar( ABM_GETAUTOHIDEBAR, &abd ) != 0;
+        if( !bar )
+            continue;
+        found = true;
+        switch( edges[i] )
+        {
+            case ABE_LEFT:   client.left   = qMax( client.left, mi.rcMonitor.left + strip ); break;
+            case ABE_TOP:    client.top    = qMax( client.top, mi.rcMonitor.top + strip ); break;
+            case ABE_RIGHT:  client.right  = qMin( client.right, mi.rcMonitor.right - strip ); break;
+            default:         client.bottom = qMin( client.bottom, mi.rcMonitor.bottom - strip ); break;
+        }
+    }
+    return found;
 }
 
 bool MainInterfaceWin32::event( QEvent *e )
@@ -374,6 +421,28 @@ bool MainInterfaceWin32::nativeEventFilter(const QByteArray &, void *message, lo
                     *result = 0;
                 return true;
         }
+    }
+
+    /* Maximised: the client rect Qt's custom margins give (the caption cut
+     * off, DefWindowProc's rect up to the window top), less the auto-hide
+     * taskbar edges; without such a bar Qt keeps handling it */
+    if( msg->message == WM_NCCALCSIZE && msg->wParam && titleBar->hasCaptionButtons()
+        && !isFullScreen() && msg->hwnd == WinId( this ) && IsZoomed( msg->hwnd ) )
+    {
+        NCCALCSIZE_PARAMS *ncp = reinterpret_cast<NCCALCSIZE_PARAMS *>( msg->lParam );
+        const NCCALCSIZE_PARAMS proposed = *ncp;
+        const LRESULT res = DefWindowProc( msg->hwnd, msg->message, msg->wParam, msg->lParam );
+        RECT client = ncp->rgrc[0];
+        client.top = proposed.rgrc[0].top;
+        if( leaveAutoHideEdges( msg->hwnd, client ) )
+        {
+            ncp->rgrc[0] = client;
+            if( result )
+                *result = res;
+            return true;
+        }
+        /* undo DefWindowProc: Qt runs it again */
+        *ncp = proposed;
     }
 
     /* another monitor's dpi: Windows drew the frames anew, the caption
