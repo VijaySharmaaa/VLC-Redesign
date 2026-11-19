@@ -68,6 +68,7 @@ private:
     bool playing;
     bool counted;
     float shown[BANDS];
+    mtime_t lastFrame;   /* when tick() last found a frame due */
 };
 
 #endif

@@ -143,7 +143,8 @@ void SpectrumWidget::setTap( intf_thread_t *p_intf, bool add )
 }
 
 SpectrumWidget::SpectrumWidget( intf_thread_t *_p_i, QWidget *parent )
-    : QWidget( parent ), p_intf( _p_i ), playing( false ), counted( false )
+    : QWidget( parent ), p_intf( _p_i ), playing( false ), counted( false ),
+      lastFrame( 0 )
 {
     memset( shown, 0, sizeof( shown ) );
     setAttribute( Qt::WA_TransparentForMouseEvents );
@@ -212,8 +213,9 @@ void SpectrumWidget::shiftForPause( int state )
 
 void SpectrumWidget::restart()
 {
+    lastFrame = mdate(); /* give the first frames time to come */
     if( isVisible() )
-        timer->start();
+        timer->start( NowPlaying::SpectrumFrame );
     else
         timer->stop();
 }
@@ -285,13 +287,11 @@ void SpectrumWidget::tick()
             timer->stop();
         return;
     }
-    timer->setInterval( NowPlaying::SpectrumFrame );
-
     float target[BANDS] = { 0.f };
+    const mtime_t now = mdate();
     if( playing )
     {
         /* Newest frame that is due, ignoring stale ones (seek, pause, gaps) */
-        const mtime_t now = mdate();
         QMutexLocker locker( &ringLock );
         const SpectrumFrame *best = NULL;
         for( unsigned i = 0; i < RING; i++ )
@@ -302,7 +302,10 @@ void SpectrumWidget::tick()
                 best = &f;
         }
         if( best != NULL )
+        {
             memcpy( target, best->bands, sizeof( target ) );
+            lastFrame = now;
+        }
     }
 
     /* Eased approach over the real time since the last frame (capped, so a
@@ -313,16 +316,25 @@ void SpectrumWidget::tick()
         clock.start();
     const float rise = 1.f - std::exp( -dt / NowPlaying::SpectrumAttack );
     const float fall = 1.f - std::exp( -dt / NowPlaying::SpectrumRelease );
-    bool settled = true;
+    bool settled = true, moved = false;
     for( unsigned b = 0; b < BANDS; b++ )
     {
         const float d = target[b] - shown[b];
+        const float was = shown[b];
         shown[b] = std::fabs( d ) < 1e-3f ? target[b] : shown[b] + d * ( d > 0.f ? rise : fall );
         settled &= shown[b] == target[b];
+        moved |= shown[b] != was;
     }
-    update();
+    if( moved )
+        update();
     if( !playing && settled )
         timer->stop(); /* paused or stopped: settled flat */
+    /* playing with no frame for a second (passthrough, a filter-less
+     * output, a stall): flat, so check back at the slow rate */
+    const bool starved = settled && now - lastFrame > CLOCK_FREQ;
+    const int interval = starved ? NowPlaying::SpectrumMotion : NowPlaying::SpectrumFrame;
+    if( timer->interval() != interval )
+        timer->setInterval( interval ); /* restarts the timer: only on a change */
 }
 
 void SpectrumWidget::paintEvent( QPaintEvent * )
