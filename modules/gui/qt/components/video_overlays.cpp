@@ -274,6 +274,7 @@ BufferingOverlay::BufferingOverlay( intf_thread_t *_p_intf, QWidget *owner, QWid
     connect( im, &InputManager::cachingChanged, this,
              [this]( float ) { refresh(); } );
     connect( im, &InputManager::playingStatusChanged, this, [this]() { refresh(); } );
+    connect( im, &InputManager::esChanged, this, [this]() { refresh(); } );
 }
 
 void BufferingOverlay::setOnPlayer( bool b )
@@ -308,10 +309,27 @@ static QString withoutUserInfo( const QString &mrl )
     return at < from ? mrl : mrl.left( from ) + mrl.mid( at + 1 );
 }
 
+/* Only an input with a track fills a cache: one without (vlc://pause, a
+ * directory or playlist being expanded) keeps "cache" at 0 all along */
+static bool hasTrack( input_thread_t *input )
+{
+    static const char *const vars[] = { "video-es", "audio-es", "spu-es" };
+    for( size_t i = 0; i < sizeof( vars ) / sizeof( *vars ); i++ )
+    {
+        vlc_value_t count;
+        if( var_Change( input, vars[i], VLC_VAR_CHOICESCOUNT, &count, NULL ) == VLC_SUCCESS
+         && count.i_int > 0 )
+            return true;
+    }
+    return false;
+}
+
 bool BufferingOverlay::buffering() const
 {
     const int status = THEMIM->getIM()->playingStatus();
-    return onPlayer && ( status == OPENING_S || status == PLAYING_S ) && level() < 1.f;
+    input_thread_t *input = THEMIM->getInput();
+    return onPlayer && ( status == OPENING_S || status == PLAYING_S ) && level() < 1.f
+        && input && hasTrack( input );
 }
 
 void BufferingOverlay::refresh()
