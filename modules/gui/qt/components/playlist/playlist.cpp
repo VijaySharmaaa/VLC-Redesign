@@ -393,7 +393,8 @@ void LocationButton::paintEvent ( QPaintEvent * )
         const Theme *theme = Theme::instance();
         p.setPen( Qt::NoPen );
         p.setBrush( theme->ink( RedesignTokens::InkAlpha::HoverFill ) );
-        p.drawRoundedRect( option.rect.adjusted( 0, 2, 0, -2 ),
+        const int inset = theme->px( RedesignTokens::Playlist::LocationHoverInsetY );
+        p.drawRoundedRect( option.rect.adjusted( 0, inset, 0, -inset ),
                            theme->metric( Theme::RadiusSm ), theme->metric( Theme::RadiusSm ) );
         p.restore();
     }

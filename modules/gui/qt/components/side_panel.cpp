@@ -143,11 +143,9 @@ void SidePanel::paintEvent( QPaintEvent * )
     if( s )
     {
         /* shortcut: a linear ramp for the prototype's 50 px blur */
-        QColor shadow( Qt::black );
-        shadow.setAlpha( Playlist::DrawerShadowAlpha );
         QLinearGradient ramp( 0, 0, s, 0 );
         ramp.setColorAt( 0, Qt::transparent );
-        ramp.setColorAt( 1, shadow );
+        ramp.setColorAt( 1, QColor::fromRgba( Playlist::DrawerShadowColor ) );
         p.fillRect( 0, 0, s, height(), ramp );
     }
     paintSheet( p, QRect( s, 0, width() - s, height() ) );
