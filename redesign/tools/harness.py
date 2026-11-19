@@ -162,10 +162,6 @@ class Vlc:
         win32gui.PostMessage(hwnd, win32con.WM_CLOSE, 0, 0)
         self.wait_for(lambda: hwnd not in self.windows(), 'window to close')
 
-    def main_size(self):
-        r = self.main.rectangle()
-        return r.width(), r.height()
-
     def press_in_window(self, keys, what):
         """Press keys that change the main window itself (a panel, sheet or
         page in the redesign) and wait until its pixels change."""
@@ -176,6 +172,12 @@ class Vlc:
 
     def toggle_playlist(self):
         self.press_in_window('^l', 'playlist to toggle')   # Ctrl+L is hard-coded in 3.0.x
+
+    def playing_time(self):
+        """Seconds played (rc get_time); 0 before playback starts. Skips the
+        asynchronous 'status change' lines rc may print in between."""
+        lines = [l.strip('> ') for l in self.rc('get_time', wait=0.2).splitlines()]
+        return max([int(l) for l in lines if l.isdigit()] or [0])
 
     def shot(self, out, title=''):
         cmd = ['powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
@@ -204,9 +206,10 @@ def baseline(args):
     v = Vlc(args.vlc)
     try:
         v.shot(p('01-main-idle.png'))
-        idle = v.main_size()
         v.rc('add ' + media('test-720p.mp4'), wait=2)
-        v.wait_for(lambda: v.main_size() != idle, 'the video to resize the window')
+        # Stock VLC resizes the window to the video, the redesign keeps its size:
+        # wait for playback to advance instead, which both do.
+        v.wait_for(lambda: v.playing_time() >= 1, 'the video to play', timeout=15)
         v.rc('seek 10', wait=1)
         v.rc('pause', wait=1)
         v.shot(p('02-main-video-paused.png'))
