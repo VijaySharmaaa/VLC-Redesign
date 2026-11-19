@@ -552,7 +552,12 @@ void MainInterface::recreateToolbars()
         THEMIM->requestVoutUpdate();
     }
 
-    setMinimalView( b_minimalView );
+    /* rebuilt in video full screen (a screen of another scale): the new
+     * decks stay hidden, setVideoFullScreen( false ) brings them back */
+    if( b_videoFullScreen )
+        displayNormalView();
+    else
+        setMinimalView( b_minimalView );
     /* the new seek rows know nothing of a paused input */
     THEMIM->getIM()->resendPosition();
 }
