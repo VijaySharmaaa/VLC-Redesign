@@ -345,7 +345,8 @@ OpenDialog::OpenDialog( QWidget *parent,
     connect( ui.cacheSpinBox, QOverload<int>::of(&QSpinBox::valueChanged), this, QOverload<>::of(&OpenDialog::updateMRL) );
     connect( ui.startTimeTimeEdit, &QTimeEdit::timeChanged, this, QOverload<>::of(&OpenDialog::updateMRL) );
     connect( ui.stopTimeTimeEdit, &QTimeEdit::timeChanged, this, QOverload<>::of(&OpenDialog::updateMRL) );
-    BUTTONACT( ui.advancedCheckBox, toggleAdvancedPanel );
+    /* toggled, not clicked: a screen reader checks the box without a click */
+    connect( ui.advancedCheckBox, &QCheckBox::toggled, this, QOverload<>::of(&OpenDialog::toggleAdvancedPanel) );
     BUTTONACT( ui.slaveBrowseButton, browseInputSlave );
 
     /* Buttons action */
@@ -498,7 +499,10 @@ void OpenDialog::showTab( int i_tab )
 
 void OpenDialog::toggleAdvancedPanel()
 {
-    if( ui.advancedFrame->isVisible() )
+    /* follows the box: the restored state at start is already shown */
+    if( ui.advancedCheckBox->isChecked() == !ui.advancedFrame->isHidden() )
+        return;
+    if( !ui.advancedCheckBox->isChecked() )
     {
         ui.advancedFrame->hide();
         ui.advancedFrame->setEnabled( false );
