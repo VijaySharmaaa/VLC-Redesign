@@ -157,6 +157,8 @@ namespace RedesignTokens
     namespace Prefs
     {
         static const int ContentMaxW = 720;   /* the prototype's max-width */
+        static const int LabelFieldGap = 14;  /* label to the field beside it, advanced forms */
+        static const int SpinW = 88;          /* a number field, sized for a few digits */
     }
 }
 

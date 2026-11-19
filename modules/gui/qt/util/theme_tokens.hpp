@@ -130,7 +130,7 @@ namespace RedesignTokens
         /* not in tokens.json: a tooltip's text inset, on top of the 2 px
          * margin and 1 px indent Qt's tooltip label adds itself */
         static const int TooltipPadX = 6, TooltipPadY = 2;
-        /* not in tokens.json: the least room between a label and the field
+        /* the least room between a label and the field
          * beside it, in the preference forms (Qt's own spacing is about 6) */
         static const int LabelFieldGap = 14;
         static const int ButtonPadX = 16;
@@ -403,7 +403,7 @@ namespace RedesignTokens
         /* the card and its rows */
         static const int CardRadius = 8, RowMinH = 60, RowPadX = 18, RowPadY = 12;
         static const int RowGap = 20, DescGap = 3, ButtonGap = 8;
-        /* not in tokens.json: a number field, sized for a few digits */
+        /* a number field, sized for a few digits */
         static const int SpinW = 88;
         /* selects and fields on the right of a row: the prototype's selW
          * (it narrows to 180 at XS) */
