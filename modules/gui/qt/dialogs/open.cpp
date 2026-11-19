@@ -508,7 +508,7 @@ void OpenDialog::toggleAdvancedPanel()
         ui.advancedFrame->setEnabled( false );
         if( size().isValid() )
             resize( size().width(), size().height()
-                    - ui.advancedFrame->height() );
+                    - ui.advancedFrame->sizeHint().height() );
     }
     else
     {
@@ -516,7 +516,7 @@ void OpenDialog::toggleAdvancedPanel()
         ui.advancedFrame->setEnabled( true );
         if( size().isValid() )
             resize( size().width(), size().height()
-                    + ui.advancedFrame->height() );
+                    + ui.advancedFrame->sizeHint().height() );
     }
 }
 
