@@ -33,6 +33,16 @@
 #include <vlc_interface.h>              /* EXTENSIONS_VIDEO */
 
 #include <climits>                       /* INT_MAX */
+#ifdef _WIN32
+# include <windows.h>                    /* GetFileAttributesW */
+/* Windows 10 1709 names, missing from older SDKs */
+# ifndef FILE_ATTRIBUTE_RECALL_ON_OPEN
+#  define FILE_ATTRIBUTE_RECALL_ON_OPEN 0x00040000
+# endif
+# ifndef FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS
+#  define FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS 0x00400000
+# endif
+#endif
 
 #include <QCoreApplication>
 #include <QCryptographicHash>
@@ -164,7 +174,21 @@ void ThumbJob::run()
     const QString file = cacheDir + QLatin1Char( '/' )
                        + QString::fromLatin1( QCryptographicHash::hash( id, QCryptographicHash::Sha1 ).toHex() )
                        + QLatin1String( ".png" );
-    emit probed( path, file, QFileInfo( file ).size() > 0 );
+    const bool cached = QFileInfo( file ).size() > 0;
+#ifdef _WIN32
+    /* an online-only file (OneDrive, other cloud folders) would be
+     * downloaded by the grab: its frame only when it is on the disk */
+    const DWORD attrs = GetFileAttributesW(
+        reinterpret_cast<const wchar_t *>( QDir::toNativeSeparators( path ).utf16() ) );
+    if( !cached && attrs != INVALID_FILE_ATTRIBUTES
+     && ( attrs & ( FILE_ATTRIBUTE_OFFLINE | FILE_ATTRIBUTE_RECALL_ON_OPEN
+                  | FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS ) ) )
+    {
+        emit probed( path, QString(), false );
+        return;
+    }
+#endif
+    emit probed( path, file, cached );
 }
 
 /**********************************************************************
@@ -181,7 +205,8 @@ Thumbnailer *Thumbnailer::instance( intf_thread_t *p_intf )
 
 Thumbnailer::Thumbnailer( intf_thread_t *_p_intf, QObject *parent )
     : QObject( parent ), p_intf( _p_intf ), epoch( 0 ), serial( 0 ),
-      /* each one decodes on all cores: half of them keeps VLC responsive */
+      /* each one decodes on one thread (--avcodec-threads=1): on half the
+       * cores, the player and the GUI keep the rest */
       maxJobs( qBound( 1, QThread::idealThreadCount() / 2, int( Library::ThumbWorkersMax ) ) )
 {
     /* portable mode: the dir functions already point next to vlc.exe */
@@ -233,9 +258,12 @@ QString Thumbnailer::frame( const QString &path, int64_t lengthMs )
     const QString key = keyOf( path );
     if( cacheDir.isEmpty() || !isVideo( path ) || failedFrames.contains( key ) )
         return QString();
-    QHash<QString, QString>::const_iterator it = frames.constFind( key );
-    if( it != frames.constEnd() )
-        return it.value();
+    /* a frame known before the last cancel() is shown while the file is
+     * looked at again (a replaced file gets a new frame) */
+    QHash<QString, Frame>::const_iterator it = frames.constFind( key );
+    if( it != frames.constEnd() && it.value().epoch == epoch )
+        return it.value().file;
+    const QString shown = it != frames.constEnd() ? it.value().file : QString();
     if( pendingFrames.contains( key ) )
     {
         /* painted again, so on screen: ahead of the cards scrolled away */
@@ -259,7 +287,7 @@ QString Thumbnailer::frame( const QString &path, int64_t lengthMs )
                  }, Qt::QueuedConnection );
         LibraryData::filePool()->start( job );
     }
-    return QString();
+    return shown;
 }
 
 const QStringList *Thumbnailer::videos( const QString &dir )
@@ -343,13 +371,17 @@ void Thumbnailer::probed( const QString &path, const QString &file, bool cached,
     {
         pendingFrames.remove( key );
         failedFrames.insert( key );
+        frames.remove( key );
         return;
     }
     if( cached )
     {
         pendingFrames.remove( key );
-        frames.insert( key, file );
-        emit changed();
+        const bool fresh = frames.value( key ).file != file;
+        const Frame f = { file, epoch };
+        frames.insert( key, f );
+        if( fresh )
+            emit changed();
         return;
     }
     /* the middle of a film opens on a scene, its start often on black */
@@ -435,8 +467,9 @@ void Thumbnailer::start( const Request &r )
          << "--no-metadata-network-access" << "--no-lua" << "--no-auto-preparse"
          << "--vout=dummy" << "--no-audio"
          << "--no-spu" << "--no-osd" << "--no-video-title-show" << "--no-sub-autodetect-file"
-         /* the scene filter takes system memory pictures */
-         << "--avcodec-hw=none"
+         /* the scene filter takes system memory pictures; one decoding
+          * thread, as several probes run at once */
+         << "--avcodec-hw=none" << "--avcodec-threads=1"
          /* the first picture at once: no file cache (1 s) before it shows,
           * a seek to the key frame before the time instead of decoding up
           * to the time, and nothing dropped for being late */
@@ -505,7 +538,8 @@ void Thumbnailer::finish( QProcess *process, bool ok )
      && ( QFile::rename( j.tmpFile, j.r.file ) || QFileInfo( j.r.file ).size() > 0 ) )
     {
         pendingFrames.remove( j.r.key );
-        frames.insert( j.r.key, j.r.file );
+        const Frame f = { j.r.file, epoch };
+        frames.insert( j.r.key, f );
         emit changed();
     }
     else if( ok && j.r.atSec > 0 )

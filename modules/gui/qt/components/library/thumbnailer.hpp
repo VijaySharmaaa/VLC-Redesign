@@ -81,6 +81,11 @@ private:
         QString key, path, file;
         int atSec;
     };
+    struct Frame
+    {
+        QString file;                        /* a PNG */
+        int epoch;                           /* when the file was last looked at */
+    };
     struct Job
     {
         Request r;
@@ -101,7 +106,7 @@ private:
     int epoch;                               /* cancel()s so far */
     int serial;                              /* of the part files */
     QString cacheDir;
-    QHash<QString, QString> frames;          /* key: its PNG file */
+    QHash<QString, Frame> frames;            /* key: its frame */
     QSet<QString> pendingFrames, failedFrames, pendingDirs;
     QHash<QString, QStringList> dirs;
     QHash<QString, QString> covers;          /* key: of dirs, a video under it */
