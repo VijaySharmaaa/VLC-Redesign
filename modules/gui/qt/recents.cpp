@@ -27,6 +27,7 @@
 #include "dialogs_provider.hpp"
 #include "menus.hpp"
 #include "util/qt_dirs.hpp"
+#include "components/library/thumbnailer.hpp"
 
 #include <QStringList>
 #include <QDateTime>
@@ -141,6 +142,8 @@ void RecentsMRL::removeRecent( const QString &mrl )
 
 void RecentsMRL::clear()
 {
+    /* also at each start while qt-recentplay is off */
+    Thumbnailer::removeCache();
     if ( recents.isEmpty() )
         return;
 

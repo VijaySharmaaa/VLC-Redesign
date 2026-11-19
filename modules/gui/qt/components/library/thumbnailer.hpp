@@ -65,6 +65,9 @@ public:
     /* Drops the queue, the listings and the failures: the page was left.
      * Nothing starts again until a frame or a listing is asked for. */
     void cancel();
+    /* Removes every cached frame (the recents were cleared or are off):
+     * they tell what was in the library */
+    static void removeCache();
 
     static bool isVideo( const QString &path );
 

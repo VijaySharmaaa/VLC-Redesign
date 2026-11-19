@@ -53,6 +53,7 @@
 #include <QMutex>
 #include <QPointer>
 #include <QProcess>
+#include <QStandardPaths>
 #include <QThread>
 #include <QTimer>
 
@@ -78,6 +79,32 @@ static const QStringList &videoFilters()
 bool Thumbnailer::isVideo( const QString &path )
 {
     return hasExtension( path, videoFilters() );
+}
+
+static QString thumbDirOf( vlc_userdir_t type )
+{
+    char *psz = config_GetUserDir( type );
+    const QString dir = psz ? QDir::fromNativeSeparators( qfu( psz ) ) + QLatin1String( "/thumbnails" )
+                            : QString();
+    free( psz );
+    return dir;
+}
+
+/* The frame cache; empty when there is none */
+static QString cacheDirectory()
+{
+#ifdef _WIN32
+    /* VLC's cache dir is in the roaming profile: the local one instead,
+     * unless VLC runs portable (a "portable" folder next to vlc.exe, as
+     * config_GetAppDir checks), where every dir of VLC is that folder */
+    if( !QFileInfo( QCoreApplication::applicationDirPath() + QLatin1String( "/portable" ) ).isDir() )
+    {
+        const QString local = QStandardPaths::writableLocation( QStandardPaths::GenericDataLocation );
+        if( !local.isEmpty() )
+            return local + QLatin1String( "/vlc/thumbnails" );
+    }
+#endif
+    return thumbDirOf( VLC_CACHE_DIR );
 }
 
 /* Trims the frame cache once per VLC run, in the first probe: the part
@@ -108,6 +135,12 @@ static void pruneCache( const QString &dir )
     for( int i = 0; i < frames.count() && total > max; i++ )
         if( QFile::remove( frames.at( i ).filePath() ) )
             total -= frames.at( i ).size();
+#ifdef _WIN32
+    /* the frames earlier builds kept in the roaming profile */
+    const QString roaming = thumbDirOf( VLC_CACHE_DIR );
+    if( !roaming.isEmpty() && QDir( roaming ) != QDir( dir ) )
+        QDir( roaming ).removeRecursively();
+#endif
 }
 
 /**********************************************************************
@@ -194,10 +227,11 @@ void ThumbJob::run()
 /**********************************************************************
  * Thumbnailer
  **********************************************************************/
+/* kept by the input manager, which outlives the pages */
+static QPointer<Thumbnailer> shared;
+
 Thumbnailer *Thumbnailer::instance( intf_thread_t *p_intf )
 {
-    /* kept by the input manager, which outlives the pages */
-    static QPointer<Thumbnailer> shared;
     if( !shared )
         shared = new Thumbnailer( p_intf, THEMIM );
     return shared;
@@ -209,11 +243,7 @@ Thumbnailer::Thumbnailer( intf_thread_t *_p_intf, QObject *parent )
        * cores, the player and the GUI keep the rest */
       maxJobs( qBound( 1, QThread::idealThreadCount() / 2, int( Library::ThumbWorkersMax ) ) )
 {
-    /* portable mode: the dir functions already point next to vlc.exe */
-    char *psz = config_GetUserDir( VLC_CACHE_DIR );
-    if( psz )
-        cacheDir = QDir::fromNativeSeparators( qfu( psz ) ) + QLatin1String( "/thumbnails" );
-    free( psz );
+    cacheDir = cacheDirectory();
 
     poll = new QTimer( this );
     poll->setInterval( Library::ThumbPollMs );
@@ -251,6 +281,20 @@ Thumbnailer::~Thumbnailer()
     foreach( const QString &name, dir.entryList( QStringList(
                  QString( "*.%1.*.part.*" ).arg( QCoreApplication::applicationPid() ) ), QDir::Files ) )
         dir.remove( name );
+}
+
+void Thumbnailer::removeCache()
+{
+    if( shared )
+    {
+        shared->cancel();
+        shared->frames.clear();
+    }
+    /* shortcut: removed on the GUI thread (at most ThumbCacheMaxMB of
+     * frames, once per clear); move it to filePool if it ever stalls */
+    const QString dir = cacheDirectory();
+    if( !dir.isEmpty() )
+        QDir( dir ).removeRecursively();
 }
 
 QString Thumbnailer::frame( const QString &path, int64_t lengthMs )
