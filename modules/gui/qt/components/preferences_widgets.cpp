@@ -1226,17 +1226,17 @@ void KeySelectorControl::finish()
         - QString name in data of column 0
         - KeyValue in String in column 1
      */
-    auto addKey = [this]( const module_config_t *p_config_item ) {
+    auto addKey = [this]( const module_config_t *p_config_item, const char *psz_value ) {
         QTreeWidgetItem *treeItem = new HotkeyItem();
         treeItem->setText( ACTION_COL, qtr( p_config_item->psz_text ) );
         treeItem->setData( ACTION_COL, Qt::UserRole,
                            QVariant( qfu( p_config_item->psz_name ) ) );
 
-        QString keys = qfu(p_config_item->value.psz ? _(p_config_item->value.psz) : "");
+        QString keys = qfu(psz_value ? _(psz_value) : "");
         treeItem->setText( HOTKEY_COL, keys );
         treeItem->setToolTip( HOTKEY_COL, qtr("Double click to change.\nDelete key to remove.") );
         treeItem->setToolTip( GLOBAL_HOTKEY_COL, qtr("Double click to change.\nDelete key to remove.") );
-        treeItem->setData( HOTKEY_COL, Qt::UserRole, QVariant( qfu( p_config_item->value.psz ) ) );
+        treeItem->setData( HOTKEY_COL, Qt::UserRole, QVariant( qfu( psz_value ) ) );
         table->addTopLevelItem( treeItem );
     };
 
@@ -1256,7 +1256,7 @@ void KeySelectorControl::finish()
          && !strncmp( p_config_item->psz_name , "key-", 4 )
          && !EMPTY_STR( p_config_item->psz_text ) )
         {
-            addKey( p_config_item );
+            addKey( p_config_item, p_config_item->value.psz );
             continue;
         }
 
@@ -1274,7 +1274,12 @@ void KeySelectorControl::finish()
      * it and the Qt module's advanced page shows no second table */
     const module_config_t *p_atob = config_FindConfig( "key-atob" /* MENU_KEY_ATOB */ );
     if( p_atob )
-        addKey( p_atob );
+    {
+        /* the live item: its value read under the config lock, as a copy */
+        char *psz_atob = config_GetPsz( p_this, "key-atob" );
+        addKey( p_atob, psz_atob );
+        free( psz_atob );
+    }
 
     auto i = global_keys.constBegin();
     while (i != global_keys.constEnd())
