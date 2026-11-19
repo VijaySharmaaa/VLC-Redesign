@@ -242,6 +242,14 @@ ThinSeekBar::ThinSeekBar( intf_thread_t *_p_i, QWidget *parent )
     setFocusPolicy( Qt::TabFocus );
     setAccessibleName( qtr( "Seek" ) );
     setToolTip( qtr( "Seek" ) );
+    /* dragging: one seek per SEEK_LIMIT_MS, the last one on release, as
+     * the stock SeekSlider does. Made before setEnabled(): changeEvent()
+     * stops it. */
+    enum { SEEK_LIMIT_MS = 150 };
+    seekLimit = new QTimer( this );
+    seekLimit->setSingleShot( true );
+    seekLimit->setInterval( SEEK_LIMIT_MS );
+    connect( seekLimit, &QTimer::timeout, this, &ThinSeekBar::seek );
     /* the mini player's is made mid-track: start from the current input */
     input_thread_t *input = THEMIM->getInput();
     setEnabled( input != NULL && var_GetBool( input, "can-seek" ) );
@@ -259,13 +267,6 @@ ThinSeekBar::ThinSeekBar( intf_thread_t *_p_i, QWidget *parent )
         if( action != SliderMove )
             seek();
     } );
-    /* dragging: one seek per SEEK_LIMIT_MS, the last one on release, as
-     * the stock SeekSlider does */
-    enum { SEEK_LIMIT_MS = 150 };
-    seekLimit = new QTimer( this );
-    seekLimit->setSingleShot( true );
-    seekLimit->setInterval( SEEK_LIMIT_MS );
-    connect( seekLimit, &QTimer::timeout, this, &ThinSeekBar::seek );
     connect( this, &QAbstractSlider::sliderMoved, this, [this]() {
         if( !seekLimit->isActive() )
             seekLimit->start();
