@@ -12,6 +12,7 @@ DIST_SUBDIRS = m4 $(SUBDIRS)
 EXTRA_DIST = \
 	extras/package/macosx/package.mak \
 	extras/package/win32/package.mak \
+	extras/package/win32/winscard-stub.c \
 	extras/package/npapi.am
 
 dist_noinst_SCRIPTS = bootstrap

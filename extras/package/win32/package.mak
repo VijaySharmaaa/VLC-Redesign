@@ -16,10 +16,15 @@ win32_debugdir=$(abs_top_builddir)/symbols-$(VERSION)
 # without a cache, but logged as stale: the zips leave plugins.dat out, as
 # Windows' own unzip restores local 2-second DOS times, never the build's.
 # The wine prefix defaults to the build dir: HOME may not be ours in a container.
+# Some wine builds have no winscard.dll, so libaribcam_plugin.dll would not load
+# and miss the cache: a stand-in goes in the prefix (never in the package).
 win32_cachegen = \
 	rm -f "$(win32_destdir)/plugins/plugins.dat"; \
-	export WINEPREFIX="$${WINEPREFIX:-$(abs_top_builddir)/wineprefix}" WINEDEBUG=-all WINEDLLOVERRIDES="mscoree,mshtml="; \
-	if command -v wine >/dev/null 2>&1 && \
+	export WINEPREFIX="$${WINEPREFIX:-$(abs_top_builddir)/wineprefix}" WINEDEBUG=-all WINEDLLOVERRIDES="mscoree,mshtml=;winscard=n"; \
+	if command -v wine >/dev/null 2>&1 && wineboot -i && \
+	   sys="$$WINEPREFIX/drive_c/windows/system32" && \
+	   { case "$(host_cpu)" in i?86) [ ! -d "$$WINEPREFIX/drive_c/windows/syswow64" ] || sys="$$WINEPREFIX/drive_c/windows/syswow64";; esac; } && \
+	   $(CC) -shared -s -o "$$sys/winscard.dll" "$(top_srcdir)/extras/package/win32/winscard-stub.c" && \
 	   wine "$(win32_destdir)/vlc-cache-gen$(EXEEXT)" "`winepath -w '$(win32_destdir)/plugins'`" ; then \
 	    echo "generated $(win32_destdir)/plugins/plugins.dat"; \
 	else \
