@@ -130,6 +130,14 @@ namespace
             }
             p->restore();
         }
+
+        /* the check state is only for screen readers: a click or Space must
+         * not flip it, choosing a row (itemClicked/itemActivated) sets it */
+        bool editorEvent( QEvent *, QAbstractItemModel *, const QStyleOptionViewItem &,
+                          const QModelIndex & ) Q_DECL_OVERRIDE
+        {
+            return false;
+        }
     };
 
     class Popover : public QFrame
@@ -190,6 +198,14 @@ namespace
         QPointer<QAbstractButton> anchor;
     };
 
+    /* the accent check, also as a check state so screen readers say "checked" */
+    void setChecked( QListWidgetItem *item, bool checked )
+    {
+        item->setData( CheckedRole, checked );
+        item->setFlags( item->flags() | Qt::ItemIsUserCheckable );
+        item->setCheckState( checked ? Qt::Checked : Qt::Unchecked );
+    }
+
     QListWidget *makeList( QWidget *parent, const QString &name )
     {
         QListWidget *list = new QListWidget( parent );
@@ -209,7 +225,7 @@ namespace
         QListWidgetItem *item = new QListWidgetItem( label, list );
         item->setData( DetailRole, detail );
         item->setData( Qt::AccessibleDescriptionRole, detail );
-        item->setData( CheckedRole, checked );
+        setChecked( item, checked );
         if( checked )
             list->setCurrentItem( item );
         return item;
@@ -308,7 +324,7 @@ namespace
              * cuts them from their exclusive QActionGroup, so the previous
              * choice stays checked; setting the variable always selects */
             for( int i = 0; i < list->count(); i++ )
-                list->item( i )->setData( CheckedRole, i == row );
+                setChecked( list->item( i ), i == row );
         };
         QObject::connect( list, &QListWidget::itemClicked, list, choose );
         QObject::connect( list, &QListWidget::itemActivated, list, choose );
@@ -398,7 +414,7 @@ QWidget *showSpeedPopover( intf_thread_t *p_intf, QAbstractButton *anchor )
     layout->addWidget( new SpeedControlWidget( p_intf, pop ) );
     QObject::connect( THEMIM->getIM(), &InputManager::rateChanged, list, [list]( float r ) {
         for( int i = 0; i < list->count(); i++ )
-            list->item( i )->setData( CheckedRole, qAbs( rates[i] - r ) < .001f );
+            setChecked( list->item( i ), qAbs( rates[i] - r ) < .001f );
     } );
 
     auto choose = [p_intf, list, pop]( QListWidgetItem *item ) {
