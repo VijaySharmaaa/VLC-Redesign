@@ -2387,8 +2387,8 @@ static bool isAtoBKey( intf_thread_t *p_intf, uint_fast32_t key )
     char *psz = var_InheritString( p_intf, MENU_KEY_ATOB );
     bool match = false;
     char *save;
-    for( char *k = psz ? strtok_r( psz, "	", &save ) : NULL; k && !match;
-         k = strtok_r( NULL, "	", &save ) )
+    for( char *k = psz ? strtok_r( psz, "\t", &save ) : NULL; k && !match;
+         k = strtok_r( NULL, "\t", &save ) )
         match = vlc_str2keycode( k ) == key;
     free( psz );
     return match;
