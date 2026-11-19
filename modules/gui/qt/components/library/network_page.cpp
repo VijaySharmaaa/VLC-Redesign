@@ -156,6 +156,8 @@ NetworkPage::NetworkPage( intf_thread_t *_p_intf, QWidget *parent )
                                 t->px( Size::PagePadX ), t->px( Library::PagePadBottom ) );
     layout->setSpacing( t->px( Library::HeaderBelow ) );
     header = new LibraryHeader( title, this );
+    header->search()->setPlaceholderText( qtr( "Search network" ) );
+    header->search()->setAccessibleName( qtr( "Search network" ) );
     layout->addWidget( header );
 
     body = new QStackedWidget( this );
