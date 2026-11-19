@@ -549,4 +549,6 @@ A full audit of `redesign/spectrum-smooth` (code read by area, plus a compile of
 | Recent media off: cache wiped at start | **pass** |
 | Baseline (7 states) and sweep (fullscreen, minimal view, mini player, Effects, Preferences, playlist, quit) | **pass**: exit code 0 |
 
-Still open: popover rows can't be reached with the arrow keys (focus stays on the list); the `.7z` `plugins.dat` misses `libaribcam_plugin.dll` (it doesn't load under wine, so that one plugin is probed at start); auto-hide taskbar, two monitors, OneDrive and Narrator checks remain manual steps.
+Popover arrow keys, rechecked: **pass**, not a bug. From 1.00×, Down Down moves the highlight to 1.50× and Enter chooses it (the rate became 1.50×). The earlier check asked UI Automation for the focused element, which names the main window because a Qt pop-up is never the active native window, and pressed Space, which does not choose a row in a list (Enter does). Whether Narrator reads each row as the highlight moves stays in the Narrator manual step.
+
+Still open: the `.7z` `plugins.dat` misses `libaribcam_plugin.dll` (it doesn't load under wine, so that one plugin is probed at start); auto-hide taskbar, two monitors, OneDrive and Narrator checks remain manual steps.
