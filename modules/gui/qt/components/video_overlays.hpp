@@ -174,7 +174,6 @@ private:
     void place();
     void followCursor();
     void setOpacity( qreal );
-    void raiseDrawers();
     QWidget *deckStop( bool first ) const;
     QFont titleFont() const;
     int rowHeight() const;

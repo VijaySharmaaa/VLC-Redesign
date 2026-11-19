@@ -92,6 +92,37 @@ void OverlayWindow::giveFocusBack()
     parentWidget()->setFocus( Qt::OtherFocusReason );
 }
 
+void OverlayWindow::setVisible( bool visible )
+{
+    const bool wasVisible = isVisible();
+    QWidget::setVisible( visible );
+    if( visible && !wasVisible )
+        raiseDrawers();
+}
+
+/* The XS drawers (playlist, Effects sheet) are tool windows of the same
+ * owner over the video: an overlay shown after them would cover them and
+ * take their clicks */
+void OverlayWindow::raiseDrawers()
+{
+    if( !parentWidget() )
+        return;
+    foreach( QWidget *w, parentWidget()->findChildren<QWidget *>( QString(),
+                                                                 Qt::FindDirectChildrenOnly ) )
+    {
+        if( !w->isWindow() || !w->isVisible()
+         || !( w->inherits( "PlaylistPanel" ) || w->inherits( "ExtendedDialog" ) ) )
+            continue;
+#ifdef _WIN32
+        /* not raise(): it would take the keys from the main window */
+        SetWindowPos( reinterpret_cast<HWND>( w->winId() ), HWND_TOP, 0, 0, 0, 0,
+                      SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE );
+#else
+        w->raise();
+#endif
+    }
+}
+
 QEasingCurve OverlayWindow::enterCurve()
 {
     QEasingCurve c( QEasingCurve::BezierSpline );

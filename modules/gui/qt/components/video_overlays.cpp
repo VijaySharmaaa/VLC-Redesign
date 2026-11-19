@@ -32,10 +32,6 @@
 #include <vlc_input.h>
 #include <vlc_vout.h>
 
-#ifdef _WIN32
-# include <windows.h>
-#endif
-
 #include <QAbstractButton>
 #include <QApplication>
 #include <QCursor>
@@ -887,27 +883,6 @@ void PlayerHeader::place()
     {
         show();
         backWindow->show();
-        raiseDrawers();
-    }
-}
-
-/* The XS drawers (playlist, Effects sheet) are tool windows of the same
- * owner over the video: a header shown after them stays below them */
-void PlayerHeader::raiseDrawers()
-{
-    foreach( QWidget *w, parentWidget()->findChildren<QWidget *>( QString(),
-                                                                 Qt::FindDirectChildrenOnly ) )
-    {
-        if( !w->isWindow() || !w->isVisible()
-         || !( w->inherits( "PlaylistPanel" ) || w->inherits( "ExtendedDialog" ) ) )
-            continue;
-#ifdef _WIN32
-        /* not raise(): it would take the keys from the main window */
-        SetWindowPos( reinterpret_cast<HWND>( w->winId() ), HWND_TOP, 0, 0, 0, 0,
-                      SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE );
-#else
-        w->raise();
-#endif
     }
 }
 
