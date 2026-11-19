@@ -10,6 +10,7 @@ Check every changed area against the relevant rows before a phase is closed. Rec
 - [ ] Switching Windows light/dark while VLC is open; high-contrast mode (fall back to system colours, keep it readable).
 - [ ] "Animation effects" off: no motion, and state changes are still visible.
 - [ ] Taskbar on top/left/auto-hide (maximised window must not cover it); title-bar double-click, Alt+Space system menu, Win+↑/↓.
+- [ ] Taskbar auto-hide turned on or off while VLC is maximised (the frame only updates on the next maximise); a maximised window moved to another monitor with Win+Shift+Arrow.
 - [ ] Quarter snap (Win+Left, Win+Up) on a 1920×1080 work area: a quarter is shorter than the 600 px minimum height.
 - [ ] Restoring a saved maximised `geometry` whose normal size is below the current minimum (stock 3.0 default 600×420): must come back truly maximised, not "zoomed" at the minimum size.
 - [ ] Leaving video fullscreen by end of media (not Esc/f) puts the window back at its old position.
@@ -20,6 +21,8 @@ Check every changed area against the relevant rows before a phase is closed. Rec
 - [ ] Playlist docked vs detached window; playlist panel at XS (overlay drawer).
 - [ ] Docked playlist toggled (Ctrl+L) repeatedly across the sidebar rail breakpoint, and in minimal view: window size must not drift.
 - [ ] Saved custom toolbar strings from an old VLC (must still load); empty or corrupt toolbar strings fall back to the defaults; the toolbar editor round-trips.
+- [ ] A user toolbar profile named "Default" survives opening and closing the toolbar editor.
+- [ ] Overlays shown while VLC is in the background (media-key Pause, a toast) never raise VLC windows over other apps.
 - [ ] First run (privacy dialog `qt-privacy-ask`); a clean profile vs a profile with old `vlc-qt-interface.ini`.
 - [ ] Systray on/off, start minimised, pause on minimise; taskbar thumbnail buttons.
 - [ ] `TaskbarButtonCreated` arriving more than once: thumbnail buttons and their signal connections are created once.
@@ -80,6 +83,8 @@ Check every changed area against the relevant rows before a phase is closed. Rec
 ## Library & playlist
 - [ ] Empty library (no Videos/Music folders, permissions denied); a folder with 10,000+ files (no UI freeze; lazy loading).
 - [ ] Playlist with 10,000 items: scrolling, filter, sort, remove, current-item tracking.
+- [ ] A playlist filter never stays active once the playlist is closed by any path (Ctrl+L, close button, Esc, Effects sheet, undock): Next and auto-advance must not skip filtered items.
+- [ ] A seek still pending from dragging the now-playing bar never lands on the next item after a track change or stop.
 - [ ] Recent media pointing at deleted files or offline network shares.
 - [ ] Removable drives and discs inserted or removed while browsing; UPnP servers appearing and disappearing.
 - [ ] Switching library pages (Home → Videos → Home) on an L-size window: the window width must not change (stack sizes remembered per page vs. the sidebar rail breakpoint).
@@ -97,6 +102,8 @@ Check every changed area against the relevant rows before a phase is closed. Rec
 - [ ] Rapid repeated clicks (play/pause spam, opening/closing panels quickly): no stuck animations or leaked widgets.
 - [ ] Closing VLC during playback, during buffering, or with a dialog open: clean shutdown, no crash, settings saved.
 - [ ] Memory: open and close every panel and dialog 50 times; no growth (check with Process Explorer or a debug build).
+- [ ] Two VLC instances (one-instance off) browsing Videos at once: clearing recents or a probe in one doesn't break the other's thumbnails.
+- [ ] Browsing a folder with hundreds of videos: the thumbnail probes' log reading doesn't load the interface thread.
 - [ ] Preferences page with panels already built while the same options are saved elsewhere (the Ctrl+P dialog fallback in fullscreen, Show all settings, Reset, the Effects sheet's Save): the page's next Save must not write its stale values back.
 - [ ] Errors re-enabled after "Hide future errors" (Reset, or the option in all settings): the next error dialog shows the box unchecked.
 - [ ] Open media "Show more options" kept across a restart (`OpenDialog/advanced`), also when VLC quits with the dialog open or closed.
