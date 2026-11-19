@@ -295,8 +295,12 @@ int Thumbnailer::watchedIn( const QString &dir )
 
 void Thumbnailer::cancel()
 {
-    /* probes still running are dropped as they come (probed); a page that
-     * asks the same frame again starts its own */
+    /* probes and listings not started yet go (the pool runs only ours), so
+     * a page shown again does not queue behind them; those still running
+     * are dropped as they come (probed); a page that asks the same frame
+     * or folder again starts its own */
+    LibraryData::filePool()->clear();
+    pendingDirs.clear();
     epoch++;
     pendingFrames.clear();
     lengths.clear();
