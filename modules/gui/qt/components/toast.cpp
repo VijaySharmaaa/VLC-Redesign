@@ -76,7 +76,6 @@ int Toast::SnapshotCB( vlc_object_t *, const char *,
 Toast::Toast( intf_thread_t *_p_intf, QWidget *owner, QWidget *_content )
     : OverlayWindow( owner ), p_intf( _p_intf ), content( _content ), overVideo( false )
 {
-    setFont( Theme::instance()->font( Theme::Body ) );
     host = new OverlayHost( _content, this );
     canShow = host->targetShown();
     connect( host, &OverlayHost::changed, this, [this]() { canShow = host->targetShown(); } );
@@ -184,6 +183,8 @@ void Toast::place()
 void Toast::fitText()
 {
     const Theme *t = Theme::instance();
+    /* here, so it follows the screen's scale (place() runs on Theme::changed) */
+    setFont( t->font( Theme::Body ) );
     /* the same sum as paintEvent's text rect: px() of the whole would round
      * differently and elide a text that fits */
     const int chrome = 2 * t->px( O::ToastPadX ) + t->px( O::ToastIcon ) + t->px( O::ToastGap );
