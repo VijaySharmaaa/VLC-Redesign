@@ -46,10 +46,13 @@ public:
     explicit OverlayWindow( QWidget *owner, InputMode = PassInput );
     static QEasingCurve enterCurve();   /* the tokens' enter easing */
     void giveFocusBack();   /* the keys back to the owner, if it has them */
+    void setVisible( bool ) Q_DECL_OVERRIDE;   /* a show keeps the XS drawers on top */
 protected:
     bool event( QEvent * ) Q_DECL_OVERRIDE;
     void keyPressEvent( QKeyEvent * ) Q_DECL_OVERRIDE;
     bool nativeEvent( const QByteArray &, void *, long * ) Q_DECL_OVERRIDE;
+private:
+    void raiseDrawers();
 };
 
 /* The first enabled control inside root that Tab reaches (focus chain

@@ -32,16 +32,13 @@
 #include <vlc_input.h>
 #include <vlc_vout.h>
 
-#ifdef _WIN32
-# include <windows.h>
-#endif
-
 #include <QAbstractButton>
 #include <QApplication>
 #include <QCursor>
 #include <QKeyEvent>
 #include <QLinearGradient>
 #include <QPainter>
+#include <QRegExp>
 #include <QStyle>
 #include <QWindow>
 #include <QVariantAnimation>
@@ -277,6 +274,7 @@ BufferingOverlay::BufferingOverlay( intf_thread_t *_p_intf, QWidget *owner, QWid
     connect( im, &InputManager::cachingChanged, this,
              [this]( float ) { refresh(); } );
     connect( im, &InputManager::playingStatusChanged, this, [this]() { refresh(); } );
+    connect( im, &InputManager::esChanged, this, [this]() { refresh(); } );
 }
 
 void BufferingOverlay::setOnPlayer( bool b )
@@ -295,10 +293,50 @@ float BufferingOverlay::level() const
     return input ? var_GetFloat( input, "cache" ) : 1.f;
 }
 
+/* The MRL as the core names items (src/input/item.c):
+ * scheme://host[:port]/path, without "user:password@", query or fragment,
+ * which may carry credentials and are drawn over the video. A path without
+ * a scheme shows as it is. */
+static QString displayUrl( const QString &mrl )
+{
+    const int start = mrl.indexOf( "://" );
+    if( start < 0 )
+        return mrl;
+    const int from = start + 3;
+    int end = mrl.indexOf( QRegExp( "[/?#]" ), from );
+    if( end < 0 )
+        end = mrl.size();
+    const int at = mrl.lastIndexOf( '@', end - 1 );
+    const int host = at < from ? from : at + 1;
+    int pathEnd = mrl.indexOf( QRegExp( "[?#]" ), end );
+    if( pathEnd < 0 )
+        pathEnd = mrl.size();
+    return mrl.left( from ) + mrl.mid( host, pathEnd - host );
+}
+
+/* Only an input with a track fills a cache once it plays: one without
+ * (vlc://pause, a directory or playlist being expanded: PLAYING_S once its
+ * demux opened) keeps "cache" at 0 all along. While it opens (OPENING_S, a
+ * stream still connecting) it has no track yet and still shows. */
+static bool hasTrack( input_thread_t *input )
+{
+    static const char *const vars[] = { "video-es", "audio-es", "spu-es" };
+    for( size_t i = 0; i < sizeof( vars ) / sizeof( *vars ); i++ )
+    {
+        vlc_value_t count;
+        if( var_Change( input, vars[i], VLC_VAR_CHOICESCOUNT, &count, NULL ) == VLC_SUCCESS
+         && count.i_int > 0 )
+            return true;
+    }
+    return false;
+}
+
 bool BufferingOverlay::buffering() const
 {
     const int status = THEMIM->getIM()->playingStatus();
-    return onPlayer && ( status == OPENING_S || status == PLAYING_S ) && level() < 1.f;
+    input_thread_t *input = THEMIM->getInput();
+    return onPlayer && input && level() < 1.f
+        && ( status == OPENING_S || ( status == PLAYING_S && hasTrack( input ) ) );
 }
 
 void BufferingOverlay::refresh()
@@ -314,7 +352,7 @@ void BufferingOverlay::refresh()
     {
         input_item_t *item = input_GetItem( THEMIM->getInput() );
         char *uri = input_item_GetURI( item );
-        url = qfu( uri );
+        url = displayUrl( qfu( uri ) );
         free( uri );
     }
     setAccessibleName( qtr( "Buffering… %1%" ).arg( qRound( level() * 100 ) ) );
@@ -638,14 +676,21 @@ void ImmersiveBar::wake()
 }
 
 /* Only a playing video hides it; never under the mouse or with one of its
- * menus open. A later mouse move, key or state change restarts the count. */
+ * menus open. Until it can, it looks again after another idle time (nothing
+ * else restarts the count when the mouse leaves or a menu closes); a mouse
+ * move, key or state change also restarts it. */
 void ImmersiveBar::sleepIfIdle()
 {
+    if( !active || asleep )
+        return;
     InputManager *im = THEMIM->getIM();
-    if( !active || asleep || im->playingStatus() != PLAYING_S || !im->hasVideo()
+    if( im->playingStatus() != PLAYING_S || !im->hasVideo()
         || underMouse() || ( header && header->hovered() )
         || QApplication::activePopupWidget() )
+    {
+        idle.start();
         return;
+    }
     giveFocusBack();   /* idle: the keys go back with it */
     setAsleep( true );
     animate( false );
@@ -887,27 +932,6 @@ void PlayerHeader::place()
     {
         show();
         backWindow->show();
-        raiseDrawers();
-    }
-}
-
-/* The XS drawers (playlist, Effects sheet) are tool windows of the same
- * owner over the video: a header shown after them stays below them */
-void PlayerHeader::raiseDrawers()
-{
-    foreach( QWidget *w, parentWidget()->findChildren<QWidget *>( QString(),
-                                                                 Qt::FindDirectChildrenOnly ) )
-    {
-        if( !w->isWindow() || !w->isVisible()
-         || !( w->inherits( "PlaylistPanel" ) || w->inherits( "ExtendedDialog" ) ) )
-            continue;
-#ifdef _WIN32
-        /* not raise(): it would take the keys from the main window */
-        SetWindowPos( reinterpret_cast<HWND>( w->winId() ), HWND_TOP, 0, 0, 0, 0,
-                      SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE );
-#else
-        w->raise();
-#endif
     }
 }
 
