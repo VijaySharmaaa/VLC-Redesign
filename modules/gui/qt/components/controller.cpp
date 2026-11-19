@@ -945,6 +945,22 @@ void AbstractController::addMoreButton( QBoxLayout *row )
     row->addWidget( moreButton );
 }
 
+/* the space an item takes beside its neighbours: the spacing of the layout
+ * holding it (a button group's gap, row 1's none), -1 when not found */
+static int itemGap( QLayout *layout, QWidget *w )
+{
+    if( layout->indexOf( w ) >= 0 )
+        return qMax( layout->spacing(), 0 );
+    for( int i = 0; i < layout->count(); i++ )
+    {
+        QLayout *sub = layout->itemAt( i )->layout();
+        const int gap = sub ? itemGap( sub, w ) : -1;
+        if( gap >= 0 )
+            return gap;
+    }
+    return -1;
+}
+
 /* the deck's rows: a column of row layouts (the deck, the immersive bar's
  * seek row and deck), or one row */
 static QList<QLayout *> deckRows( QLayout *top )
@@ -969,8 +985,7 @@ void AbstractController::fitDeck( int room )
     /* a hide refreshes the top layout's hint only, not its rows' (the
      * button groups): activate, or the widths read here are stale */
     layout()->activate();
-    const int gap = Theme::instance()->px( Deck::Gap );
-    const int moreWidth = moreButton->width() + gap;
+    const int moreWidth = moreButton->width() + qMax( itemGap( layout(), moreButton ), 0 );
     const QList<QWidget *> items = rankedItems();
     const QList<QLayout *> rows = deckRows( layout() );
     if( rows.first() != layout() )
@@ -997,7 +1012,8 @@ void AbstractController::fitDeck( int room )
             {
                 rowOf[i] = r;
                 if( items.at( i )->isHidden() )
-                    width[r] += items.at( i )->sizeHint().width() + gap;
+                    width[r] += items.at( i )->sizeHint().width()
+                                + itemGap( rows.at( r ), items.at( i ) );
             }
     }
     /* drop the lowest ranks of each row too wide, until it (and More, in
@@ -1016,7 +1032,7 @@ void AbstractController::fitDeck( int room )
             drop[i] = true;
             dropped++;
             changed = true;
-            width[r] -= items.at( i )->sizeHint().width() + gap;
+            width[r] -= items.at( i )->sizeHint().width() + itemGap( rows.at( r ), items.at( i ) );
         }
     }
     for( int i = 0; i < items.count(); i++ )
@@ -1132,7 +1148,6 @@ int ControlsWidget::compactWidth() const
 {
     /* the hint, not the minimum: below it the volume squeezes its label;
      * the widest row with all its ranked items in More */
-    const int gap = Theme::instance()->px( Deck::Gap );
     const QList<QWidget *> items = rankedItems();
     int width = 0;
     foreach( QLayout *rowLayout, deckRows( layout() ) )
@@ -1142,9 +1157,9 @@ int ControlsWidget::compactWidth() const
         int rowWidth = rowLayout->sizeHint().width();
         foreach( QWidget *w, items )
             if( !w->isHidden() && row.contains( w ) )
-                rowWidth -= w->sizeHint().width() + gap;
+                rowWidth -= w->sizeHint().width() + itemGap( rowLayout, w );
         if( !items.isEmpty() && moreButton->isHidden() && row.contains( moreButton ) )
-            rowWidth += moreButton->width() + gap;
+            rowWidth += moreButton->width() + itemGap( rowLayout, moreButton );
         width = qMax( width, rowWidth );
     }
     const QMargins pad = layout()->contentsMargins();
