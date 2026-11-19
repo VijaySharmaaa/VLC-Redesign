@@ -83,6 +83,7 @@ private:
     {
         QString key, path, file;
         int atSec;
+        int turn;                            /* clockwise, to be upright */
     };
     struct Frame
     {
@@ -95,18 +96,19 @@ private:
         QString tmpFile;
         QProcess *process;
         QElapsedTimer clock;
-        unsigned sarNum, sarDen;             /* 0 until its log tells */
+        unsigned sarNum, sarDen;             /* den 0 until its log tells */
     };
     Thumbnailer( intf_thread_t *, QObject *parent );
     /* asked: the epoch of the frame() that started the probe */
-    void probed( const QString &path, const QString &file, bool cached, int asked );
+    void probed( const QString &path, const QString &file, bool cached, int turn, int asked );
     void startNext();
     void start( const Request & );
     void check();
     void finish( QProcess *, bool ok );
     static void stopProcess( QProcess *, const QString &tmpFile );
     void readLog( QProcess * );
-    static bool saveSquare( const QString &from, const QString &to, unsigned num, unsigned den );
+    static bool saveUpright( const QString &from, const QString &to, unsigned num, unsigned den,
+                             int turn );
 
     intf_thread_t *p_intf;
     int epoch;                               /* cancel()s so far */
@@ -136,8 +138,8 @@ public:
     void run() Q_DECL_OVERRIDE;
 
 signals:
-    /* file empty: no such file */
-    void probed( const QString &path, const QString &file, bool cached );
+    /* file empty: no such file; turn: clockwise, for an MP4/MOV video */
+    void probed( const QString &path, const QString &file, bool cached, int turn );
     void listed( const QString &dir, const QStringList &videos, const QString &cover );
 
 private:

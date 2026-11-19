@@ -366,8 +366,11 @@ MainInterface::MainInterface( intf_thread_t *_p_intf, bool customFrame ) : QVLCM
     connect( THEDP, &DialogsProvider::panelShown, this, [this]( int action, bool shown ) {
         if( action == EXTENDED_ACTION && shown && playlistPanel && playlistPanel->isVisible() )
         {
+            /* a close, as togglePlaylist()'s: the panel does not come
+             * back with the sheet, so no filter is left hiding items */
             playlistVisible = false;
             showPlaylistPanel( false );
+            playlistPanel->clearFilter();
         }
     } );
     installEventFilter( this );

@@ -963,7 +963,26 @@ void PLModel::followMain()
         return;
     const bool searched = latestSearch != mainSearchText;
     latestSearch = mainSearchText;
-    rebuild();
+    /* rebuilt as a layout change, not a reset: the views' selection, tree
+     * expansion and current row follow their items by id (dropped when
+     * the filter hid them). shortcut: one tree search per persistent
+     * index (selection ranges, expanded nodes); index ids if it is slow */
+    emit layoutAboutToBeChanged();
+    const QModelIndexList before = persistentIndexList();
+    QVector<int> ids;
+    ids.reserve( before.count() );
+    foreach( const QModelIndex &index, before )
+        ids << itemId( index );
+    {
+        vlc_playlist_locker pl_lock( THEPL );
+        rootItem->clearChildren();
+        updateChildren( rootItem );
+    }
+    QModelIndexList after;
+    for( int i = 0; i < before.count(); i++ )
+        after << indexByPLID( ids.at( i ), before.at( i ).column() );
+    changePersistentIndexList( before, after );
+    emit layoutChanged();
     /* the playlist window's view goes back into the node it showed */
     emit rootIndexChanged();
     if( searched )

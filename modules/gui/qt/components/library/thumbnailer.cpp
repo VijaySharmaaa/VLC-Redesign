@@ -34,6 +34,7 @@
 
 #include <climits>                       /* INT_MAX */
 #include <cstdio>                        /* sscanf */
+#include <cstring>                       /* memcmp */
 #ifdef _WIN32
 # include <windows.h>                    /* GetFileAttributesW */
 /* Windows 10 1709 names, missing from older SDKs */
@@ -56,6 +57,8 @@
 #include <QImage>
 #include <QProcess>
 #include <QSaveFile>
+#include <QTransform>
+#include <QtEndian>
 #include <QStandardPaths>
 #include <QThread>
 #include <QTimer>
@@ -146,6 +149,89 @@ static void pruneCache( const QString &dir )
 #endif
 }
 
+/* The box of that type in [from, to) of an MP4/MOV file: from and to become
+ * its payload; false when there is none (or the file is no such file) */
+static bool findBox( QFile &f, qint64 &from, qint64 &to, const char *type )
+{
+    /* bounded: another kind of file reads as boxes of any size */
+    for( int boxes = 0; from + 8 <= to && boxes < 1024; boxes++ )
+    {
+        if( !f.seek( from ) )
+            return false;
+        const QByteArray h = f.read( 16 );
+        if( h.size() < 8 )
+            return false;
+        const uchar *d = reinterpret_cast<const uchar *>( h.constData() );
+        quint64 size = qFromBigEndian<quint32>( d );
+        qint64 head = 8;
+        if( size == 1 )   /* 64-bit size */
+        {
+            if( h.size() < 16 )
+                return false;
+            size = qFromBigEndian<quint64>( d + 8 );
+            head = 16;
+        }
+        else if( size == 0 )   /* up to the end */
+            size = quint64( to - from );
+        if( size < quint64( head ) || size > quint64( to - from ) )
+            return false;
+        if( !memcmp( d + 4, type, 4 ) )
+        {
+            to = from + qint64( size );
+            from += head;
+            return true;
+        }
+        from += qint64( size );
+    }
+    return false;
+}
+
+/* The clockwise turn (0, 90, 180 or 270) the first video track of an
+ * MP4/MOV file asks for in its tkhd matrix, as VLC's mp4 demux reads it
+ * (essetup.c): the scene filter writes the picture as coded, upright only
+ * once the display turns it (a phone video shot upright).
+ * shortcut: MP4/MOV only (VLC's own demux sets no turn for other files;
+ * avformat's rarely used ones are not read), extend if they show up */
+static int mp4Turn( const QString &path )
+{
+    QFile f( path );
+    if( !f.open( QIODevice::ReadOnly ) )
+        return 0;
+    qint64 moov = 0, moovEnd = f.size();
+    if( !findBox( f, moov, moovEnd, "moov" ) )
+        return 0;
+    for( qint64 at = moov; ; )
+    {
+        qint64 from = at, to = moovEnd;
+        if( !findBox( f, from, to, "trak" ) )
+            return 0;
+        at = to;
+        if( !findBox( f, from, to, "tkhd" ) || !f.seek( from ) )
+            continue;
+        const QByteArray box = f.read( qMin<qint64>( to - from, 128 ) );
+        if( box.isEmpty() )
+            continue;
+        /* version and flags, times and duration (64-bit in version 1),
+         * reserved, layer, group, volume, reserved, then the matrix and
+         * the size */
+        const int matrix = 4 + ( box.at( 0 ) == 1 ? 32 : 20 ) + 16;
+        if( box.size() < matrix + 44 )
+            continue;
+        const uchar *d = reinterpret_cast<const uchar *>( box.constData() ) + matrix;
+        if( !qFromBigEndian<quint32>( d + 36 ) || !qFromBigEndian<quint32>( d + 40 ) )
+            continue;   /* no picture: a sound track */
+        const qint32 a = qint32( qFromBigEndian<quint32>( d ) );
+        const qint32 b = qint32( qFromBigEndian<quint32>( d + 4 ) );
+        if( a == 0 && b > 0 )
+            return 90;
+        if( a < 0 && b == 0 )
+            return 180;
+        if( a == 0 && b < 0 )
+            return 270;
+        return 0;
+    }
+}
+
 /**********************************************************************
  * ThumbJob
  **********************************************************************/
@@ -188,7 +274,7 @@ void ThumbJob::run()
     const QFileInfo info( path );
     if( !info.isFile() || !QDir().mkpath( cacheDir ) )
     {
-        emit probed( path, QString(), false );
+        emit probed( path, QString(), false, 0 );
         return;
     }
     /* before any probe hands out a frame, so none is one it deletes */
@@ -220,11 +306,12 @@ void ThumbJob::run()
      && ( attrs & ( FILE_ATTRIBUTE_OFFLINE | FILE_ATTRIBUTE_RECALL_ON_OPEN
                   | FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS ) ) )
     {
-        emit probed( path, QString(), false );
+        emit probed( path, QString(), false, 0 );
         return;
     }
 #endif
-    emit probed( path, file, cached );
+    /* read with the file's probe, off the GUI thread */
+    emit probed( path, file, cached, cached ? 0 : mp4Turn( path ) );
 }
 
 /**********************************************************************
@@ -329,8 +416,8 @@ QString Thumbnailer::frame( const QString &path, int64_t lengthMs )
         /* queued: a result that comes after this is gone is dropped */
         const int asked = epoch;
         connect( job, &ThumbJob::probed, this,
-                 [this, asked]( const QString &p, const QString &file, bool cached ) {
-                     probed( p, file, cached, asked );
+                 [this, asked]( const QString &p, const QString &file, bool cached, int turn ) {
+                     probed( p, file, cached, turn, asked );
                  }, Qt::QueuedConnection );
         LibraryData::filePool()->start( job );
     }
@@ -408,7 +495,8 @@ void Thumbnailer::cancel()
         frames.clear();
 }
 
-void Thumbnailer::probed( const QString &path, const QString &file, bool cached, int asked )
+void Thumbnailer::probed( const QString &path, const QString &file, bool cached, int turn,
+                          int asked )
 {
     if( asked != epoch )
         return;
@@ -434,7 +522,7 @@ void Thumbnailer::probed( const QString &path, const QString &file, bool cached,
     /* the middle of a film opens on a scene, its start often on black */
     const Request r = { key, path, file,
                         lengthMs > 0 ? int( lengthMs / 1000 * Library::ThumbAtPercent / 100 )
-                                     : Library::ThumbUnknownAtS };
+                                     : Library::ThumbUnknownAtS, turn };
     queue.prepend( r );
     /* scrolled past: dropped, asked again when painted again */
     while( queue.count() > Library::ThumbQueueMax )
@@ -558,15 +646,23 @@ void Thumbnailer::start( const Request &r )
 }
 
 /* The scene filter writes a .swp file and renames it: once the picture is
- * there it is whole, and the rest of the playback is not waited for */
+ * there it is whole, and the rest of the playback is not waited for. The
+ * pixel aspect line is printed before, but it can still be in the pipe:
+ * the picture is taken once that line is read (or the process ended,
+ * finish() then reads the rest), so the aspect never depends on which
+ * came first; at the timeout a written picture is kept as it is */
 void Thumbnailer::check()
 {
     QList<QProcess *> done, late;
     foreach( const Job &j, jobs )
-        if( QFileInfo( j.tmpFile ).size() > 0 )
+    {
+        const bool written = QFileInfo( j.tmpFile ).size() > 0;
+        const bool timedOut = j.clock.elapsed() > Library::ThumbTimeoutMs;
+        if( written && ( j.sarDen || timedOut ) )
             done << j.process;
-        else if( j.clock.elapsed() > Library::ThumbTimeoutMs )
+        else if( timedOut )
             late << j.process;
+    }
     foreach( QProcess *p, done )
         finish( p, true );
     foreach( QProcess *p, late )
@@ -588,7 +684,7 @@ void Thumbnailer::finish( QProcess *process, bool ok )
     /* the picture is whole once renamed by the scene filter, even while
      * the process still runs */
     if( ok && QFileInfo( j.tmpFile ).size() > 0
-     && ( saveSquare( j.tmpFile, j.r.file, j.sarNum, j.sarDen )
+     && ( saveUpright( j.tmpFile, j.r.file, j.sarNum, j.sarDen, j.r.turn )
        || QFile::rename( j.tmpFile, j.r.file ) || QFileInfo( j.r.file ).size() > 0 ) )
     {
         pendingFrames.remove( j.r.key );
@@ -613,9 +709,9 @@ void Thumbnailer::finish( QProcess *process, bool ok )
 
 /* The vout's debug line "original format sz 720x576, ..., sar 64:45, ..."
  * (video_format_Print): the scene filter writes the coded pixels, so an
- * anamorphic video's frame is squeezed until saveSquare corrects it.
- * shortcut: not the orientation (not in the line; a phone video shot
- * upright stays on its side); read the input's video track if needed */
+ * anamorphic video's frame is squeezed until saveUpright corrects it.
+ * The orientation is not in the line (nor anywhere in a release build's
+ * log): mp4Turn() reads it from the file */
 void Thumbnailer::readLog( QProcess *process )
 {
     while( process->canReadLine() )
@@ -635,26 +731,31 @@ void Thumbnailer::readLog( QProcess *process )
     }
 }
 
-/* The frame scaled to square pixels, into the cache; false when it is
- * square already (or unknown, or implausible) or cannot be written */
-bool Thumbnailer::saveSquare( const QString &from, const QString &to, unsigned num, unsigned den )
+/* The frame scaled to square pixels, then turned upright, into the cache;
+ * false when it is both already (the ratio unknown or implausible counts as
+ * square) or it cannot be written */
+bool Thumbnailer::saveUpright( const QString &from, const QString &to, unsigned num, unsigned den,
+                               int turn )
 {
     /* the ratio comes from the probe's log: one past 4:1 is bogus (and
      * would scale a huge image here), kept square */
-    if( !num || !den || num == den
-     || quint64( num ) > 4 * quint64( den ) || quint64( den ) > 4 * quint64( num ) )
+    const bool scale = num && den && num != den
+                    && quint64( num ) <= 4 * quint64( den ) && quint64( den ) <= 4 * quint64( num );
+    if( !scale && !turn )
         return false;
-    const QImage image( from );
+    QImage image( from );
     if( image.isNull() )
         return false;
     /* shortcut: decoded and encoded on the GUI thread (a 480 px PNG, only
-     * for anamorphic videos); move it to filePool if it ever stutters */
-    const int height = qMax( 1, qRound( qreal( image.height() ) * den / num ) );
+     * for anamorphic or turned videos); move it to filePool if it ever
+     * stutters */
+    if( scale )
+        image = image.scaled( image.width(), qMax( 1, qRound( qreal( image.height() ) * den / num ) ),
+                              Qt::IgnoreAspectRatio, Qt::SmoothTransformation );
+    if( turn )
+        image = image.transformed( QTransform().rotate( turn ) );
     QSaveFile out( to );
-    return out.open( QIODevice::WriteOnly )
-        && image.scaled( image.width(), height, Qt::IgnoreAspectRatio, Qt::SmoothTransformation )
-                .save( &out, "PNG" )
-        && out.commit();
+    return out.open( QIODevice::WriteOnly ) && image.save( &out, "PNG" ) && out.commit();
 }
 
 /* Killed without waiting on the GUI thread (an antivirus can hold a dying
