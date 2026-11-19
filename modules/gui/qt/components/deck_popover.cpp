@@ -386,6 +386,13 @@ QWidget *showTracksPopover( intf_thread_t *p_intf, QAbstractButton *anchor )
     return pop;
 }
 
+/* the input keeps the rate as 1000 / rate in an integer (1.5 reads back as
+ * 1.5015): equal to the label's two decimals */
+static bool sameRate( float a, float b )
+{
+    return qAbs( a - b ) < .005f;
+}
+
 QWidget *showSpeedPopover( intf_thread_t *p_intf, QAbstractButton *anchor )
 {
     /* SCREEN_INVENTORY 1.4.1 */
@@ -402,7 +409,7 @@ QWidget *showSpeedPopover( intf_thread_t *p_intf, QAbstractButton *anchor )
     const float rate = currentRate( p_intf );
     for( size_t i = 0; i < sizeof( rates ) / sizeof( rates[0] ); i++ )
         addRow( list, rateText( rates[i] ), QString(),
-                qAbs( rates[i] - rate ) < .001f );
+                sameRate( rates[i], rate ) );
     fitRows( list );
     layout->addWidget( list );
 
@@ -414,7 +421,7 @@ QWidget *showSpeedPopover( intf_thread_t *p_intf, QAbstractButton *anchor )
     layout->addWidget( new SpeedControlWidget( p_intf, pop ) );
     QObject::connect( THEMIM->getIM(), &InputManager::rateChanged, list, [list]( float r ) {
         for( int i = 0; i < list->count(); i++ )
-            setChecked( list->item( i ), qAbs( rates[i] - r ) < .001f );
+            setChecked( list->item( i ), sameRate( rates[i], r ) );
     } );
 
     auto choose = [p_intf, list, pop]( QListWidgetItem *item ) {
