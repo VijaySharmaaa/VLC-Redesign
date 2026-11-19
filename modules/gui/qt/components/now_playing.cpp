@@ -320,6 +320,14 @@ void ThinSeekBar::mouseReleaseEvent( QMouseEvent *e )
     e->accept();
 }
 
+/* the wheel does over the bar what it does over the rest of the player
+ * (MainInterface::wheelEvent: the volume); QSlider would move the thumb
+ * with no seek */
+void ThinSeekBar::wheelEvent( QWheelEvent *e )
+{
+    e->ignore();
+}
+
 void ThinSeekBar::paintEvent( QPaintEvent * )
 {
     const Theme *t = Theme::instance();

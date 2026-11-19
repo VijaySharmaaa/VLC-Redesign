@@ -69,8 +69,9 @@ private:
     bool onVideo;
 };
 
-/* The design's 3 px seek line: click or drag to seek, arrows step. Follows
- * the current input; disabled when it cannot seek. */
+/* The design's 3 px seek line: click or drag to seek, arrows step; the
+ * wheel passes to the window (volume). Follows the current input;
+ * disabled when it cannot seek. */
 class ThinSeekBar : public QSlider
 {
     Q_OBJECT
@@ -83,6 +84,7 @@ protected:
     void mousePressEvent( QMouseEvent * ) Q_DECL_OVERRIDE;
     void mouseMoveEvent( QMouseEvent * ) Q_DECL_OVERRIDE;
     void mouseReleaseEvent( QMouseEvent * ) Q_DECL_OVERRIDE;
+    void wheelEvent( QWheelEvent * ) Q_DECL_OVERRIDE;
 private:
     int valueAt( int x ) const;
     void seek();
