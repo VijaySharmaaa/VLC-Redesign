@@ -375,7 +375,11 @@ OpenDialog::OpenDialog( QWidget *parent,
     /* at another screen's scale that hint is stale (the hidden pages too):
      * from then on the layout's minimum, which follows the page shown */
     connect( Theme::instance(), &Theme::changed, this, [this]() { setMinimumSize( 0, 0 ); } );
-    resize( getSettings()->value( "OpenDialog/size", QSize( 500, 400 ) ).toSize() );
+    /* the size is saved without the advanced frame (see the destructor) */
+    QSize saved = getSettings()->value( "OpenDialog/size", QSize( 500, 400 ) ).toSize();
+    if( ui.advancedFrame->isEnabled() )
+        saved.rheight() += ui.advancedFrame->sizeHint().height();
+    resize( saved );
 }
 
 /* The tiles are a tab list: only the checked tile is a Tab stop (its focus
