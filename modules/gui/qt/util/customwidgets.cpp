@@ -678,6 +678,9 @@ QFrame *cardRow( QLabel *title, const QString &desc, const QList<QWidget *> &con
     title->setWordWrap( true );
     /* a form's label may be right-aligned for its old grid column */
     title->setAlignment( Qt::AlignLeading | Qt::AlignVCenter );
+    /* and its size policy (Maximum, to hug that column): the text takes the
+     * row's slack, so a field keeps its width at the row's end */
+    title->setSizePolicy( QSizePolicy::Preferred, title->sizePolicy().verticalPolicy() );
     text->addWidget( title );
     if( !desc.isEmpty() )
     {

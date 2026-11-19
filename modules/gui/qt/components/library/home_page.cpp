@@ -58,6 +58,7 @@
 #include <QTreeWidget>
 #include <QUrl>
 #include <QVBoxLayout>
+#include <QWheelEvent>
 
 using namespace RedesignTokens;
 
@@ -407,6 +408,7 @@ HomePage::HomePage( intf_thread_t *_p_intf, QWidget *parent )
     cardsLayout->setSpacing( t->px( Home::CardGap ) );
     cardsLayout->addStretch( 1 );
     cardsArea->setWidget( row );
+    cardsArea->viewport()->installEventFilter( this );   /* the wheel scrolls the cards */
     cardsSectionLayout->addWidget( cardsArea );
     listsLayout->addWidget( cardsSection );
 
@@ -774,6 +776,21 @@ void HomePage::showEvent( QShowEvent *e )
 
 bool HomePage::eventFilter( QObject *o, QEvent *e )
 {
+    /* the cards only scroll sideways, and a scroll area hands the usual
+     * (vertical) wheel to its vertical bar, which they have none of: give
+     * it to the horizontal bar. At either end the page scrolls on. */
+    if( o == cardsArea->viewport() && e->type() == QEvent::Wheel )
+    {
+        const QWheelEvent *w = static_cast<QWheelEvent *>( e );
+        QScrollBar *bar = cardsArea->horizontalScrollBar();
+        if( bar->maximum() > 0 && qAbs( w->angleDelta().y() ) > qAbs( w->angleDelta().x() ) )
+        {
+            const int before = bar->value();
+            QApplication::sendEvent( bar, e );
+            if( bar->value() != before )
+                return true;
+        }
+    }
     /* back from Explorer, say, where a file may have been deleted */
     if( o == window() && e->type() == QEvent::WindowActivate && isVisible() )
         startCheck();

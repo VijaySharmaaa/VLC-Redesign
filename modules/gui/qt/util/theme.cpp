@@ -30,6 +30,7 @@
 #include <QAbstractItemView>
 #include <QAbstractScrollArea>
 #include <QAbstractSlider>
+#include <QScrollBar>
 #include <QAbstractSpinBox>
 #include <QAction>
 #include <QApplication>
@@ -483,6 +484,9 @@ namespace
             if (t && (m == PM_IndicatorWidth || m == PM_IndicatorHeight) && isToggle(w))
                 return t->metric(m == PM_IndicatorWidth ? Theme::ToggleW : Theme::ToggleH)
                      + 4 * Size::FocusRing;
+            /* the forms' label-to-field room (layouts that set no spacing) */
+            if (t && m == PM_LayoutHorizontalSpacing)
+                return qMax(QProxyStyle::pixelMetric(m, opt, w), t->px(Size::LabelFieldGap));
             return QProxyStyle::pixelMetric(m, opt, w);
         }
 
@@ -507,9 +511,10 @@ namespace
                                       t->px(Size::TooltipPadX), t->px(Size::TooltipPadY));
             }
             /* the player's own sliders (seek, volume) keep the wheel: only
-             * sliders on a scrolling page are guarded */
+             * sliders on a scrolling page are guarded. Never a scroll bar: a
+             * scroll area scrolls by handing it the wheel */
             bool onPage = false;
-            if (qobject_cast<QAbstractSlider *>(w))
+            if (qobject_cast<QAbstractSlider *>(w) && !qobject_cast<QScrollBar *>(w))
                 for (QWidget *a = w->parentWidget(); a && !onPage; a = a->parentWidget())
                     onPage = qobject_cast<QAbstractScrollArea *>(a) != NULL;
             if ((qobject_cast<QComboBox *>(w) || qobject_cast<QAbstractSpinBox *>(w) || onPage)
@@ -1093,22 +1098,28 @@ void Theme::paintFocusRing(QPainter *p, const QRectF &r, qreal radius)
 /* Qt 5.6 has no per-font switch for ClearType (QFont::NoSubpixelAntialias
  * is 5.8) but draws grayscale glyphs into any image that is not
  * ARGB32_Premultiplied or RGB32 (QRasterPaintEngine::begin): draw the text
- * there, at the device's pixel ratio, then onto the widget. */
+ * there, then onto the widget. Those grayscale glyphs come from GDI, which
+ * obeys the font's gasp table: at UI sizes Segoe UI gets no smoothing, only
+ * pixel-snapped stems. So the text is drawn at 4x the device's pixel ratio,
+ * where it is smoothed, and averaged down. */
 void Theme::drawGrayText(QPainter *p, const QRect &r, int flags, const QString &text, const QColor &c)
 {
+    static const int SuperSample = 4;
     const qreal dpr = p->device() ? p->device()->devicePixelRatioF() : 1.0;
     const QSize size = (QSizeF(r.size()) * dpr).toSize();
     if (size.isEmpty())
         return;
-    QImage img(size, QImage::Format_RGBA8888_Premultiplied);
-    img.setDevicePixelRatio(dpr);
-    img.fill(Qt::transparent);
-    QPainter ip(&img);
+    QImage big(size * SuperSample, QImage::Format_RGBA8888_Premultiplied);
+    big.setDevicePixelRatio(dpr * SuperSample);
+    big.fill(Qt::transparent);
+    QPainter ip(&big);
     ip.setFont(p->font());
     ip.setPen(c);
-    ip.setRenderHints(p->renderHints());
+    ip.setRenderHints(p->renderHints() | QPainter::TextAntialiasing);
     ip.drawText(QRect(QPoint(0, 0), r.size()), flags, text);
     ip.end();
+    QImage img = big.scaled(size, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+    img.setDevicePixelRatio(dpr);
     p->drawImage(r.topLeft(), img);
 }
 
@@ -1574,9 +1585,19 @@ static void showAccessKeys(QWidget *window, bool on)
 
 bool Theme::eventFilter(QObject *o, QEvent *e)
 {
-    /* focus rings for keyboard focus only: what moved the focus last */
+    /* focus rings for keyboard focus only: what moved the focus last. As in
+     * Windows, only the keys that move the focus count: Space on Play, a
+     * shortcut or a media key left a ring on a button no one tabbed to */
     if (e->type() == QEvent::KeyPress)
-        keyboardInput = true;
+    {
+        switch (static_cast<QKeyEvent *>(e)->key())
+        {
+        case Qt::Key_Tab: case Qt::Key_Backtab:
+        case Qt::Key_Left: case Qt::Key_Right: case Qt::Key_Up: case Qt::Key_Down:
+            keyboardInput = true; break;
+        default: break;
+        }
+    }
     else if (e->type() == QEvent::MouseButtonPress || e->type() == QEvent::MouseButtonDblClick)
         keyboardInput = false;
     else if (e->type() == QEvent::FocusIn && o->isWidgetType())
@@ -1586,7 +1607,11 @@ bool Theme::eventFilter(QObject *o, QEvent *e)
         bool key;
         switch (static_cast<QFocusEvent *>(e)->reason())
         {
-        case Qt::TabFocusReason: case Qt::BacktabFocusReason: case Qt::ShortcutFocusReason:
+        /* Qt says Tab too when a focused widget hides and hands the focus on
+         * (Continue, clicked, gave its ring to Play): only a real Tab counts */
+        case Qt::TabFocusReason: case Qt::BacktabFocusReason:
+            key = keyboardInput; break;
+        case Qt::ShortcutFocusReason:
             key = true; break;
         case Qt::MouseFocusReason:
             key = false; break;

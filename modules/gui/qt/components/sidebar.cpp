@@ -165,10 +165,11 @@ void SidebarButton::paintEvent( QPaintEvent * )
      * the box's empty sides read as extra space before it and before the
      * label (#11). The accent button spaces and centres what is drawn. */
     int inkLeft = 0, inkW = iconPx;
+    qreal inkDy = 0;    /* device px from the box's middle to the drawn part's */
     if( primary && !rail )
     {
         const QImage scan = glyphImage.convertToFormat( QImage::Format_ARGB32 );
-        int l = scan.width(), r = -1;
+        int l = scan.width(), r = -1, top = scan.height(), bottom = -1;
         for( int y = 0; y < scan.height(); y++ )
         {
             const QRgb *line = reinterpret_cast<const QRgb *>( scan.constScanLine( y ) );
@@ -176,10 +177,12 @@ void SidebarButton::paintEvent( QPaintEvent * )
                 if( qAlpha( line[gx] ) > 24 )
                 {
                     l = qMin( l, gx ); r = qMax( r, gx );
+                    top = qMin( top, y ); bottom = qMax( bottom, y );
                 }
         }
         if( r >= l )
         {
+            inkDy = ( top + bottom + 1 ) / 2. - scan.height() / 2.;
             const qreal dprI = devicePixelRatioF();
             inkLeft = qFloor( l / dprI );
             inkW = qCeil( ( r + 1 ) / dprI ) - inkLeft;
@@ -204,15 +207,15 @@ void SidebarButton::paintEvent( QPaintEvent * )
     QPointF centre = ( rail ? QRectF( rect() ) : QRectF( iconAt ) ).center();
     if( primary && !rail )
     {
-        /* the + on the label's optical middle, between its capitals' and
-         * its lowercase letters' middles: on the box's middle it sat above
-         * a mostly lowercase label (#10) */
+        /* the + on the middle of the label's capitals, the line the eye
+         * reads as the label's: between the capitals' and the lowercase
+         * letters' middles (#10) it sat two pixels low */
         const QFontMetricsF fmf( font );
         const qreal baseline = ( height() - fmf.height() ) / 2 + fmf.ascent() - t->textNudge( font );
-        centre.setY( baseline - ( fmf.tightBoundingRect( QStringLiteral( "H" ) ).height()
-                                  + fmf.xHeight() ) / 4 );
+        centre.setY( baseline - fmf.tightBoundingRect( QStringLiteral( "H" ) ).height() / 2 );
     }
     centre *= dpr;
+    centre.ry() -= inkDy;   /* the drawn part on that middle, not its box */
     p.save();
     p.scale( 1 / dpr, 1 / dpr );
     p.drawImage( QRect( qRound( centre.x() - devicePx / 2. ), qRound( centre.y() - devicePx / 2. ),

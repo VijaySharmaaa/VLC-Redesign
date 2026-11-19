@@ -32,6 +32,7 @@
 #include <QAbstractItemView>
 #include <QApplication>
 #include <QCheckBox>
+#include <QDoubleSpinBox>
 #include <QComboBox>
 #include <QFileInfo>
 #include <QFileSystemWatcher>
@@ -44,6 +45,7 @@
 #include <QPainter>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QSpinBox>
 #include <QStackedWidget>
 #include <QStyledItemDelegate>
 #include <QTreeView>
@@ -261,7 +263,12 @@ static QFrame *buildRow( const Row &r, const QString &orphan, bool first, QList<
         /* as tall as the row, as its state label is: both on the row's
          * exact centre (drawToggle draws on the widget's), where a fixed
          * height was placed on a centre rounded to whole pixels */
-        toggle->setSizePolicy( toggle->sizePolicy().horizontalPolicy(), QSizePolicy::Preferred );
+        toggle->setSizePolicy( QSizePolicy::Fixed, QSizePolicy::Preferred );
+        /* the width the form gave it to line up its old label column (250
+         * for some): the switch is drawn at its left, past it the row's
+         * end stood empty */
+        toggle->setMinimumWidth( 0 );
+        toggle->setMaximumWidth( QWIDGETSIZE_MAX );
         QLabel *state = new QLabel;
         state->setProperty( "role", "hint" );
         state->setFont( Theme::instance()->font( Theme::Meta ) );
@@ -274,6 +281,39 @@ static QFrame *buildRow( const Row &r, const QString &orphan, bool first, QList<
     {
         name = new QLabel( orphan );
         controls.prepend( r.lead );
+    }
+
+    /* a number: a short field with the number alone, left like every other
+     * field's text; its prefix and suffix ("Every", "days") read beside it */
+    for( int i = 0; i < controls.count(); i++ )
+    {
+        QAbstractSpinBox *spin = qobject_cast<QAbstractSpinBox *>( controls[i] );
+        if( !spin )
+            continue;
+        QString prefix, suffix;
+        if( QSpinBox *s = qobject_cast<QSpinBox *>( spin ) )
+        {
+            prefix = s->prefix(); suffix = s->suffix();
+            s->setPrefix( QString() ); s->setSuffix( QString() );
+        }
+        else if( QDoubleSpinBox *d = qobject_cast<QDoubleSpinBox *>( spin ) )
+        {
+            prefix = d->prefix(); suffix = d->suffix();
+            d->setPrefix( QString() ); d->setSuffix( QString() );
+        }
+        spin->setAlignment( Qt::AlignLeading | Qt::AlignVCenter );
+        spin->setSizePolicy( QSizePolicy::Fixed, spin->sizePolicy().verticalPolicy() );
+        spin->setFixedWidth( qMax( spin->sizeHint().width(), Theme::instance()->px( Prefs::SpinW ) ) );
+        const auto unit = []( const QString &text ) {
+            QLabel *l = new QLabel( text.trimmed() );
+            l->setProperty( "role", "hint" );
+            l->setFont( Theme::instance()->font( Theme::Meta ) );
+            return l;
+        };
+        if( !suffix.trimmed().isEmpty() )
+            controls.insert( i + 1, unit( suffix ) );
+        if( !prefix.trimmed().isEmpty() )
+            controls.insert( i++, unit( prefix ) );
     }
 
     /* the description: the option's own long text */
