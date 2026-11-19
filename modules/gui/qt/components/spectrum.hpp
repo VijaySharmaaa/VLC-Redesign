@@ -31,7 +31,8 @@ class QTimer;
  * plugin, qt.cpp) measures each block in the decoder thread, stamped with
  * the block's playback date; the widget shows the frame that is due now.
  * The filter is put on the playlist's audio output only, never on the
- * playlist or the configuration, and it skips the work while no
+ * configuration (playlist_EnableAudioFilter copies it into the playlist's
+ * list: setTap( false ) cleans that too), and it skips the work while no
  * SpectrumWidget is visible. */
 int OpenSpectrumFilter( vlc_object_t * );
 

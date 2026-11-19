@@ -122,12 +122,10 @@ int OpenSpectrumFilter( vlc_object_t *p_this )
     return VLC_SUCCESS;
 }
 
-void SpectrumWidget::setTap( intf_thread_t *p_intf, bool add )
+/* Adds or removes the tap in obj's "audio-filter" */
+static void editTap( vlc_object_t *obj, bool add )
 {
-    audio_output_t *aout = THEMIM->getAout();
-    if( aout == NULL )
-        return;
-    char *psz = var_GetString( aout, "audio-filter" );
+    char *psz = var_GetString( obj, "audio-filter" );
     QStringList list = qfu( psz ).split( ':', QString::SkipEmptyParts );
     free( psz );
     if( list.contains( tapName ) != add )
@@ -136,9 +134,22 @@ void SpectrumWidget::setTap( intf_thread_t *p_intf, bool add )
             list << tapName;
         else
             list.removeAll( tapName );
-        /* the audio output rebuilds its filters (FilterCallback) */
-        var_SetString( aout, "audio-filter", qtu( list.join( ":" ) ) );
+        /* an audio output rebuilds its filters (FilterCallback) */
+        var_SetString( obj, "audio-filter", qtu( list.join( ":" ) ) );
     }
+}
+
+void SpectrumWidget::setTap( intf_thread_t *p_intf, bool add )
+{
+    /* playlist_EnableAudioFilter (Lua, HTTP, the equalizer) copies the
+     * output's list, tap included, into the playlist's: the next output
+     * and any later interface would inherit it */
+    if( !add )
+        editTap( VLC_OBJECT( THEPL ), false );
+    audio_output_t *aout = THEMIM->getAout();
+    if( aout == NULL )
+        return;
+    editTap( VLC_OBJECT( aout ), add );
     vlc_object_release( aout );
 }
 
