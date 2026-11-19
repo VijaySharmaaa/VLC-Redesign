@@ -299,18 +299,38 @@ float BufferingOverlay::level() const
  * a scheme shows as it is. */
 static QString displayUrl( const QString &mrl )
 {
-    if( !mrl.contains( "://" ) )
+    const int sep = mrl.indexOf( "://" );
+    if( sep < 0 )
         return mrl;
     vlc_url_t url;
-    vlc_UrlParse( &url, qtu( mrl ) );
-    const QString path = url.psz_path ? qfu( url.psz_path ) : QString();
-    QString name = qfu( url.psz_host ? url.psz_host : "" );
-    if( url.i_port > 0 )
-        name += ':' + QString::number( url.i_port );
-    if( url.psz_protocol )
-        name = qfu( url.psz_protocol ) + "://" + name;
+    QString name;
+    if( vlc_UrlParse( &url, qtu( mrl ) ) == 0 && url.psz_host && url.psz_protocol )
+    {
+        name = qfu( url.psz_host );
+        if( name.contains( ':' ) )   /* IPv6 */
+            name = '[' + name + ']';
+        if( url.i_port > 0 )
+            name += ':' + QString::number( url.i_port );
+        name = qfu( url.psz_protocol ) + "://" + name
+             + ( url.psz_path ? qfu( url.psz_path ) : QString() );
+    }
+    else
+    {
+        /* not parsed (a raw space in the path, a bad host or port): cut by
+         * hand, the authority without what comes before its last '@' */
+        const int start = sep + 3;
+        int end = start;
+        while( end < mrl.size() && !QString( "/?#" ).contains( mrl.at( end ) ) )
+            end++;
+        int pathEnd = end;
+        while( pathEnd < mrl.size() && mrl.at( pathEnd ) != '?' && mrl.at( pathEnd ) != '#' )
+            pathEnd++;
+        const QString authority = mrl.mid( start, end - start );
+        name = mrl.left( start ) + authority.mid( authority.lastIndexOf( '@' ) + 1 )
+             + mrl.mid( end, pathEnd - end );
+    }
     vlc_UrlClean( &url );
-    return name + path;
+    return name;
 }
 
 /* Only an input with a track fills a cache once it plays: one without
