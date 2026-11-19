@@ -354,14 +354,10 @@ OpenDialog::OpenDialog( QWidget *parent,
     BUTTONACT( selectButton, close );
     BUTTONACT( cancelButton, cancel );
 
-    /* Hide the advancedPanel */
-    if( !getSettings()->value( "OpenDialog/advanced", false ).toBool())
-    {
-        ui.advancedFrame->hide();
-        ui.advancedFrame->setEnabled( false );
-    }
-    else
-        ui.advancedCheckBox->setChecked( true );
+    /* the advanced frame starts hidden: the minimum size is the dialog's
+     * without it, so unticking can shrink it again */
+    ui.advancedFrame->hide();
+    ui.advancedFrame->setEnabled( false );
 
     /* Initialize caching */
     storedMethod = "";
@@ -376,10 +372,13 @@ OpenDialog::OpenDialog( QWidget *parent,
     /* at another screen's scale that hint is stale (the hidden pages too):
      * from then on the layout's minimum, which follows the page shown */
     connect( Theme::instance(), &Theme::changed, this, [this]() { setMinimumSize( 0, 0 ); } );
-    /* the size is saved without the advanced frame (see the destructor) */
+    /* the size is saved as shown, with the advanced frame if it was open */
+    const bool advanced = getSettings()->value( "OpenDialog/advanced", false ).toBool();
+    ui.advancedCheckBox->setChecked( advanced );   /* toggled: shows the frame */
     QSize saved = getSettings()->value( "OpenDialog/size", QSize( 500, 400 ) ).toSize();
-    if( ui.advancedFrame->isEnabled() )
-        saved.rheight() += ui.advancedFrame->sizeHint().height();
+    if( advanced )   /* earlier builds saved it without the frame */
+        saved.setHeight( qMax( saved.height(),
+                               minimumHeight() + ui.advancedFrame->sizeHint().height() ) );
     resize( saved );
 }
 
@@ -446,11 +445,8 @@ void OpenDialog::setMenuAction()
 
 OpenDialog::~OpenDialog()
 {
-    /* the hint, as the constructor adds back: a stretched frame's height
-     * would shrink the size each session */
-    getSettings()->setValue( "OpenDialog/size", size() -
-                 ( ui.advancedFrame->isEnabled() ?
-                   QSize(0, ui.advancedFrame->sizeHint().height()) : QSize(0, 0) ) );
+    /* as shown: the constructor restores it with the same frame state */
+    getSettings()->setValue( "OpenDialog/size", size() );
     /* the checkbox: the frame is no longer visible once the dialog is hidden */
     getSettings()->setValue( "OpenDialog/advanced", ui.advancedCheckBox->isChecked() );
 }
