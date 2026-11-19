@@ -130,8 +130,8 @@ namespace RedesignTokens
         /* not in tokens.json: a tooltip's text inset, on top of the 2 px
          * margin and 1 px indent Qt's tooltip label adds itself */
         static const int TooltipPadX = 6, TooltipPadY = 2;
-        /* not in tokens.json: the least room between a label and the field
-         * beside it, in every form (Qt's own layout spacing is about 6) */
+        /* the least room between a label and the field
+         * beside it, in the preference forms (Qt's own spacing is about 6) */
         static const int LabelFieldGap = 14;
         static const int ButtonPadX = 16;
         static const int SidebarItemH = 36, SidebarOpenBtnH = 38, SidebarRailBelow = 1200;
@@ -229,6 +229,9 @@ namespace RedesignTokens
         static const int ListPadX = 6, ListPadBottom = 10;
         static const int RowPadX = 10, RowGap = 10, RowNumberW = 24, RowIcon = 18, RowMetaGap = 2;
         static const int DrawerShadow = 50, DrawerShadowAlpha = 115; /* -20px 0 50px rgba(0,0,0,.45) */
+        static const QRgb DrawerShadowColor = QRgb(DrawerShadowAlpha) << 24;  /* black at that alpha */
+        /* the location bar's hover highlight, inset from the row's top and bottom */
+        static const int LocationHoverInsetY = 2;
     }
 
     /* ---- Phase 3: now playing, mini player, audio mode (DESIGN_SPEC 4, 5, 9;
@@ -403,7 +406,7 @@ namespace RedesignTokens
         /* the card and its rows */
         static const int CardRadius = 8, RowMinH = 60, RowPadX = 18, RowPadY = 12;
         static const int RowGap = 20, DescGap = 3, ButtonGap = 8;
-        /* not in tokens.json: a number field, sized for a few digits */
+        /* a number field, sized for a few digits */
         static const int SpinW = 88;
         /* selects and fields on the right of a row: the prototype's selW
          * (it narrows to 180 at XS) */
