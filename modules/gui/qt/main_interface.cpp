@@ -1518,7 +1518,7 @@ void MainInterface::createPlaylist()
     {
         playlistWidget = dialog->exportPlaylistWidget();
         stackCentralW->addWidget( playlistWidget );
-        stackWidgetsSizes[playlistWidget] = settings->value( "playlistSize", QSize( 600, 300 ) ).toSize();
+        stackWidgetsSizes[playlistWidget] = settings->value( "MainWindow/playlistSize", QSize( 600, 300 ) ).toSize();
     }
     connect( dialog, &PlaylistDialog::visibilityChanged, this, &MainInterface::setPlaylistVisibility );
 }
