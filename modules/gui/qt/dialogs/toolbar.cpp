@@ -149,9 +149,11 @@ ToolbarEditDialog::ToolbarEditDialog( QWidget *_w, intf_thread_t *_p_intf)
     QToolButton *newButton = new QToolButton;
     newButton->setIcon( QIcon( ":/new.svg" ) );
     newButton->setToolTip( qtr("New profile") );
+    newButton->setAccessibleName( qtr("New profile") );
     QToolButton *deleteButton = new QToolButton;
     deleteButton->setIcon( QIcon( ":/toolbar/clear.svg" ) );
     deleteButton->setToolTip( qtr( "Delete the current profile" ) );
+    deleteButton->setAccessibleName( qtr( "Delete the current profile" ) );
 
     profileBoxLayout->addWidget( new QLabel( qtr( "Select profile:" ) ), 0, 0 );
     profileBoxLayout->addWidget( profileCombo, 0, 1 );
@@ -166,9 +168,16 @@ ToolbarEditDialog::ToolbarEditDialog( QWidget *_w, intf_thread_t *_p_intf)
     {
         getSettings()->setArrayIndex(i);
         /* every saved one, also one the user named Default: the built-in
-         * Default is never saved (marked below) */
-        profileCombo->addItem( getSettings()->value( "ProfileName" ).toString(),
-                               getSettings()->value( "Value" ).toString() );
+         * Default is never saved (marked below), but earlier builds saved
+         * it with this deck; that copy is dropped (and not saved again) */
+        const QString name = getSettings()->value( "ProfileName" ).toString();
+        const QString value = getSettings()->value( "Value" ).toString();
+        if( name == qtr( "Default" ) && value == QLatin1String( "0|38;65|"
+                "0-2;3;1;4;32;20;19;13;14;11;12;41;65;26;42;9;10;27;7;32;35-4|"
+                "32;13;14;11;12;41|43;33-4;44|"
+                "0-2;3;1;4;32;20;19;13;14;11;12;41;65;26;42;9;10;8;25;32;35-4" ) )
+            continue;
+        profileCombo->addItem( name, value );
     }
     getSettings()->endArray();
 

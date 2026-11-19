@@ -9,11 +9,12 @@ win32_debugdir=$(abs_top_builddir)/symbols-$(VERSION)
 7Z_OPTS=-t7z -m0=lzma -mx=9 -mfb=64 -md=32m -ms=on
 
 # The cross build skips vlc-cache-gen (bin/Makefile.am), and only the NSIS
-# installer runs it, at install time. Build plugins/plugins.dat for the zip/7z
+# installer runs it, at install time. Build plugins/plugins.dat for the 7z
 # too, through wine when it is there. The cache is valid only for these exact
 # DLLs (path, size and mtime of each), so run it after the last change to them.
-# A DLL whose mtime does not match (e.g. a zip tool that rounds times) is
-# loaded and probed again at start, like without a cache.
+# A DLL whose mtime does not match is loaded and probed again at start, like
+# without a cache, but logged as stale: the zips leave plugins.dat out, as
+# Windows' own unzip restores local 2-second DOS times, never the build's.
 # The wine prefix defaults to the build dir: HOME may not be ours in a container.
 win32_cachegen = \
 	rm -f "$(win32_destdir)/plugins/plugins.dat"; \
@@ -159,11 +160,11 @@ package-win32-exe: package-win32-src $(win32_destdir)/NSIS/nsProcess.dll extras/
 
 package-win32-zip: package-win-strip
 	rm -f -- $(WINVERSION).zip
-	zip -r -9 $(WINVERSION).zip vlc-$(VERSION) --exclude \*.nsi \*NSIS\* \*languages\* \*sdk\* \*helpers\* spad\*
+	zip -r -9 $(WINVERSION).zip vlc-$(VERSION) --exclude \*.nsi \*NSIS\* \*languages\* \*sdk\* \*helpers\* spad\* \*/plugins/plugins.dat
 
 package-win32-debug-zip: package-win-common
 	rm -f -- $(WINVERSION)-debug.zip
-	zip -r -9 $(WINVERSION)-debug.zip vlc-$(VERSION)
+	zip -r -9 $(WINVERSION)-debug.zip vlc-$(VERSION) --exclude \*/plugins/plugins.dat
 
 package-win32-7zip: package-win-strip
 	7z a $(7Z_OPTS) $(WINVERSION).7z vlc-$(VERSION)

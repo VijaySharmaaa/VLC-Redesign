@@ -2452,6 +2452,12 @@ void MainInterface::handleKeyPress( QKeyEvent *e )
     else if( ( e->modifiers() & Qt::ControlModifier ) && ( e->key() == Qt::Key_K ) &&
         playlistWidget )
     {
+        QWidget *window = playlistWidget->window();
+        if( window != this && window->isVisible() )
+        {   /* the detached playlist: its search takes the keys */
+            window->raise();
+            window->activateWindow();
+        }
         playlistWidget->setSearchFieldFocus();
         e->accept();
     }
