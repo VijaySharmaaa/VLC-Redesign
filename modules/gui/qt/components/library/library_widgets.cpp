@@ -774,6 +774,9 @@ LibraryBrowser::LibraryBrowser( intf_thread_t *_p_intf, LibraryFilter *_filter, 
     expandTimer->setInterval( Library::ExpandTimeoutMs );
     connect( expandTimer, &QTimer::timeout, this, [this]() {
         expandFailed = true;   /* still browsed into if its items come later */
+        /* the request is over (a preparse ends within the timeout): asking
+         * again cannot add the items twice */
+        expandRequested.remove( expandingId );
         emit changed();
     } );
     /* a folder expanded by expand(): open it, as StandardPLPanel does */
@@ -825,6 +828,13 @@ void LibraryBrowser::expand( const QModelIndex &source )
 
 void LibraryBrowser::cancelExpand()
 {
+    if( expandTimer->isActive() )
+    {
+        /* its request still runs: it can be asked again once that is over */
+        const int id = expandingId;
+        QTimer::singleShot( expandTimer->remainingTime(), this,
+                            [this, id]() { expandRequested.remove( id ); } );
+    }
     expandTimer->stop();
     expandFailed = false;
     expandingId = -1;
@@ -860,12 +870,7 @@ void LibraryBrowser::goBack()
 void LibraryBrowser::noticeAction( bool primary )
 {
     if( expandFailed && primary && expandingIndex.isValid() )
-    {
-        /* the first request is over (a preparse ends within the timeout):
-         * asking again cannot add the items twice */
-        expandRequested.remove( model()->itemId( expandingIndex ) );
-        expand( expandingIndex );
-    }
+        expand( expandingIndex );   /* the timeout let it be asked again */
     else if( !expandFailed && !header->search()->text().trimmed().isEmpty() )
     {
         header->search()->clear();
@@ -1139,7 +1144,8 @@ void LoadingRing::paintEvent( QPaintEvent * )
 /**********************************************************************
  * LibraryNotice
  **********************************************************************/
-LibraryNotice::LibraryNotice( QWidget *parent ) : QWidget( parent )
+LibraryNotice::LibraryNotice( QWidget *parent )
+    : QWidget( parent ), glyphIcon( NULL ), glyphRole( Theme::Dim )
 {
     QVBoxLayout *layout = noticeLayout( this );
     layout->addStretch( 1 );
@@ -1165,6 +1171,17 @@ LibraryNotice::LibraryNotice( QWidget *parent ) : QWidget( parent )
     layout->addStretch( 1 );
     /* a page moving the focus here from its grid lands on the action */
     setFocusProxy( primary );
+    connect( Theme::instance(), &Theme::changed, this, &LibraryNotice::paintGlyph );
+}
+
+/* in the theme's colours: again when they change */
+void LibraryNotice::paintGlyph()
+{
+    if( !glyphIcon )
+        return;
+    Theme *t = Theme::instance();
+    const int px = t->px( Library::NoticeGlyph );
+    glyph->setPixmap( t->icon( QLatin1String( glyphIcon ), glyphRole, QSize( px, px ) ).pixmap( px, px ) );
 }
 
 void LibraryNotice::setText( QLabel *label, const QString &s )
@@ -1201,10 +1218,10 @@ void LibraryNotice::showMessage( const char *icon, Theme::ColorRole role, const 
                                  const QString &_text, const QString &primaryText,
                                  const QString &secondaryText )
 {
-    Theme *t = Theme::instance();
     ring->hide();
-    const int px = t->px( Library::NoticeGlyph );
-    glyph->setPixmap( t->icon( QLatin1String( icon ), role, QSize( px, px ) ).pixmap( px, px ) );
+    glyphIcon = icon;
+    glyphRole = role;
+    paintGlyph();
     glyph->show();
     setText( title, _title );
     setText( text, _text );

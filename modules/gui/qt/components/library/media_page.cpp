@@ -29,6 +29,7 @@
 #include "util/redesign_icons.hpp"
 
 #include <QApplication>
+#include <QHideEvent>
 #include <QItemSelectionModel>
 #include <QLineEdit>
 #include <QStackedWidget>
@@ -117,7 +118,7 @@ void MediaPage::showEvent( QShowEvent *e )
 
 void MediaPage::hideEvent( QHideEvent *e )
 {
-    if( thumbs )
+    if( thumbs && !e->spontaneous() )   /* not when the window is minimised */
         thumbs->cancel();
     QWidget::hideEvent( e );
 }

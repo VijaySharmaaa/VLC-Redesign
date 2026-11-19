@@ -354,7 +354,7 @@ void ExistsCheck::run()
     for( int i = 0; i < paths.count(); i++ )
         if( !QFileInfo::exists( paths.at( i ) ) )
             missing.append( mrls.at( i ) );
-    emit done( missing );
+    emit done( mrls, missing );
 }
 
 /**********************************************************************
@@ -518,6 +518,16 @@ void HomePage::rebuild()
     RecentsMRL *recents = RecentsMRL::getInstance( p_intf );
     const QStringList mrls = enabled ? recents->recentList() : QStringList();
 
+    /* the keyboard stays on the same item (each track change rebuilds):
+     * its card, or its row, by MRL */
+    QString focusedCard;
+    foreach( ResumeCard *card, cards )
+        if( card->hasFocus() )
+            focusedCard = card->mrl;
+    const int currentRow = table->currentIndex().row();
+    const QString currentMrl = table->currentItem()
+                             ? table->currentItem()->data( TitleCol, MrlRole ).toString() : QString();
+
     /* later: a card's own menu may still be open on the stack */
     foreach( ResumeCard *card, cards )
     {
@@ -525,7 +535,6 @@ void HomePage::rebuild()
         card->deleteLater();
     }
     cards.clear();
-    const int currentRow = table->currentIndex().row();
     table->clear();
 
     const QString search = header->search()->text().trimmed();
@@ -537,7 +546,8 @@ void HomePage::rebuild()
             continue;
         const int64_t timeMs = recents->time( mrl );
         const int64_t lengthMs = recents->length( mrl );
-        if( timeMs > 0 )
+        /* played to its end: Resume would stop at once */
+        if( timeMs > 0 && !( lengthMs > 0 && timeMs >= lengthMs ) )
         {
             /* frames of videos only: not of a disc, a folder or a stream */
             const QString video = e.icon == RedesignIcons::IconVideo ? e.localPath : QString();
@@ -561,21 +571,26 @@ void HomePage::rebuild()
         item->setText( WhenCol, whenText( recents->date( mrl ) ) );
         item->setTextAlignment( WhenCol, Qt::AlignRight | Qt::AlignVCenter );
     }
-    /* new cards join the end of the focus chain: put them before the table */
-    QWidget *previous = NULL;
+    /* new cards join the end of the focus chain: the search, the cards,
+     * then the table */
+    QWidget *previous = header->search();
     foreach( ResumeCard *card, cards )
     {
-        if( previous )
-            setTabOrder( previous, card );
+        setTabOrder( previous, card );
         previous = card;
     }
-    if( previous )
-        setTabOrder( previous, table );
+    setTabOrder( previous, table );
 
     const int count = table->topLevelItemCount();
     table->setFixedHeight( count * t->px( Home::RowH ) );
     if( table->hasFocus() && currentRow >= 0 && count > 0 )
-        table->setCurrentItem( table->topLevelItem( qMin( currentRow, count - 1 ) ) );
+    {
+        QTreeWidgetItem *current = table->topLevelItem( qMin( currentRow, count - 1 ) );
+        for( int i = 0; i < count; i++ )
+            if( table->topLevelItem( i )->data( TitleCol, MrlRole ).toString() == currentMrl )
+                current = table->topLevelItem( i );
+        table->setCurrentItem( current );
+    }
 
     cardsSection->setVisible( !cards.isEmpty() );
     recentSection->setVisible( count > 0 );
@@ -585,6 +600,22 @@ void HomePage::rebuild()
     if( !mrls.isEmpty() && count == 0 )
         noResults->showNoResults( qtr( "Nothing in your recent media matches \"%1\"." ).arg( search ) );
     noResults->setVisible( !mrls.isEmpty() && count == 0 );
+    if( !focusedCard.isEmpty() )
+    {
+        /* its card, else its row (no more to resume) */
+        QWidget *target = NULL;
+        foreach( ResumeCard *card, cards )
+            if( card->mrl == focusedCard )
+                target = card;
+        for( int i = 0; !target && i < count; i++ )
+            if( table->topLevelItem( i )->data( TitleCol, MrlRole ).toString() == focusedCard )
+            {
+                table->setCurrentItem( table->topLevelItem( i ) );
+                target = table;
+            }
+        if( target )
+            target->setFocus( Qt::OtherFocusReason );
+    }
 
     applyMissing();
     layoutForWidth();
@@ -619,9 +650,10 @@ void HomePage::startCheck()
     LibraryData::workerPool()->start( check );
 }
 
-void HomePage::setMissing( const QStringList &mrls )
+void HomePage::setMissing( const QStringList &checkedMrls, const QStringList &mrls )
 {
     checking = false;
+    checked = QSet<QString>::fromList( checkedMrls );
     missing = QSet<QString>::fromList( mrls );
     applyMissing();
     if( recheck )
@@ -733,7 +765,9 @@ void HomePage::popup( const QString mrl, const QPoint &globalPos )
     QAction *showAction = menu.addAction(
         Theme::themedIcon( RedesignIcons::IconShowFolder, Theme::Text2 ),
         qtr( "Show containing folder" ) );
-    showAction->setEnabled( !e.localPath.isEmpty() && !missing.contains( mrl ) );
+    /* only once checked: opening a folder on an offline share would hang
+     * the window (ShellExecute) until the network gives up */
+    showAction->setEnabled( !e.localPath.isEmpty() && checked.contains( mrl ) && !missing.contains( mrl ) );
     QAction *copyAction = menu.addAction(
         Theme::themedIcon( RedesignIcons::IconCopy, Theme::Text2 ), qtr( "Copy path" ) );
     menu.addSeparator();
@@ -762,7 +796,8 @@ void HomePage::updateCards()
 
 void HomePage::hideEvent( QHideEvent *e )
 {
-    thumbs->cancel();
+    if( !e->spontaneous() )   /* not when the window is minimised */
+        thumbs->cancel();
     QScrollArea::hideEvent( e );
 }
 
@@ -785,9 +820,11 @@ bool HomePage::eventFilter( QObject *o, QEvent *e )
         QScrollBar *bar = cardsArea->horizontalScrollBar();
         if( bar->maximum() > 0 && qAbs( w->angleDelta().y() ) > qAbs( w->angleDelta().x() ) )
         {
-            const int before = bar->value();
-            QApplication::sendEvent( bar, e );
-            if( bar->value() != before )
+            /* the bar accepts what it takes, a touchpad's part of a step
+             * too, and ignores it only at its end. Called directly: sendEvent
+             * would hand an ignored wheel on to the page as well. */
+            static_cast<QObject *>( bar )->event( e );
+            if( e->isAccepted() )
                 return true;
         }
     }

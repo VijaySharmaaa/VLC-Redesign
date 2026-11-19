@@ -53,7 +53,7 @@ protected:
 
 private slots:
     void rebuild();
-    void setMissing( const QStringList &mrls );
+    void setMissing( const QStringList &checkedMrls, const QStringList &mrls );
     void updateCards();
 
 private:
@@ -77,6 +77,7 @@ private:
     LibraryEmptyState *empty;
     LibraryNotice *noResults;
     QSet<QString> missing;  /* mrls of local files that are not there */
+    QSet<QString> checked;  /* mrls the last check covered */
     /* one check at a time: a blocked one must not pile up others */
     bool checking, recheck;
     QElapsedTimer sincePlay;
@@ -93,7 +94,7 @@ public:
     void run() Q_DECL_OVERRIDE;
 
 signals:
-    void done( const QStringList &missingMrls );
+    void done( const QStringList &checkedMrls, const QStringList &missingMrls );
 
 private:
     QStringList mrls, paths;

@@ -60,7 +60,8 @@ namespace LibraryData
      * folders, servers, shares) without playing it: the playlist then turns
      * it into a node (leafBecameParent; *browseId is the one to open then).
      * Not twice: a second listing would add the items again, so `requested`
-     * keeps every id asked for until it became a node. */
+     * keeps every id asked for until it became a node or its request is
+     * over (LibraryBrowser: the timeout). */
     void expand( intf_thread_t *, PLModel *, const QModelIndex &source,
                  int *browseId, QSet<int> *requested );
     /* P4-3: appends a copy of the item (a folder: its items) to the
@@ -329,8 +330,11 @@ signals:
 
 private:
     void setText( QLabel *, const QString & );
+    void paintGlyph();
 
     LoadingRing *ring;
+    const char *glyphIcon;      /* the last message's, NULL before one */
+    Theme::ColorRole glyphRole;
     QLabel *glyph, *title, *text;
     QPushButton *primary, *secondary;
 };
