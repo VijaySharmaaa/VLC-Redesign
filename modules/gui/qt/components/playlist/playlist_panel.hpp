@@ -60,6 +60,9 @@ signals:
 protected:
     void keyPressEvent( QKeyEvent * ) Q_DECL_OVERRIDE;
     bool eventFilter( QObject *, QEvent * ) Q_DECL_OVERRIDE;
+    /* files dropped here are queued, as on the playlist window */
+    void dragEnterEvent( QDragEnterEvent * ) Q_DECL_OVERRIDE;
+    void dropEvent( QDropEvent * ) Q_DECL_OVERRIDE;
 
 private:
     void popup( const QPoint & );

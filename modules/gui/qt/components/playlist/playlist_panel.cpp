@@ -27,6 +27,7 @@
 #include "components/playlist/sorting.h"            /* COLUMN_* */
 #include "components/library/library_widgets.hpp"     /* setupSearchField */
 #include "input_manager.hpp"
+#include "components/playlist/playlist.hpp"         /* PlaylistWidget::enqueueDrop */
 #include "dialogs_provider.hpp"
 #include "menus.hpp"                    /* MENU_KEY_* */
 #include "util/customwidgets.hpp"                   /* timeString */
@@ -38,11 +39,13 @@
 
 #include <QApplication>
 #include <QBoxLayout>
+#include <QDropEvent>
 #include <QKeyEvent>
 #include <QKeySequence>
 #include <QLabel>
 #include <QLineEdit>
 #include <QMenu>
+#include <QMimeData>
 #include <QPainter>
 #include <QStyledItemDelegate>
 #include <QToolButton>
@@ -298,6 +301,9 @@ PlaylistPanel::PlaylistPanel( intf_thread_t *_p_intf, QBoxLayout *_dock, QWidget
     connect( model, &QAbstractItemModel::dataChanged, this, [this]() { countTimer.start(); } );
 
     connect( t, &Theme::changed, this, [this]() { update(); view->viewport()->update(); } );
+
+    /* the list takes its own reordering drags, other drops come here */
+    setAcceptDrops( true );
 }
 
 void PlaylistPanel::updateCount()
@@ -382,6 +388,17 @@ bool PlaylistPanel::eventFilter( QObject *obj, QEvent *e )
         }
     }
     return QWidget::eventFilter( obj, e );
+}
+
+void PlaylistPanel::dragEnterEvent( QDragEnterEvent *e )
+{
+    if( e->mimeData()->hasUrls() )
+        e->acceptProposedAction();
+}
+
+void PlaylistPanel::dropEvent( QDropEvent *e )
+{
+    PlaylistWidget::enqueueDrop( p_intf, e );
 }
 
 void PlaylistPanel::popup( const QPoint &pos )
