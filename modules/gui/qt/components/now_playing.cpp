@@ -334,9 +334,16 @@ NowPlayingInfo::NowPlayingInfo( intf_thread_t *_p_i, QObject *parent )
     : QObject( parent ), p_intf( _p_i )
 {
     InputManager *im = THEMIM->getIM();
-    /* a stop sends NULL: the views keep the last item */
+    /* delInput, at a stop and before every next input, clears the name and
+     * the art with no input left: the views keep the last item, and a new
+     * item's own name and art are read when it starts */
     connect( im, QOverload<QString>::of( &InputManager::artChanged ), this,
-             [this]( const QString &url ) { art = url; emit changed(); } );
+             [this]( const QString &url ) {
+                 if( url.isEmpty() && !THEMIM->getIM()->hasInput() )
+                     return;
+                 art = url;
+                 emit changed();
+             } );
     /* the name stock shows: input-title-format, with a stream's now playing */
     connect( im, &InputManager::nameChanged, this, [this]( const QString &name ) {
         if( name.isEmpty() && !THEMIM->getIM()->hasInput() )
@@ -350,6 +357,7 @@ NowPlayingInfo::NowPlayingInfo( intf_thread_t *_p_i, QObject *parent )
         if( has && THEMIM->getInput() )
         {
             title = THEMIM->getIM()->getName();
+            art = InputManager::decodeArtURL( input_GetItem( THEMIM->getInput() ) );
             readItem( input_GetItem( THEMIM->getInput() ) );
         }
     } );
