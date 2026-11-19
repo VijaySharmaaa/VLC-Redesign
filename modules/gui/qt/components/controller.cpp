@@ -57,6 +57,7 @@
 #include <QRegion>
 #include <QSignalMapper>
 #include <QTimer>
+#include <QVector>
 #include <QApplication>
 #include <QWindow>
 #include <QScreen>
@@ -940,6 +941,23 @@ void AbstractController::addMoreButton( QBoxLayout *row )
     row->addWidget( moreButton );
 }
 
+/* the deck's rows: a column of row layouts (the deck, the immersive bar's
+ * seek row and deck), or one row */
+static QList<QLayout *> deckRows( QLayout *top )
+{
+    QList<QLayout *> rows;
+    QBoxLayout *column = qobject_cast<QBoxLayout *>( top );
+    if( column && column->direction() == QBoxLayout::TopToBottom )
+    {
+        for( int i = 0; i < column->count(); i++ )
+            if( column->itemAt( i )->layout() )
+                rows << column->itemAt( i )->layout();
+    }
+    if( rows.isEmpty() )
+        rows << top;
+    return rows;
+}
+
 void AbstractController::fitDeck( int room )
 {
     if( !moreButton )
@@ -950,22 +968,59 @@ void AbstractController::fitDeck( int room )
     const int gap = Theme::instance()->px( Deck::Gap );
     const int moreWidth = moreButton->width() + gap;
     const QList<QWidget *> items = rankedItems();
-    /* the width with every item shown and no More button */
-    int full = layout()->sizeHint().width() - ( moreButton->isHidden() ? 0 : moreWidth );
-    foreach( QWidget *w, items )
-        if( w->isHidden() )
-            full += w->sizeHint().width() + gap;
-    /* drop the lowest ranks until the rest and More fit */
-    int need = full > room ? full + moreWidth : full;
+    const QList<QLayout *> rows = deckRows( layout() );
+    if( rows.first() != layout() )
+    {
+        const QMargins pad = layout()->contentsMargins();
+        room -= pad.left() + pad.right();
+    }
+    /* each row's width with every item shown and no More button */
+    QVector<int> width( rows.count() ), rowOf( items.count() );
+    int moreRow = 0;
+    for( int r = 0; r < rows.count(); r++ )
+    {
+        QList<QWidget *> row;
+        deckWidgets( rows.at( r ), row );
+        width[r] = rows.at( r )->sizeHint().width();
+        if( row.contains( moreButton ) )
+        {
+            moreRow = r;
+            if( !moreButton->isHidden() )
+                width[r] -= moreWidth;
+        }
+        for( int i = 0; i < items.count(); i++ )
+            if( row.contains( items.at( i ) ) )
+            {
+                rowOf[i] = r;
+                if( items.at( i )->isHidden() )
+                    width[r] += items.at( i )->sizeHint().width() + gap;
+            }
+    }
+    /* drop the lowest ranks of each row too wide, until it (and More, in
+     * its row) fits; again while a drop brings More to a row that fit */
+    QVector<bool> drop( items.count(), false );
     int dropped = 0;
-    while( need > room && dropped < items.count() )
-        need -= items.at( dropped++ )->sizeHint().width() + gap;
+    for( bool changed = true; changed; )
+    {
+        changed = false;
+        for( int i = 0; i < items.count(); i++ )
+        {
+            const int r = rowOf[i];
+            const bool more = r == moreRow && ( dropped > 0 || width[r] > room );
+            if( drop[i] || width[r] + ( more ? moreWidth : 0 ) <= room )
+                continue;
+            drop[i] = true;
+            dropped++;
+            changed = true;
+            width[r] -= items.at( i )->sizeHint().width() + gap;
+        }
+    }
     for( int i = 0; i < items.count(); i++ )
     {
         QWidget *w = items.at( i );
-        w->setProperty( "deckDropped", i < dropped );
-        if( w->isHidden() != ( i < dropped ) )
-            w->setVisible( i >= dropped );
+        w->setProperty( "deckDropped", drop[i] );
+        if( w->isHidden() != drop[i] )
+            w->setVisible( !drop[i] );
     }
     if( moreButton->isHidden() != ( dropped == 0 ) )
         moreButton->setVisible( dropped > 0 );
@@ -1068,16 +1123,25 @@ ControlsWidget::ControlsWidget( intf_thread_t *_p_i,
 
 int ControlsWidget::compactWidth() const
 {
-    /* the hint, not the minimum: below it the volume squeezes its label */
+    /* the hint, not the minimum: below it the volume squeezes its label;
+     * the widest row with all its ranked items in More */
     const int gap = Theme::instance()->px( Deck::Gap );
-    int width = layout()->sizeHint().width();
     const QList<QWidget *> items = rankedItems();
-    foreach( QWidget *w, items )
-        if( !w->isHidden() )
-            width -= w->sizeHint().width() + gap;
-    if( !items.isEmpty() && moreButton->isHidden() )
-        width += moreButton->width() + gap;
-    return width;
+    int width = 0;
+    foreach( QLayout *rowLayout, deckRows( layout() ) )
+    {
+        QList<QWidget *> row;
+        deckWidgets( rowLayout, row );
+        int rowWidth = rowLayout->sizeHint().width();
+        foreach( QWidget *w, items )
+            if( !w->isHidden() && row.contains( w ) )
+                rowWidth -= w->sizeHint().width() + gap;
+        if( !items.isEmpty() && moreButton->isHidden() && row.contains( moreButton ) )
+            rowWidth += moreButton->width() + gap;
+        width = qMax( width, rowWidth );
+    }
+    const QMargins pad = layout()->contentsMargins();
+    return width + pad.left() + pad.right();
 }
 
 QSize ControlsWidget::minimumSizeHint() const
