@@ -38,7 +38,10 @@ class NetworkTile : public QAbstractButton
     Q_OBJECT
 public:
     NetworkTile( const char *icon, const QString &name, const QString &address, QWidget *parent );
+    void setDetails( const QString &name, const QString &address );
     QSize sizeHint() const Q_DECL_OVERRIDE;
+
+    QPersistentModelIndex source;   /* a server's or share's row */
 
 protected:
     void paintEvent( QPaintEvent * ) Q_DECL_OVERRIDE;
@@ -77,6 +80,7 @@ private:
     void openSd( const LibraryData::Sd &, const QString &title );
     void open( PLModel *, const QModelIndex &source, const QString &title );
     void activate( const QModelIndex & );
+    void play( PLModel *, const QModelIndex &source );
     void showTiles();
     void updateState();
     bool listing() const;   /* a list (or its state), not the tiles */
@@ -99,6 +103,7 @@ private:
     QPersistentModelIndex top;   /* the opened tile; invalid: a whole discovery */
     QString topTitle;
     bool topIsItem;              /* a server or share, which can go away */
+    bool listed;                 /* listing(): the notice also shows the tiles' no results */
     bool loaded;
 };
 

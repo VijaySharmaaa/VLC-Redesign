@@ -49,16 +49,25 @@ using namespace RedesignTokens;
  **********************************************************************/
 NetworkTile::NetworkTile( const char *_icon, const QString &name, const QString &_address,
                           QWidget *parent )
-    : QAbstractButton( parent ), icon( _icon ), address( _address )
+    : QAbstractButton( parent ), icon( _icon )
 {
-    setText( name );
-    setAccessibleName( name );
-    setAccessibleDescription( address );
-    setToolTip( address.isEmpty() ? name : QString( "%1\n%2" ).arg( name, address ) );
+    setDetails( name, _address );
     setFocusPolicy( Qt::StrongFocus );
     setAttribute( Qt::WA_Hover );
     /* the grid's column stretch alone sets the width: equal columns */
     setSizePolicy( QSizePolicy::Ignored, QSizePolicy::Fixed );
+}
+
+void NetworkTile::setDetails( const QString &name, const QString &_address )
+{
+    if( name == text() && _address == address && !name.isEmpty() )
+        return;
+    address = _address;
+    setText( name );
+    setAccessibleName( name );
+    setAccessibleDescription( address );
+    setToolTip( address.isEmpty() ? name : QString( "%1\n%2" ).arg( name, address ) );
+    update();
 }
 
 QSize NetworkTile::sizeHint() const
@@ -136,7 +145,8 @@ static const int tileColumns[] = { Library::NetColsXS, Library::NetColsS,
                                    Library::NetColsM, Library::NetColsL };
 
 NetworkPage::NetworkPage( intf_thread_t *_p_intf, QWidget *parent )
-    : QWidget( parent ), p_intf( _p_intf ), browsed( NULL ), topIsItem( false ), loaded( false )
+    : QWidget( parent ), p_intf( _p_intf ), browsed( NULL ), topIsItem( false ), listed( false ),
+      loaded( false )
 {
     const Theme *t = Theme::instance();
     const QString title = qtr( "Network" );
@@ -176,7 +186,15 @@ NetworkPage::NetworkPage( intf_thread_t *_p_intf, QWidget *parent )
     browser = new LibraryBrowser( p_intf, filter, list, header, this );
     connect( browser, &LibraryBrowser::changed, this, &NetworkPage::updateState );
     connect( browser, &LibraryBrowser::backFromTop, this, &NetworkPage::showTiles );
-    connect( notice, &LibraryNotice::primaryClicked, browser, [this]() { browser->noticeAction( true ); } );
+    connect( notice, &LibraryNotice::primaryClicked, browser, [this]() {
+        if( listing() )
+            browser->noticeAction( true );
+        else
+        {
+            header->search()->clear();   /* the tiles' no results */
+            header->search()->setFocus();
+        }
+    } );
     connect( notice, &LibraryNotice::secondaryClicked, browser, [this]() { browser->noticeAction( false ); } );
 
     rebuild = new QTimer( this );
@@ -275,9 +293,22 @@ void NetworkPage::load()
             connect( lan.model, &QAbstractItemModel::rowsRemoved, this, topLevel,
                      Qt::QueuedConnection );
             connect( lan.model, &QAbstractItemModel::modelReset, rebuild, QOverload<>::of( &QTimer::start ) );
-            connect( lan.model, &QAbstractItemModel::dataChanged, this, [this]( const QModelIndex &i ) {
-                if( !i.parent().isValid() )
-                    rebuild->start();
+            /* a server's name or address: in place, so a press, the hover
+             * and the screen reader's place stay */
+            PLModel *model = lan.model;
+            connect( lan.model, &QAbstractItemModel::dataChanged, this,
+                     [this, model]( const QModelIndex &first, const QModelIndex &last ) {
+                if( first.parent().isValid() || rebuild->isActive() )
+                    return;
+                foreach( NetworkTile *tile, lanTiles )
+                    if( tile->source.model() == model && tile->source.row() >= first.row()
+                     && tile->source.row() <= last.row() )
+                        tile->setDetails( model->getTitle( tile->source ), model->getURI( tile->source ) );
+                if( !header->search()->text().trimmed().isEmpty() )
+                {
+                    layoutTiles();   /* it may match the search now, or no more */
+                    updateState();
+                }
             } );
         }
         else if( sd.name == QLatin1String( "lua{sd='icecast'}" ) || sd.name == QLatin1String( "podcast" ) )
@@ -306,14 +337,19 @@ void NetworkPage::rebuildLanTiles()
     foreach( const Lan &lan, lans )
         for( int i = 0; i < lan.model->rowCount(); i++ )
         {
-            const QPersistentModelIndex source = lan.model->index( i, 0, QModelIndex() );
-            const QString name = lan.model->getTitle( source );
-            NetworkTile *tile = new NetworkTile( lan.icon, name, lan.model->getURI( source ),
-                                                 tilesPage->widget() );
+            const QModelIndex source = lan.model->index( i, 0, QModelIndex() );
+            NetworkTile *tile = new NetworkTile( lan.icon, lan.model->getTitle( source ),
+                                                 lan.model->getURI( source ), tilesPage->widget() );
+            tile->source = source;
             PLModel *model = lan.model;
-            connect( tile, &QAbstractButton::clicked, this, [this, model, source, name]() {
-                if( source.isValid() )
-                    open( model, source, name );
+            connect( tile, &QAbstractButton::clicked, this, [this, model, tile]() {
+                if( !tile->source.isValid() )
+                    return;
+                /* a SAP announcement without a category is a stream */
+                if( LibraryData::isFolder( model, tile->source ) )
+                    open( model, tile->source, tile->text() );
+                else
+                    play( model, tile->source );
             } );
             lanTiles.append( tile );
         }
@@ -391,6 +427,7 @@ void NetworkPage::open( PLModel *model, const QModelIndex &source, const QString
     topTitle = title;
     topIsItem = source.isValid();
     browser->setTop( source );
+    listed = true;
     body->setCurrentWidget( list );
     browser->browse( source );
     body->currentWidget()->setFocus();   /* the list, or its state's button */
@@ -414,17 +451,23 @@ void NetworkPage::activate( const QModelIndex &index )
         browser->expand( source );
         return;
     }
-    input_item_t *input = browsed->getInputItem( source );
+    play( browsed, source );
+}
+
+void NetworkPage::play( PLModel *model, const QModelIndex &source )
+{
+    input_item_t *input = model->getInputItem( source );
     if( !input )
         return;
     input_item_Hold( input );
-    browsed->activateItem( source );
+    model->activateItem( source );   /* from the discovery's node, as the stock playlist */
     LibraryData::revealWhenPlaying( p_intf, input, false );
 }
 
 void NetworkPage::showTiles()
 {
     browser->cancelExpand();
+    listed = false;
     body->setCurrentWidget( tilesPage );
     header->search()->clear();
     filter->setText( QString() );
@@ -435,7 +478,7 @@ void NetworkPage::showTiles()
 
 bool NetworkPage::listing() const
 {
-    return body->currentWidget() != tilesPage;
+    return listed;
 }
 
 void NetworkPage::updateState()
@@ -455,16 +498,27 @@ void NetworkPage::updateState()
     lanHint->setVisible( lanTiles.isEmpty() );
     lanHint->setText( settle->isActive() ? qtr( "Looking for media servers and shares..." )
                                          : qtr( "No media server or share found on your network" ) );
-    if( !inList )
-        return;
 
+    const QString search = header->search()->text().trimmed();
+    QWidget *page = notice;
+    if( !inList )
+    {
+        /* the tiles, or no results for a search that matches none */
+        page = tilesPage;
+        bool any = search.isEmpty();
+        foreach( const NetworkTile *tile, lanTiles + streamTiles )
+            any = any || matches( tile, search );
+        if( !any )
+        {
+            notice->showNoResults( qtr( "No server, share or stream matches \"%1\"." ).arg( search ) );
+            page = notice;
+        }
+    }
     /* an empty list: maybe still coming (a discovery's download, a server
      * being listed; VLC 3 says neither when it is done), else nothing there
      * or nothing matches */
-    const QString search = header->search()->text().trimmed();
-    QWidget *page = notice;
-    if( !browser->showExpandState( notice, qtr( "VLC could not list \"%1\". The server or share may be "
-                                                "offline, or the folder unreadable." ), topTitle ) )
+    else if( !browser->showExpandState( notice, qtr( "VLC could not list \"%1\". The server or share may be "
+                                                     "offline, or the folder unreadable." ), topTitle ) )
     {
         if( filter->rowCount( root ) > 0 )
             page = list;
