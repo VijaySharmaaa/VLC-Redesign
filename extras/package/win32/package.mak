@@ -8,6 +8,22 @@ win32_debugdir=$(abs_top_builddir)/symbols-$(VERSION)
 
 7Z_OPTS=-t7z -m0=lzma -mx=9 -mfb=64 -md=32m -ms=on
 
+# The cross build skips vlc-cache-gen (bin/Makefile.am), and only the NSIS
+# installer runs it, at install time. Build plugins/plugins.dat for the zip/7z
+# too, through wine when it is there. The cache is valid only for these exact
+# DLLs (path, size and mtime of each), so run it after the last change to them.
+# A DLL whose mtime does not match (e.g. a zip tool that rounds times) is
+# loaded and probed again at start, like without a cache.
+# The wine prefix defaults to the build dir: HOME may not be ours in a container.
+win32_cachegen = \
+	rm -f "$(win32_destdir)/plugins/plugins.dat"; \
+	export WINEPREFIX="$${WINEPREFIX:-$(abs_top_builddir)/wineprefix}" WINEDEBUG=-all WINEDLLOVERRIDES="mscoree,mshtml="; \
+	if command -v wine >/dev/null 2>&1 && \
+	   wine "$(win32_destdir)/vlc-cache-gen$(EXEEXT)" "`winepath -w '$(win32_destdir)/plugins'`" ; then \
+	    echo "generated $(win32_destdir)/plugins/plugins.dat"; \
+	else \
+	    echo "no plugins.dat (wine missing or failed): on Windows run vlc-cache-gen.exe plugins in the package folder"; \
+	fi
 
 if HAVE_WIN32
 include extras/package/npapi.am
@@ -86,6 +102,7 @@ endif
 
 # Convert to DOS line endings
 	find $(win32_destdir) -type f \( -name "*xml" -or -name "*html" -or -name '*js' -or -name '*css' -or -name '*hosts' -or -iname '*txt' -or -name '*.cfg' -or -name '*.lua' \) -exec $(U2D) -q {} \;
+	$(win32_cachegen)
 
 package-win-activex: build-npapi
 	cp "$(top_builddir)/npapi-vlc/installed/lib/axvlc.dll" "$(win32_destdir)/"
@@ -101,6 +118,7 @@ package-win-strip: package-win-common package-win-activex
 	    $(OBJCOPY) --add-gnu-debuglink="$(win32_debugdir)/`basename $$i.dbg`" "$$i" ; \
 	  fi ; \
 	done
+	$(win32_cachegen)
 
 $(win32_destdir)/NSIS/nsProcess.dll: extras/package/win32/NSIS/nsProcess/nsProcess.c extras/package/win32/NSIS/nsProcess/pluginapi.c
 	mkdir -p "$(win32_destdir)/NSIS/"
