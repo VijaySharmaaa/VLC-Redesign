@@ -102,7 +102,7 @@ namespace
 TitleBar::TitleBar( QWidget *_window )
     : QWidget( _window ), window( _window ),
       b_captionButtons( false ), b_minimal( false ), b_fullScreen( false ),
-      b_videoFullScreen( false )
+      b_videoFullScreen( false ), b_menus( false )
 {
     QHBoxLayout *layout = new QHBoxLayout( this );
     layout->setContentsMargins( 0, 0, 0, 0 );
@@ -192,15 +192,15 @@ void TitleBar::updateIcons()
 
 void TitleBar::updateLayout()
 {
-    const bool strip = b_minimal && b_captionButtons;
+    const bool strip = b_minimal && ( b_captionButtons || b_menus );
     setFixedHeight( Theme::instance()->metric( strip ? Theme::MenuTitleH : Theme::TitleBar ) );
     cone->setVisible( !b_minimal );
-    bar->setVisible( !b_minimal );
+    bar->setVisible( !b_minimal || b_menus );
     const bool buttons = b_captionButtons && !b_fullScreen;
     minButton->setVisible( buttons );
     maxButton->setVisible( buttons );
     closeButton->setVisible( buttons );
-    setVisible( !b_videoFullScreen && ( !b_minimal || buttons ) );
+    setVisible( !b_videoFullScreen && ( !b_minimal || buttons || b_menus ) );
     update();
 }
 
@@ -213,6 +213,7 @@ void TitleBar::setCaptionButtonsVisible( bool visible )
 void TitleBar::setMinimal( bool minimal )
 {
     b_minimal = minimal;
+    b_menus = false;
     updateLayout();
 }
 
@@ -225,8 +226,12 @@ void TitleBar::setFullScreen( bool fullScreen, bool video )
 
 void TitleBar::toggleMenus()
 {
-    if( b_minimal && !isHidden() )
-        bar->setVisible( bar->isHidden() );
+    /* also without a strip (a native caption, F11): the bar comes back
+     * with the menus only */
+    if( !b_minimal || b_videoFullScreen )
+        return;
+    b_menus = !b_menus;
+    updateLayout();
 }
 
 TitleBar::Area TitleBar::areaAt( const QPoint &pos ) const

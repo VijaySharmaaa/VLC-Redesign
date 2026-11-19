@@ -50,7 +50,8 @@ public:
      * the window buttons. */
     void setMinimal( bool );
     void setFullScreen( bool fullScreen, bool video );
-    /* Alt in minimal view: show or hide the menus inside the strip. */
+    /* Alt in minimal view: show or hide the menus, inside the strip or,
+     * without one, in a bar of their own. */
     void toggleMenus();
     /* Height the bar takes in the window, 0 when hidden. */
     int barHeight() const { return isHidden() ? 0 : maximumHeight(); }
@@ -80,6 +81,7 @@ private:
     QMenuBar *bar;
     QToolButton *cone, *minButton, *maxButton, *closeButton;
     bool b_captionButtons, b_minimal, b_fullScreen, b_videoFullScreen;
+    bool b_menus;   /* shown by Alt in minimal view */
 };
 
 #endif

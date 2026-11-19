@@ -40,7 +40,7 @@
 #define MENU_KEY_EFFECTS     "Ctrl+E"
 #define MENU_KEY_MEDIA_INFO  "Ctrl+I"
 #define MENU_KEY_PLAYLIST    N_( "Ctrl+L" )  /* translated: qtr() it */
-#define MENU_KEY_ATOB        N_( "Shift+L" ) /* the window's A->B shortcut, translated */
+#define MENU_KEY_ATOB        "key-atob"      /* the A->B loop's hotkey (qt.cpp) */
 
 class MenuItemData : public QObject
 {

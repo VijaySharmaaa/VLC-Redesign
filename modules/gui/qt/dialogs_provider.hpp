@@ -35,6 +35,7 @@
 
 #include "dialogs/open.hpp"
 #include <QObject>
+#include <QPointer>
 #include <QSet>
 #include <QStringList>
 
@@ -61,6 +62,7 @@ enum {
 class QEvent;
 class QSignalMapper;
 class VLCMenuBar;
+class PrefsDialog;
 
 class DialogsProvider : public QObject
 {
@@ -127,6 +129,7 @@ private:
     QWidget* root;
     bool b_isDying;
     QSet<int> shownPanels;
+    QPointer<PrefsDialog> prefs;   /* deletes itself on close */
 
     void openDialog( int );
     void addFromSimple( bool, bool );

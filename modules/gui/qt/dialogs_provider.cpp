@@ -256,8 +256,13 @@ void DialogsProvider::prefsDialog()
     if( mi && !var_InheritBool( p_intf, "qt-advanced-pref" )
            && !var_InheritBool( p_intf, "advanced" ) && mi->showPreferences() )
         return;
-    PrefsDialog *p = new PrefsDialog( (QWidget *)mi, p_intf );
-    p->toggleVisible();
+    /* one dialog: behind the mini player nothing blocks a second Ctrl+P,
+     * and two would save over each other */
+    if( !prefs )
+        prefs = new PrefsDialog( (QWidget *)mi, p_intf );
+    prefs->show();
+    prefs->raise();
+    prefs->activateWindow();
 }
 
 void DialogsProvider::setPanelShown( int action, bool shown )

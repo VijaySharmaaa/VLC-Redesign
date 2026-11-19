@@ -507,6 +507,7 @@ protected:
 private:
     void buildAppHotkeysList( QWidget *rootWidget );
     void finish();
+    static bool hasGlobal( const QTreeWidgetItem * );
     QLabel *label;
     QLabel *searchLabel;
     SearchLineEdit *actionSearch;
