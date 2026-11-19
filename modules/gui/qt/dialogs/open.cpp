@@ -445,9 +445,11 @@ void OpenDialog::setMenuAction()
 
 OpenDialog::~OpenDialog()
 {
+    /* the hint, as the constructor adds back: a stretched frame's height
+     * would shrink the size each session */
     getSettings()->setValue( "OpenDialog/size", size() -
                  ( ui.advancedFrame->isEnabled() ?
-                   QSize(0, ui.advancedFrame->height()) : QSize(0, 0) ) );
+                   QSize(0, ui.advancedFrame->sizeHint().height()) : QSize(0, 0) ) );
     /* the checkbox: the frame is no longer visible once the dialog is hidden */
     getSettings()->setValue( "OpenDialog/advanced", ui.advancedCheckBox->isChecked() );
 }
