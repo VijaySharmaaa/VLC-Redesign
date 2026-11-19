@@ -38,6 +38,7 @@
 #include <QKeyEvent>
 #include <QLinearGradient>
 #include <QPainter>
+#include <QRegExp>
 #include <QStyle>
 #include <QWindow>
 #include <QVariantAnimation>
@@ -291,6 +292,22 @@ float BufferingOverlay::level() const
     return input ? var_GetFloat( input, "cache" ) : 1.f;
 }
 
+/* The MRL without its "user:password@", as the core names items: drawn
+ * over the video, it must not show the password. Only the authority is
+ * touched, so file paths and other MRLs show as they are. */
+static QString withoutUserInfo( const QString &mrl )
+{
+    const int start = mrl.indexOf( "://" );
+    if( start < 0 )
+        return mrl;
+    const int from = start + 3;
+    int end = mrl.indexOf( QRegExp( "[/?#]" ), from );
+    if( end < 0 )
+        end = mrl.size();
+    const int at = mrl.lastIndexOf( '@', end - 1 );
+    return at < from ? mrl : mrl.left( from ) + mrl.mid( at + 1 );
+}
+
 bool BufferingOverlay::buffering() const
 {
     const int status = THEMIM->getIM()->playingStatus();
@@ -310,7 +327,7 @@ void BufferingOverlay::refresh()
     {
         input_item_t *item = input_GetItem( THEMIM->getInput() );
         char *uri = input_item_GetURI( item );
-        url = qfu( uri );
+        url = withoutUserInfo( qfu( uri ) );
         free( uri );
     }
     setAccessibleName( qtr( "Buffering… %1%" ).arg( qRound( level() * 100 ) ) );
