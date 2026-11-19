@@ -201,18 +201,31 @@ Thumbnailer::Thumbnailer( intf_thread_t *_p_intf, QObject *parent )
 
 Thumbnailer::~Thumbnailer()
 {
-    /* VLC quits: all killed first, then waited for together, so their
-     * part files can go */
-    foreach( const Job &j, jobs )
+    /* VLC quits: every probe, also those let go (stopProcess) whose
+     * deleteLater no longer runs, killed first, then waited for together,
+     * ThumbKillWaitMs in all; one still alive then (an antivirus can hold
+     * a dying process) is left behind, as ~QProcess would wait 30 s */
+    const QList<QProcess *> all = findChildren<QProcess *>();
+    foreach( QProcess *p, all )
     {
-        j.process->disconnect();
-        j.process->kill();
+        p->disconnect();
+        p->kill();
     }
-    foreach( const Job &j, jobs )
+    QElapsedTimer clock;
+    clock.start();
+    foreach( QProcess *p, all )
     {
-        j.process->waitForFinished( Library::ThumbKillWaitMs );
-        QFile::remove( j.tmpFile );
+        const int left = qMax( 0, int( Library::ThumbKillWaitMs - clock.elapsed() ) );
+        if( !p->waitForFinished( left ) && p->state() != QProcess::NotRunning )
+            p->setParent( NULL );
     }
+    /* this run's part files; one still held goes in the next run's prune */
+    if( cacheDir.isEmpty() )
+        return;
+    QDir dir( cacheDir );
+    foreach( const QString &name, dir.entryList( QStringList(
+                 QString( "*.%1.*.part.*" ).arg( QCoreApplication::applicationPid() ) ), QDir::Files ) )
+        dir.remove( name );
 }
 
 QString Thumbnailer::frame( const QString &path, int64_t lengthMs )
@@ -455,7 +468,9 @@ void Thumbnailer::start( const Request &r )
     j.clock.start();
     jobs.append( j );
     process->start( QCoreApplication::applicationFilePath(), args );
-    poll->start();
+    /* not when it failed to start: finish() ran inside start() already */
+    if( !jobs.isEmpty() )
+        poll->start();
 }
 
 /* The scene filter writes a .swp file and renames it: once the picture is
