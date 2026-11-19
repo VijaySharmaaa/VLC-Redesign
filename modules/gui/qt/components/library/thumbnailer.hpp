@@ -65,6 +65,9 @@ public:
     /* Drops the queue, the listings and the failures: the page was left.
      * Nothing starts again until a frame or a listing is asked for. */
     void cancel();
+    /* Removes every cached frame (the recents were cleared or are off):
+     * they tell what was in the library */
+    static void removeCache();
 
     static bool isVideo( const QString &path );
 
@@ -81,12 +84,18 @@ private:
         QString key, path, file;
         int atSec;
     };
+    struct Frame
+    {
+        QString file;                        /* a PNG */
+        int epoch;                           /* when the file was last looked at */
+    };
     struct Job
     {
         Request r;
         QString tmpFile;
         QProcess *process;
         QElapsedTimer clock;
+        unsigned sarNum, sarDen;             /* 0 until its log tells */
     };
     Thumbnailer( intf_thread_t *, QObject *parent );
     /* asked: the epoch of the frame() that started the probe */
@@ -96,12 +105,14 @@ private:
     void check();
     void finish( QProcess *, bool ok );
     static void stopProcess( QProcess *, const QString &tmpFile );
+    void readLog( QProcess * );
+    static bool saveSquare( const QString &from, const QString &to, unsigned num, unsigned den );
 
     intf_thread_t *p_intf;
     int epoch;                               /* cancel()s so far */
     int serial;                              /* of the part files */
     QString cacheDir;
-    QHash<QString, QString> frames;          /* key: its PNG file */
+    QHash<QString, Frame> frames;            /* key: its frame */
     QSet<QString> pendingFrames, failedFrames, pendingDirs;
     QHash<QString, QStringList> dirs;
     QHash<QString, QString> covers;          /* key: of dirs, a video under it */

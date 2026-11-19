@@ -33,6 +33,17 @@
 #include <vlc_interface.h>              /* EXTENSIONS_VIDEO */
 
 #include <climits>                       /* INT_MAX */
+#include <cstdio>                        /* sscanf */
+#ifdef _WIN32
+# include <windows.h>                    /* GetFileAttributesW */
+/* Windows 10 1709 names, missing from older SDKs */
+# ifndef FILE_ATTRIBUTE_RECALL_ON_OPEN
+#  define FILE_ATTRIBUTE_RECALL_ON_OPEN 0x00040000
+# endif
+# ifndef FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS
+#  define FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS 0x00400000
+# endif
+#endif
 
 #include <QCoreApplication>
 #include <QCryptographicHash>
@@ -42,7 +53,10 @@
 #include <QFileInfo>
 #include <QMutex>
 #include <QPointer>
+#include <QImage>
 #include <QProcess>
+#include <QSaveFile>
+#include <QStandardPaths>
 #include <QThread>
 #include <QTimer>
 
@@ -68,6 +82,32 @@ static const QStringList &videoFilters()
 bool Thumbnailer::isVideo( const QString &path )
 {
     return hasExtension( path, videoFilters() );
+}
+
+static QString thumbDirOf( vlc_userdir_t type )
+{
+    char *psz = config_GetUserDir( type );
+    const QString dir = psz ? QDir::fromNativeSeparators( qfu( psz ) ) + QLatin1String( "/thumbnails" )
+                            : QString();
+    free( psz );
+    return dir;
+}
+
+/* The frame cache; empty when there is none */
+static QString cacheDirectory()
+{
+#ifdef _WIN32
+    /* VLC's cache dir is in the roaming profile: the local one instead,
+     * unless VLC runs portable (a "portable" folder next to vlc.exe, as
+     * config_GetAppDir checks), where every dir of VLC is that folder */
+    if( !QFileInfo( QCoreApplication::applicationDirPath() + QLatin1String( "/portable" ) ).isDir() )
+    {
+        const QString local = QStandardPaths::writableLocation( QStandardPaths::GenericDataLocation );
+        if( !local.isEmpty() )
+            return local + QLatin1String( "/vlc/thumbnails" );
+    }
+#endif
+    return thumbDirOf( VLC_CACHE_DIR );
 }
 
 /* Trims the frame cache once per VLC run, in the first probe: the part
@@ -98,6 +138,12 @@ static void pruneCache( const QString &dir )
     for( int i = 0; i < frames.count() && total > max; i++ )
         if( QFile::remove( frames.at( i ).filePath() ) )
             total -= frames.at( i ).size();
+#ifdef _WIN32
+    /* the frames earlier builds kept in the roaming profile */
+    const QString roaming = thumbDirOf( VLC_CACHE_DIR );
+    if( !roaming.isEmpty() && QDir( roaming ) != QDir( dir ) )
+        QDir( roaming ).removeRecursively();
+#endif
 }
 
 /**********************************************************************
@@ -164,16 +210,31 @@ void ThumbJob::run()
     const QString file = cacheDir + QLatin1Char( '/' )
                        + QString::fromLatin1( QCryptographicHash::hash( id, QCryptographicHash::Sha1 ).toHex() )
                        + QLatin1String( ".png" );
-    emit probed( path, file, QFileInfo( file ).size() > 0 );
+    const bool cached = QFileInfo( file ).size() > 0;
+#ifdef _WIN32
+    /* an online-only file (OneDrive, other cloud folders) would be
+     * downloaded by the grab: its frame only when it is on the disk */
+    const DWORD attrs = GetFileAttributesW(
+        reinterpret_cast<const wchar_t *>( QDir::toNativeSeparators( path ).utf16() ) );
+    if( !cached && attrs != INVALID_FILE_ATTRIBUTES
+     && ( attrs & ( FILE_ATTRIBUTE_OFFLINE | FILE_ATTRIBUTE_RECALL_ON_OPEN
+                  | FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS ) ) )
+    {
+        emit probed( path, QString(), false );
+        return;
+    }
+#endif
+    emit probed( path, file, cached );
 }
 
 /**********************************************************************
  * Thumbnailer
  **********************************************************************/
+/* kept by the input manager, which outlives the pages */
+static QPointer<Thumbnailer> shared;
+
 Thumbnailer *Thumbnailer::instance( intf_thread_t *p_intf )
 {
-    /* kept by the input manager, which outlives the pages */
-    static QPointer<Thumbnailer> shared;
     if( !shared )
         shared = new Thumbnailer( p_intf, THEMIM );
     return shared;
@@ -181,14 +242,11 @@ Thumbnailer *Thumbnailer::instance( intf_thread_t *p_intf )
 
 Thumbnailer::Thumbnailer( intf_thread_t *_p_intf, QObject *parent )
     : QObject( parent ), p_intf( _p_intf ), epoch( 0 ), serial( 0 ),
-      /* each one decodes on all cores: half of them keeps VLC responsive */
+      /* each one decodes on one thread (--avcodec-threads=1): on half the
+       * cores, the player and the GUI keep the rest */
       maxJobs( qBound( 1, QThread::idealThreadCount() / 2, int( Library::ThumbWorkersMax ) ) )
 {
-    /* portable mode: the dir functions already point next to vlc.exe */
-    char *psz = config_GetUserDir( VLC_CACHE_DIR );
-    if( psz )
-        cacheDir = QDir::fromNativeSeparators( qfu( psz ) ) + QLatin1String( "/thumbnails" );
-    free( psz );
+    cacheDir = cacheDirectory();
 
     poll = new QTimer( this );
     poll->setInterval( Library::ThumbPollMs );
@@ -201,18 +259,45 @@ Thumbnailer::Thumbnailer( intf_thread_t *_p_intf, QObject *parent )
 
 Thumbnailer::~Thumbnailer()
 {
-    /* VLC quits: all killed first, then waited for together, so their
-     * part files can go */
-    foreach( const Job &j, jobs )
+    /* VLC quits: every probe, also those let go (stopProcess) whose
+     * deleteLater no longer runs, killed first, then waited for together,
+     * ThumbKillWaitMs in all; one still alive then (an antivirus can hold
+     * a dying process) is left behind, as ~QProcess would wait 30 s */
+    const QList<QProcess *> all = findChildren<QProcess *>();
+    foreach( QProcess *p, all )
     {
-        j.process->disconnect();
-        j.process->kill();
+        p->disconnect();
+        p->kill();
     }
-    foreach( const Job &j, jobs )
+    QElapsedTimer clock;
+    clock.start();
+    foreach( QProcess *p, all )
     {
-        j.process->waitForFinished( Library::ThumbKillWaitMs );
-        QFile::remove( j.tmpFile );
+        const int left = qMax( 0, int( Library::ThumbKillWaitMs - clock.elapsed() ) );
+        if( !p->waitForFinished( left ) && p->state() != QProcess::NotRunning )
+            p->setParent( NULL );
     }
+    /* this run's part files; one still held goes in the next run's prune */
+    if( cacheDir.isEmpty() )
+        return;
+    QDir dir( cacheDir );
+    foreach( const QString &name, dir.entryList( QStringList(
+                 QString( "*.%1.*.part.*" ).arg( QCoreApplication::applicationPid() ) ), QDir::Files ) )
+        dir.remove( name );
+}
+
+void Thumbnailer::removeCache()
+{
+    if( shared )
+    {
+        shared->cancel();
+        shared->frames.clear();
+    }
+    /* shortcut: removed on the GUI thread (at most ThumbCacheMaxMB of
+     * frames, once per clear); move it to filePool if it ever stalls */
+    const QString dir = cacheDirectory();
+    if( !dir.isEmpty() )
+        QDir( dir ).removeRecursively();
 }
 
 QString Thumbnailer::frame( const QString &path, int64_t lengthMs )
@@ -220,9 +305,12 @@ QString Thumbnailer::frame( const QString &path, int64_t lengthMs )
     const QString key = keyOf( path );
     if( cacheDir.isEmpty() || !isVideo( path ) || failedFrames.contains( key ) )
         return QString();
-    QHash<QString, QString>::const_iterator it = frames.constFind( key );
-    if( it != frames.constEnd() )
-        return it.value();
+    /* a frame known before the last cancel() is shown while the file is
+     * looked at again (a replaced file gets a new frame) */
+    QHash<QString, Frame>::const_iterator it = frames.constFind( key );
+    if( it != frames.constEnd() && it.value().epoch == epoch )
+        return it.value().file;
+    const QString shown = it != frames.constEnd() ? it.value().file : QString();
     if( pendingFrames.contains( key ) )
     {
         /* painted again, so on screen: ahead of the cards scrolled away */
@@ -246,7 +334,7 @@ QString Thumbnailer::frame( const QString &path, int64_t lengthMs )
                  }, Qt::QueuedConnection );
         LibraryData::filePool()->start( job );
     }
-    return QString();
+    return shown;
 }
 
 const QStringList *Thumbnailer::videos( const QString &dir )
@@ -295,8 +383,12 @@ int Thumbnailer::watchedIn( const QString &dir )
 
 void Thumbnailer::cancel()
 {
-    /* probes still running are dropped as they come (probed); a page that
-     * asks the same frame again starts its own */
+    /* probes and listings not started yet go (the pool runs only ours), so
+     * a page shown again does not queue behind them; those still running
+     * are dropped as they come (probed); a page that asks the same frame
+     * or folder again starts its own */
+    LibraryData::filePool()->clear();
+    pendingDirs.clear();
     epoch++;
     pendingFrames.clear();
     lengths.clear();
@@ -326,13 +418,17 @@ void Thumbnailer::probed( const QString &path, const QString &file, bool cached,
     {
         pendingFrames.remove( key );
         failedFrames.insert( key );
+        frames.remove( key );
         return;
     }
     if( cached )
     {
         pendingFrames.remove( key );
-        frames.insert( key, file );
-        emit changed();
+        const bool fresh = frames.value( key ).file != file;
+        const Frame f = { file, epoch };
+        frames.insert( key, f );
+        if( fresh )
+            emit changed();
         return;
     }
     /* the middle of a film opens on a scene, its start often on black */
@@ -402,6 +498,7 @@ void Thumbnailer::start( const Request &r )
 {
     Job j;
     j.r = r;
+    j.sarNum = j.sarDen = 0;
     /* one name per grab: a killed one's file goes only once it is let go */
     const QString prefix = QFileInfo( r.file ).completeBaseName()
                          + QString( ".%1.%2.part" ).arg( QCoreApplication::applicationPid() )
@@ -414,12 +511,15 @@ void Thumbnailer::start( const Request &r )
      * library) and not the crash report question; local files only; no
      * Lua scripts (playlist probes) and no preparsing of the item */
     args << "--intf=dummy" << "--dummy-quiet" << "--ignore-config" << "--no-one-instance"
-         << "--no-media-library" << "--no-crashdump" << "--quiet" << "--no-stats"
+         << "--no-media-library" << "--no-crashdump" << "--no-stats"
          << "--no-metadata-network-access" << "--no-lua" << "--no-auto-preparse"
          << "--vout=dummy" << "--no-audio"
+         /* debug messages: the pixel aspect ratio is in one (readLog) */
+         << "--verbose=2" << "--no-color"
          << "--no-spu" << "--no-osd" << "--no-video-title-show" << "--no-sub-autodetect-file"
-         /* the scene filter takes system memory pictures */
-         << "--avcodec-hw=none"
+         /* the scene filter takes system memory pictures; one decoding
+          * thread, as several probes run at once */
+         << "--avcodec-hw=none" << "--avcodec-threads=1"
          /* the first picture at once: no file cache (1 s) before it shows,
           * a seek to the key frame before the time instead of decoding up
           * to the time, and nothing dropped for being late */
@@ -439,7 +539,8 @@ void Thumbnailer::start( const Request &r )
 
     QProcess *process = new QProcess( this );
     j.process = process;
-    process->setProcessChannelMode( QProcess::ForwardedChannels );
+    process->setProcessChannelMode( QProcess::MergedChannels );
+    connect( process, &QProcess::readyRead, this, [this, process]() { readLog( process ); } );
     connect( process, static_cast<void (QProcess::*)( int, QProcess::ExitStatus )>( &QProcess::finished ),
              this, [this, process]( int, QProcess::ExitStatus status ) {
         finish( process, status == QProcess::NormalExit );
@@ -451,7 +552,9 @@ void Thumbnailer::start( const Request &r )
     j.clock.start();
     jobs.append( j );
     process->start( QCoreApplication::applicationFilePath(), args );
-    poll->start();
+    /* not when it failed to start: finish() ran inside start() already */
+    if( !jobs.isEmpty() )
+        poll->start();
 }
 
 /* The scene filter writes a .swp file and renames it: once the picture is
@@ -477,16 +580,20 @@ void Thumbnailer::finish( QProcess *process, bool ok )
         i++;
     if( i == jobs.count() )
         return;   /* already finished */
+    if( ok )
+        readLog( process );   /* the lines not handled yet */
     Job j = jobs.takeAt( i );
     if( jobs.isEmpty() )
         poll->stop();
     /* the picture is whole once renamed by the scene filter, even while
      * the process still runs */
     if( ok && QFileInfo( j.tmpFile ).size() > 0
-     && ( QFile::rename( j.tmpFile, j.r.file ) || QFileInfo( j.r.file ).size() > 0 ) )
+     && ( saveSquare( j.tmpFile, j.r.file, j.sarNum, j.sarDen )
+       || QFile::rename( j.tmpFile, j.r.file ) || QFileInfo( j.r.file ).size() > 0 ) )
     {
         pendingFrames.remove( j.r.key );
-        frames.insert( j.r.key, j.r.file );
+        const Frame f = { j.r.file, epoch };
+        frames.insert( j.r.key, f );
         emit changed();
     }
     else if( ok && j.r.atSec > 0 )
@@ -502,6 +609,49 @@ void Thumbnailer::finish( QProcess *process, bool ok )
     }
     stopProcess( j.process, j.tmpFile );   /* also after a timeout */
     startNext();
+}
+
+/* The vout's debug line "original format sz 720x576, ..., sar 64:45, ..."
+ * (video_format_Print): the scene filter writes the coded pixels, so an
+ * anamorphic video's frame is squeezed until saveSquare corrects it.
+ * shortcut: not the orientation (not in the line; a phone video shot
+ * upright stays on its side); read the input's video track if needed */
+void Thumbnailer::readLog( QProcess *process )
+{
+    while( process->canReadLine() )
+    {
+        const QByteArray line = process->readLine();
+        const int at = line.indexOf( "original format sz " );
+        const int sar = at < 0 ? -1 : line.indexOf( " sar ", at );
+        unsigned num, den;
+        if( sar < 0 || sscanf( line.constData() + sar, " sar %u:%u", &num, &den ) != 2 )
+            continue;
+        for( int i = 0; i < jobs.count(); i++ )
+            if( jobs.at( i ).process == process )
+            {
+                jobs[i].sarNum = num;
+                jobs[i].sarDen = den;
+            }
+    }
+}
+
+/* The frame scaled to square pixels, into the cache; false when it is
+ * square already (or unknown) or cannot be written */
+bool Thumbnailer::saveSquare( const QString &from, const QString &to, unsigned num, unsigned den )
+{
+    if( !num || !den || num == den )
+        return false;
+    const QImage image( from );
+    if( image.isNull() )
+        return false;
+    /* shortcut: decoded and encoded on the GUI thread (a 480 px PNG, only
+     * for anamorphic videos); move it to filePool if it ever stutters */
+    const int height = qMax( 1, qRound( qreal( image.height() ) * den / num ) );
+    QSaveFile out( to );
+    return out.open( QIODevice::WriteOnly )
+        && image.scaled( image.width(), height, Qt::IgnoreAspectRatio, Qt::SmoothTransformation )
+                .save( &out, "PNG" )
+        && out.commit();
 }
 
 /* Killed without waiting on the GUI thread (an antivirus can hold a dying

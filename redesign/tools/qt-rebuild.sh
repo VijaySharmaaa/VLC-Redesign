@@ -20,3 +20,10 @@ docker run --rm -e JOBS="$JOBS" -u "$(id -u):$(id -g)" -e HOME=/tmp -v "$BUILD":
 cp "$BUILD/win64/libqt_plugin.stripped.dll" "$PKG/plugins/gui/libqt_plugin.dll" ||
     { echo "copy failed: close the vlc.exe running from $PKG (it locks the plugin)" >&2; exit 1; }
 echo "updated $PKG/plugins/gui/libqt_plugin.dll"
+
+# A changed plugin makes plugins.dat stale: every vlc.exe (also each library
+# thumbnail probe) then loads that DLL and its Qt DLLs at start. The cross
+# build skips vlc-cache-gen, so run the package's own copy through WSL interop.
+# Without interop, on Windows: <pkg>\vlc-cache-gen.exe <pkg>\plugins
+"$PKG/vlc-cache-gen.exe" "$(wslpath -w "$PKG/plugins")" ||
+    echo "plugins.dat not refreshed: run $PKG/vlc-cache-gen.exe on its plugins folder" >&2
