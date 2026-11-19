@@ -30,6 +30,9 @@
 #include <QListWidget>
 #include <QCheckBox>
 
+/* the deck as shipped (controller.hpp): first, so it can always come back */
+#define VALUE_DEFAULT "0|" MAIN_TB1_DEFAULT "|" MAIN_TB2_DEFAULT "|" ADV_TB_DEFAULT "|" \
+                      INPT_TB_DEFAULT "|" FSC_TB_DEFAULT
 #define PROFILE_NAME_1 "VLC 1.1.x Style"
 #define VALUE_1 "0|64;39;64;38;65;|0-2;64;3;1;4;64;7;10;9;64-4;20;19;64-4;37;65;35-4;|12;11;13;14;|5-1;33;6-1;|0-2;64;3;1;4;64;37;64;38;64;8;65;25;35-4;34;"
 #define PROFILE_NAME_2 "VLC 0.8.x Style"
