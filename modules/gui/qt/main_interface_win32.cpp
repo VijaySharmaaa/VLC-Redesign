@@ -169,8 +169,9 @@ void MainInterfaceWin32::updateCustomFrame( bool fullscreen )
 /* A maximised client rect covering the whole monitor reads as full screen
  * to the shell, which then keeps an auto-hide taskbar down: leave the
  * edges such a bar slides in from free, as other drawn-caption apps do.
- * Returns whether one was found. */
-static bool leaveAutoHideEdges( HWND hwnd, RECT &client )
+ * window is the proposed rect: the window still has its old one, maybe on
+ * another monitor. Returns whether one was found. */
+static bool leaveAutoHideEdges( const RECT &window, RECT &client )
 {
     typedef UINT_PTR (WINAPI *AppBarFn)( DWORD, APPBARDATA * );
     /* shell32 is not linked by the module: looked up once */
@@ -178,7 +179,7 @@ static bool leaveAutoHideEdges( HWND hwnd, RECT &client )
             GetProcAddress( LoadLibraryW( L"shell32.dll" ), "SHAppBarMessage" ) );
     MONITORINFO mi;
     mi.cbSize = sizeof( mi );
-    if( !appBar || !GetMonitorInfo( MonitorFromWindow( hwnd, MONITOR_DEFAULTTONEAREST ), &mi ) )
+    if( !appBar || !GetMonitorInfo( MonitorFromRect( &window, MONITOR_DEFAULTTONEAREST ), &mi ) )
         return false;
     /* the shell's own threshold: a 2 px strip lets the bar see the mouse */
     const LONG strip = 2;
@@ -434,7 +435,7 @@ bool MainInterfaceWin32::nativeEventFilter(const QByteArray &, void *message, lo
         const LRESULT res = DefWindowProc( msg->hwnd, msg->message, msg->wParam, msg->lParam );
         RECT client = ncp->rgrc[0];
         client.top = proposed.rgrc[0].top;
-        if( leaveAutoHideEdges( msg->hwnd, client ) )
+        if( leaveAutoHideEdges( proposed.rgrc[0], client ) )
         {
             ncp->rgrc[0] = client;
             if( result )
