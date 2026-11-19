@@ -1587,15 +1587,25 @@ bool Theme::eventFilter(QObject *o, QEvent *e)
 {
     /* focus rings for keyboard focus only: what moved the focus last. As in
      * Windows, only the keys that move the focus count: Space on Play, a
-     * shortcut or a media key left a ring on a button no one tabbed to */
+     * plain-letter hotkey or a media key left a ring on a button no one
+     * tabbed to. Enter and a Ctrl or Alt shortcut count: they open a
+     * folder or a dialog whose first control then takes the focus. */
     if (e->type() == QEvent::KeyPress)
     {
-        switch (static_cast<QKeyEvent *>(e)->key())
+        const QKeyEvent *k = static_cast<QKeyEvent *>(e);
+        switch (k->key())
         {
         case Qt::Key_Tab: case Qt::Key_Backtab:
         case Qt::Key_Left: case Qt::Key_Right: case Qt::Key_Up: case Qt::Key_Down:
+        case Qt::Key_Home: case Qt::Key_End: case Qt::Key_PageUp: case Qt::Key_PageDown:
+        case Qt::Key_Return: case Qt::Key_Enter:
             keyboardInput = true; break;
-        default: break;
+        case Qt::Key_Control: case Qt::Key_Alt: case Qt::Key_Shift: case Qt::Key_Meta:
+            break;  /* a modifier alone: the key it goes with decides */
+        default:
+            if (k->modifiers() & (Qt::ControlModifier | Qt::AltModifier))
+                keyboardInput = true;
+            break;
         }
     }
     else if (e->type() == QEvent::MouseButtonPress || e->type() == QEvent::MouseButtonDblClick)
