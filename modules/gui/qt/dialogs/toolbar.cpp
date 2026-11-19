@@ -268,7 +268,7 @@ void ToolbarEditDialog::close()
     QString c2 = getSettings()->value( "MainWindow/MainToolbar2" ).toString();
     QString cA = getSettings()->value( "MainWindow/AdvToolbar" ).toString();
     QString c = getSettings()->value( "MainWindow/InputToolbar" ).toString();
-    QString cFSC = getSettings()->value( "MainWindow/FSCToolbar" ).toString();
+    QString cFSC = getSettings()->value( "MainWindow/FSCtoolbar" ).toString();
 
     if ( isChecked == positionCheckbox->isChecked()
          && c1 == controller1->getValue()
