@@ -208,6 +208,9 @@ namespace
     /* true while the widget has focus from the keyboard: the stylesheet's
      * focus rings are [keyFocus="true"]:focus (Theme::showsFocus) */
     const char keyFocusProperty[] = "keyFocus";
+    /* a window shown since its last focus change: its first focus follows
+     * the input that opened it, not how that widget had it last time */
+    const char windowShownProperty[] = "vlcWindowShown";
 
     /* a field the user types in shows its ring however it got focus, as
      * CSS :focus-visible does */
@@ -1608,8 +1611,9 @@ bool Theme::eventFilter(QObject *o, QEvent *e)
      * Windows, only the keys that move the focus count: Space on Play, a
      * plain-letter hotkey or a media key left a ring on a button no one
      * tabbed to. Enter and a Ctrl or Alt shortcut count: they open a
-     * folder or a dialog whose first control then takes the focus. */
-    if (e->type() == QEvent::KeyPress)
+     * folder or a dialog whose first control then takes the focus. A key
+     * a shortcut takes (Ctrl+O) comes as ShortcutOverride only. */
+    if (e->type() == QEvent::KeyPress || e->type() == QEvent::ShortcutOverride)
     {
         const QKeyEvent *k = static_cast<QKeyEvent *>(e);
         switch (k->key())
@@ -1652,9 +1656,13 @@ bool Theme::eventFilter(QObject *o, QEvent *e)
             key = false; break;
         case Qt::OtherFocusReason:  /* arrow keys in a group, or setFocus() */
             key = keyboardInput; break;
-        default:  /* back from another window, a menu or a pop-up: as it was */
-            key = was.isValid() ? was.toBool() : keyboardInput; break;
+        default:  /* back from another window, a menu or a pop-up: as it was;
+                   * a window just shown: as it was opened */
+            key = was.isValid() && !w->window()->property(windowShownProperty).toBool()
+                ? was.toBool() : keyboardInput;
+            break;
         }
+        w->window()->setProperty(windowShownProperty, QVariant());
         key = key || isTextEntry(w);
         if (was.toBool() != key)
         {
@@ -1664,6 +1672,8 @@ bool Theme::eventFilter(QObject *o, QEvent *e)
         else if (!was.isValid())
             w->setProperty(keyFocusProperty, key);  /* remembered, the look is the same */
     }
+    if (e->type() == QEvent::Show && o->isWidgetType() && static_cast<QWidget *>(o)->isWindow())
+        o->setProperty(windowShownProperty, true);
     /* a list that is a window of its own (QCompleter's popup) is styled
      * as a popup, without the focus ring of the lists in a window */
     if (e->type() == QEvent::Show && o->isWidgetType()
