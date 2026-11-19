@@ -293,10 +293,11 @@ float BufferingOverlay::level() const
     return input ? var_GetFloat( input, "cache" ) : 1.f;
 }
 
-/* The MRL without its "user:password@", as the core names items: drawn
- * over the video, it must not show the password. Only the authority is
- * touched, so file paths and other MRLs show as they are. */
-static QString withoutUserInfo( const QString &mrl )
+/* The MRL as the core names items (src/input/item.c):
+ * scheme://host[:port]/path, without "user:password@", query or fragment,
+ * which may carry credentials and are drawn over the video. A path without
+ * a scheme shows as it is. */
+static QString displayUrl( const QString &mrl )
 {
     const int start = mrl.indexOf( "://" );
     if( start < 0 )
@@ -306,7 +307,11 @@ static QString withoutUserInfo( const QString &mrl )
     if( end < 0 )
         end = mrl.size();
     const int at = mrl.lastIndexOf( '@', end - 1 );
-    return at < from ? mrl : mrl.left( from ) + mrl.mid( at + 1 );
+    const int host = at < from ? from : at + 1;
+    int pathEnd = mrl.indexOf( QRegExp( "[?#]" ), end );
+    if( pathEnd < 0 )
+        pathEnd = mrl.size();
+    return mrl.left( from ) + mrl.mid( host, pathEnd - host );
 }
 
 /* Only an input with a track fills a cache: one without (vlc://pause, a
@@ -345,7 +350,7 @@ void BufferingOverlay::refresh()
     {
         input_item_t *item = input_GetItem( THEMIM->getInput() );
         char *uri = input_item_GetURI( item );
-        url = withoutUserInfo( qfu( uri ) );
+        url = displayUrl( qfu( uri ) );
         free( uri );
     }
     setAccessibleName( qtr( "Buffering… %1%" ).arg( qRound( level() * 100 ) ) );
