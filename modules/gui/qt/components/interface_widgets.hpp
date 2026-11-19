@@ -228,6 +228,9 @@ signals:
     void broadcastRemainingTime( bool );
 };
 
+/* the rate playing: the input's (an item's :rate), else the next one's */
+float currentRate( intf_thread_t * );
+
 /* "1.00×", accent when not 1 (DESIGN_SPEC 3); a click opens the speed popover */
 class SpeedLabel : public QToolButton
 {

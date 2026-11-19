@@ -383,7 +383,7 @@ QWidget *showSpeedPopover( intf_thread_t *p_intf, QAbstractButton *anchor )
     const int pad = t->px( Size::MenuPanelPadding );
     layout->setContentsMargins( pad, pad, pad, pad );
     QListWidget *list = makeList( pop, qtr( "Playback speed" ) );
-    const float rate = var_GetFloat( THEPL, "rate" );
+    const float rate = currentRate( p_intf );
     for( size_t i = 0; i < sizeof( rates ) / sizeof( rates[0] ); i++ )
         addRow( list, rateText( rates[i] ), QString(),
                 qAbs( rates[i] - rate ) < .001f );
