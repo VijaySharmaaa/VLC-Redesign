@@ -229,6 +229,9 @@ namespace RedesignTokens
         static const int ListPadX = 6, ListPadBottom = 10;
         static const int RowPadX = 10, RowGap = 10, RowNumberW = 24, RowIcon = 18, RowMetaGap = 2;
         static const int DrawerShadow = 50, DrawerShadowAlpha = 115; /* -20px 0 50px rgba(0,0,0,.45) */
+        static const QRgb DrawerShadowColor = QRgb(DrawerShadowAlpha) << 24;  /* black at that alpha */
+        /* the location bar's hover highlight, inset from the row's top and bottom */
+        static const int LocationHoverInsetY = 2;
     }
 
     /* ---- Phase 3: now playing, mini player, audio mode (DESIGN_SPEC 4, 5, 9;

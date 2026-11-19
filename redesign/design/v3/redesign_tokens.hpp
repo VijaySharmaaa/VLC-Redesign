@@ -118,6 +118,14 @@ namespace RedesignTokens
         static const int RadiusXs = 4, RadiusSm = 5, RadiusMd = 6, RadiusLg = 8, RadiusXl = 10, RadiusTile = 12;
     }
 
+    /* ---- Playlist drawer and location bar ---- */
+    namespace Playlist
+    {
+        static const int DrawerShadow = 50, DrawerShadowAlpha = 115; /* -20px 0 50px rgba(0,0,0,.45) */
+        static const QRgb DrawerShadowColor = QRgb(DrawerShadowAlpha) << 24;  /* black at that alpha */
+        static const int LocationHoverInsetY = 2;
+    }
+
     /* ---- Breakpoints by window width ---- */
     namespace Breakpoint
     {
