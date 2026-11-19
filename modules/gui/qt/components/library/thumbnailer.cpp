@@ -393,9 +393,7 @@ void Thumbnailer::removeCache()
 QString Thumbnailer::frame( const QString &path, int64_t lengthMs )
 {
     const QString key = keyOf( path );
-    /* the frames tell what was played: none kept while recents are off */
-    if( cacheDir.isEmpty() || !var_InheritBool( p_intf, "qt-recentplay" )
-     || !isVideo( path ) || failedFrames.contains( key ) )
+    if( cacheDir.isEmpty() || !isVideo( path ) || failedFrames.contains( key ) )
         return QString();
     /* a frame known before the last cancel() is shown while the file is
      * looked at again (a replaced file gets a new frame) */
