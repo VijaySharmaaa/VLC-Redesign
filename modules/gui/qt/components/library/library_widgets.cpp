@@ -106,16 +106,17 @@ bool LibraryData::isFolder( const PLModel *model, const QModelIndex &source )
 }
 
 void LibraryData::expand( intf_thread_t *p_intf, PLModel *model, const QModelIndex &source,
-                          int *browseId, QSet<int> *requested )
+                          int *browseId, QHash<int, QElapsedTimer> *requested )
 {
     input_item_t *input = model->getInputItem( source );
     const int id = model->itemId( source );
     if( !input )
         return;
     *browseId = id;   /* the latest pick opens once listed */
-    if( requested->contains( id ) )
+    /* a preparse ends within the timeout: one older is over */
+    if( requested->contains( id ) && !requested->value( id ).hasExpired( Library::ExpandTimeoutMs ) )
         return;
-    requested->insert( id );
+    ( *requested )[id].start();
     /* The scan keeps subfolders collapsed (preparse depth 0); a request
      * lists one level. A network folder is the user's own pick here, as
      * when the stock playlist plays it to list it. */
@@ -774,9 +775,6 @@ LibraryBrowser::LibraryBrowser( intf_thread_t *_p_intf, LibraryFilter *_filter, 
     expandTimer->setInterval( Library::ExpandTimeoutMs );
     connect( expandTimer, &QTimer::timeout, this, [this]() {
         expandFailed = true;   /* still browsed into if its items come later */
-        /* the request is over (a preparse ends within the timeout): asking
-         * again cannot add the items twice */
-        expandRequested.remove( expandingId );
         emit changed();
     } );
     /* a folder expanded by expand(): open it, as StandardPLPanel does */
@@ -828,13 +826,7 @@ void LibraryBrowser::expand( const QModelIndex &source )
 
 void LibraryBrowser::cancelExpand()
 {
-    if( expandTimer->isActive() )
-    {
-        /* its request still runs: it can be asked again once that is over */
-        const int id = expandingId;
-        QTimer::singleShot( expandTimer->remainingTime(), this,
-                            [this, id]() { expandRequested.remove( id ); } );
-    }
+    /* its request may still run: expand() asks again once that is over */
     expandTimer->stop();
     expandFailed = false;
     expandingId = -1;
