@@ -45,7 +45,7 @@
  * rest go to the deck's More menu (AbstractController::fitDeck). */
 #define MAIN_TB1_DEFAULT "38;65"
 #define MAIN_TB2_DEFAULT "0-2;3;1;4;32;20;19;13;14;11;12;41;65;26;42;9;10;27;7;32;35-4"
-#define ADV_TB_DEFAULT "32;13;14;11;12;41"
+#define ADV_TB_DEFAULT "13;14;11;12;41"
 #define INPT_TB_DEFAULT "43;33-4;44"
 #define FSC_TB_DEFAULT "0-2;3;1;4;32;20;19;13;14;11;12;41;65;26;42;9;10;8;25;32;35-4"
 

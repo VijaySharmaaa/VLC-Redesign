@@ -30,6 +30,7 @@
 #include "util/redesign_icons.hpp"
 
 #include <vlc_input.h>
+#include <vlc_url.h>
 #include <vlc_vout.h>
 
 #include <QAbstractButton>
@@ -38,7 +39,6 @@
 #include <QKeyEvent>
 #include <QLinearGradient>
 #include <QPainter>
-#include <QRegExp>
 #include <QStyle>
 #include <QWindow>
 #include <QVariantAnimation>
@@ -299,19 +299,18 @@ float BufferingOverlay::level() const
  * a scheme shows as it is. */
 static QString displayUrl( const QString &mrl )
 {
-    const int start = mrl.indexOf( "://" );
-    if( start < 0 )
+    if( !mrl.contains( "://" ) )
         return mrl;
-    const int from = start + 3;
-    int end = mrl.indexOf( QRegExp( "[/?#]" ), from );
-    if( end < 0 )
-        end = mrl.size();
-    const int at = mrl.lastIndexOf( '@', end - 1 );
-    const int host = at < from ? from : at + 1;
-    int pathEnd = mrl.indexOf( QRegExp( "[?#]" ), end );
-    if( pathEnd < 0 )
-        pathEnd = mrl.size();
-    return mrl.left( from ) + mrl.mid( host, pathEnd - host );
+    vlc_url_t url;
+    vlc_UrlParse( &url, qtu( mrl ) );
+    const QString path = url.psz_path ? qfu( url.psz_path ) : QString();
+    QString name = qfu( url.psz_host ? url.psz_host : "" );
+    if( url.i_port > 0 )
+        name += ':' + QString::number( url.i_port );
+    if( url.psz_protocol )
+        name = qfu( url.psz_protocol ) + "://" + name;
+    vlc_UrlClean( &url );
+    return name + path;
 }
 
 /* Only an input with a track fills a cache once it plays: one without

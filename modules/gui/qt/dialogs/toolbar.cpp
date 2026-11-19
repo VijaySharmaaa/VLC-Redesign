@@ -162,8 +162,10 @@ ToolbarEditDialog::ToolbarEditDialog( QWidget *_w, intf_thread_t *_p_intf)
     for( int i = 0; i < i_size; i++ )
     {
         getSettings()->setArrayIndex(i);
-        profileCombo->addItem( getSettings()->value( "ProfileName" ).toString(),
-                               getSettings()->value( "Value" ).toString() );
+        const QString name = getSettings()->value( "ProfileName" ).toString();
+        /* the Default deck comes from this build, not from a saved copy */
+        if( name != qtr( "Default" ) )
+            profileCombo->addItem( name, getSettings()->value( "Value" ).toString() );
     }
     getSettings()->endArray();
 
@@ -171,7 +173,7 @@ ToolbarEditDialog::ToolbarEditDialog( QWidget *_w, intf_thread_t *_p_intf)
     /* We could decide that we load defaults on first launch of the dialog
        or when the combo is back to 0. I choose the second solution, because some clueless
        user might hit on delete a bit too much, but discussion is opened. -- jb */
-    if( i_size == 0 )
+    if( profileCombo->count() == 0 )
     {
         profileCombo->addItem( PROFILE_NAME_6, QString( VALUE_6 ) );
         profileCombo->addItem( PROFILE_NAME_1, QString( VALUE_1 ) );
@@ -180,9 +182,8 @@ ToolbarEditDialog::ToolbarEditDialog( QWidget *_w, intf_thread_t *_p_intf)
         profileCombo->addItem( PROFILE_NAME_4, QString( VALUE_4 ) );
         profileCombo->addItem( PROFILE_NAME_5, QString( VALUE_5 ) );
     }
-    /* profiles saved before the redesign lack its deck */
-    if( profileCombo->findData( QString( VALUE_DEFAULT ) ) < 0 )
-        profileCombo->insertItem( 0, qtr( "Default" ), QString( VALUE_DEFAULT ) );
+    /* not saved (the destructor skips it): follows VALUE_DEFAULT */
+    profileCombo->insertItem( 0, qtr( "Default" ), QString( VALUE_DEFAULT ) );
     profileCombo->setCurrentIndex( -1 );
 
     /* Build and prepare our preview */
@@ -215,9 +216,11 @@ ToolbarEditDialog::ToolbarEditDialog( QWidget *_w, intf_thread_t *_p_intf)
 ToolbarEditDialog::~ToolbarEditDialog()
 {
     getSettings()->beginWriteArray( "ToolbarProfiles" );
-    for( int i = 0; i < profileCombo->count(); i++ )
+    for( int i = 0, saved = 0; i < profileCombo->count(); i++ )
     {
-        getSettings()->setArrayIndex(i);
+        if( profileCombo->itemText( i ) == qtr( "Default" ) )
+            continue;
+        getSettings()->setArrayIndex( saved++ );
         getSettings()->setValue( "ProfileName", profileCombo->itemText( i ) );
         getSettings()->setValue( "Value", profileCombo->itemData( i ) );
     }

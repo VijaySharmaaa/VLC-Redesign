@@ -636,10 +636,13 @@ void Thumbnailer::readLog( QProcess *process )
 }
 
 /* The frame scaled to square pixels, into the cache; false when it is
- * square already (or unknown) or cannot be written */
+ * square already (or unknown, or implausible) or cannot be written */
 bool Thumbnailer::saveSquare( const QString &from, const QString &to, unsigned num, unsigned den )
 {
-    if( !num || !den || num == den )
+    /* the ratio comes from the probe's log: one past 4:1 is bogus (and
+     * would scale a huge image here), kept square */
+    if( !num || !den || num == den
+     || quint64( num ) > 4 * quint64( den ) || quint64( den ) > 4 * quint64( num ) )
         return false;
     const QImage image( from );
     if( image.isNull() )

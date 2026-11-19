@@ -24,6 +24,8 @@
 #include "util/theme.hpp"                       /* Theme::ColorRole */
 #include "util/searchlineedit.hpp"              /* setupSearchField */
 
+#include <QElapsedTimer>
+#include <QHash>
 #include <QListView>
 #include <QPersistentModelIndex>
 #include <QRunnable>
@@ -60,10 +62,10 @@ namespace LibraryData
      * folders, servers, shares) without playing it: the playlist then turns
      * it into a node (leafBecameParent; *browseId is the one to open then).
      * Not twice: a second listing would add the items again, so `requested`
-     * keeps every id asked for until it became a node or its request is
-     * over (LibraryBrowser: the timeout). */
+     * keeps when each id was asked for, until it became a node; a request
+     * older than Library::ExpandTimeoutMs is over and can be made again. */
     void expand( intf_thread_t *, PLModel *, const QModelIndex &source,
-                 int *browseId, QSet<int> *requested );
+                 int *browseId, QHash<int, QElapsedTimer> *requested );
     /* P4-3: appends a copy of the item (a folder: its items) to the
      * playlist and plays the first; returns that input, held, or NULL */
     input_item_t *playInPlaylist( intf_thread_t *, PLModel *, const QModelIndex &source );
@@ -125,7 +127,7 @@ private:
     QTimer *expandTimer;    /* then the folder is reported as not opened */
     int expandingId;        /* a folder being expanded, to browse into */
     QPersistentModelIndex expandingIndex;
-    QSet<int> expandRequested;
+    QHash<int, QElapsedTimer> expandRequested;
     bool expandFailed;
 };
 

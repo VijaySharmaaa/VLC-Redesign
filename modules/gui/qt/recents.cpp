@@ -142,11 +142,12 @@ void RecentsMRL::removeRecent( const QString &mrl )
 
 void RecentsMRL::clear()
 {
-    /* also at each start while qt-recentplay is off */
-    Thumbnailer::removeCache();
+    /* also at each start while qt-recentplay is off: the frames go with
+     * the recents once, not each session (another VLC may be writing them) */
     if ( recents.isEmpty() )
         return;
 
+    Thumbnailer::removeCache();
     recents.clear();
     times.clear();
     lengths.clear();

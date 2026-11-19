@@ -53,6 +53,7 @@
 #include <QMenuBar>
 #include <QPainter>
 #include <QPalette>
+#include <QPixmapCache>
 #include <QPlainTextEdit>
 #include <QPointer>
 #include <QProxyStyle>
@@ -207,6 +208,9 @@ namespace
     /* true while the widget has focus from the keyboard: the stylesheet's
      * focus rings are [keyFocus="true"]:focus (Theme::showsFocus) */
     const char keyFocusProperty[] = "keyFocus";
+    /* a window shown since its last focus change: its first focus follows
+     * the input that opened it, not how that widget had it last time */
+    const char windowShownProperty[] = "vlcWindowShown";
 
     /* a field the user types in shows its ring however it got focus, as
      * CSS :focus-visible does */
@@ -1106,7 +1110,8 @@ void Theme::paintFocusRing(QPainter *p, const QRectF &r, qreal radius)
  * there, then onto the widget. Those grayscale glyphs come from GDI, which
  * obeys the font's gasp table: at UI sizes Segoe UI gets no smoothing, only
  * pixel-snapped stems. So the text is drawn at 4x the device's pixel ratio,
- * where it is smoothed, and averaged down. */
+ * where it is smoothed, and averaged down; the result is cached, as lists
+ * (the EPG grid, the plugins) repaint the same labels often. */
 void Theme::drawGrayText(QPainter *p, const QRect &r, int flags, const QString &text, const QColor &c)
 {
     static const int SuperSample = 4;
@@ -1114,6 +1119,15 @@ void Theme::drawGrayText(QPainter *p, const QRect &r, int flags, const QString &
     const QSize size = (QSizeF(r.size()) * dpr).toSize();
     if (size.isEmpty())
         return;
+    const QString key = QString("grayText|%1|%2|%3x%4|%5|%6|%7|%8")
+        .arg(p->font().key()).arg(c.rgba()).arg(r.width()).arg(r.height())
+        .arg(dpr).arg(flags).arg(int(p->renderHints())).arg(text);
+    QPixmap cached;
+    if (QPixmapCache::find(key, &cached))
+    {
+        p->drawPixmap(r.topLeft(), cached);
+        return;
+    }
     QImage big(size * SuperSample, QImage::Format_RGBA8888_Premultiplied);
     big.setDevicePixelRatio(dpr * SuperSample);
     big.fill(Qt::transparent);
@@ -1125,7 +1139,10 @@ void Theme::drawGrayText(QPainter *p, const QRect &r, int flags, const QString &
     ip.end();
     QImage img = big.scaled(size, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
     img.setDevicePixelRatio(dpr);
-    p->drawImage(r.topLeft(), img);
+    cached = QPixmap::fromImage(img);
+    cached.setDevicePixelRatio(dpr);
+    QPixmapCache::insert(key, cached);
+    p->drawPixmap(r.topLeft(), cached);
 }
 
 void Theme::setDestructive(QAction *action)
@@ -1594,8 +1611,9 @@ bool Theme::eventFilter(QObject *o, QEvent *e)
      * Windows, only the keys that move the focus count: Space on Play, a
      * plain-letter hotkey or a media key left a ring on a button no one
      * tabbed to. Enter and a Ctrl or Alt shortcut count: they open a
-     * folder or a dialog whose first control then takes the focus. */
-    if (e->type() == QEvent::KeyPress)
+     * folder or a dialog whose first control then takes the focus. A key
+     * a shortcut takes (Ctrl+O) comes as ShortcutOverride only. */
+    if (e->type() == QEvent::KeyPress || e->type() == QEvent::ShortcutOverride)
     {
         const QKeyEvent *k = static_cast<QKeyEvent *>(e);
         switch (k->key())
@@ -1608,9 +1626,15 @@ bool Theme::eventFilter(QObject *o, QEvent *e)
         case Qt::Key_Control: case Qt::Key_Alt: case Qt::Key_Shift: case Qt::Key_Meta:
             break;  /* a modifier alone: the key it goes with decides */
         default:
-            if (k->modifiers() & (Qt::ControlModifier | Qt::AltModifier))
+        {
+            const Qt::KeyboardModifiers m = k->modifiers() & (Qt::ControlModifier | Qt::AltModifier);
+            /* AltGr arrives as Ctrl+Alt: typing @ { or a euro sign is no shortcut */
+            const bool altGr = m == (Qt::ControlModifier | Qt::AltModifier)
+                && !k->text().isEmpty() && k->text().at(0).isPrint();
+            if (m && !altGr)
                 keyboardInput = true;
             break;
+        }
         }
     }
     else if (e->type() == QEvent::MouseButtonPress || e->type() == QEvent::MouseButtonDblClick)
@@ -1632,9 +1656,13 @@ bool Theme::eventFilter(QObject *o, QEvent *e)
             key = false; break;
         case Qt::OtherFocusReason:  /* arrow keys in a group, or setFocus() */
             key = keyboardInput; break;
-        default:  /* back from another window, a menu or a pop-up: as it was */
-            key = was.isValid() ? was.toBool() : keyboardInput; break;
+        default:  /* back from another window, a menu or a pop-up: as it was;
+                   * a window just shown: as it was opened */
+            key = was.isValid() && !w->window()->property(windowShownProperty).toBool()
+                ? was.toBool() : keyboardInput;
+            break;
         }
+        w->window()->setProperty(windowShownProperty, QVariant());
         key = key || isTextEntry(w);
         if (was.toBool() != key)
         {
@@ -1644,6 +1672,8 @@ bool Theme::eventFilter(QObject *o, QEvent *e)
         else if (!was.isValid())
             w->setProperty(keyFocusProperty, key);  /* remembered, the look is the same */
     }
+    if (e->type() == QEvent::Show && o->isWidgetType() && static_cast<QWidget *>(o)->isWindow())
+        o->setProperty(windowShownProperty, true);
     /* a list that is a window of its own (QCompleter's popup) is styled
      * as a popup, without the focus ring of the lists in a window */
     if (e->type() == QEvent::Show && o->isWidgetType()
