@@ -2434,10 +2434,16 @@ void MainInterface::handleKeyPress( QKeyEvent *e )
     else if( ( e->modifiers() & Qt::ControlModifier ) && ( e->key() == Qt::Key_K ) &&
         b_plDocked )
     {
-        /* the docked panel's filter: the playlistWidget page is not shown */
-        if( !( playlistPanel && playlistPanel->isVisible() ) )
+        /* the docked panel's filter: the playlistWidget page is not shown;
+         * not opened where the panel steps aside (full screen, minimal
+         * view, the Effects sheet, Preferences) */
+        if( !( playlistPanel && playlistPanel->isVisible() )
+         && !b_videoFullScreen && !b_minimalView
+         && !THEDP->isPanelShown( EXTENDED_ACTION )
+         && stackCentralW->currentWidget() != sidebar->page( Sidebar::Preferences ) )
             togglePlaylist();
-        playlistPanel->focusFilter();
+        if( playlistPanel && playlistPanel->isVisible() )
+            playlistPanel->focusFilter();
         e->accept();
     }
     else if( ( e->modifiers() & Qt::ControlModifier ) && ( e->key() == Qt::Key_K ) &&
