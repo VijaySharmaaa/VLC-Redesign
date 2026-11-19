@@ -657,6 +657,7 @@ QWidget *AbstractController::createWidget( buttonType_e button, int options )
         BUTTON_SET_BAR( tracksButton );
         /* on while a subtitle track shows (SCREEN_INVENTORY 1.3.3) */
         tracksButton->setCheckable( true );
+        tracksButton->setProperty( "tracks", true );   /* addMoreEntry */
         ENABLE_ON_INPUT( tracksButton );
         intf_thread_t *intf = p_intf;
         /* our own state changes are silent: toggled() is then the user's,
@@ -1045,9 +1046,12 @@ static void addMoreEntry( intf_thread_t *p_intf, QMenu *menu, QWidget *item,
     if( aspect )
         action->setMenu( aspect->ratios() );
     else if( qobject_cast<SpeedLabel *>( button ) )
-        /* its popover points at the button on screen: More */
+        /* their popovers point at the button on screen: More */
         QObject::connect( action, &QAction::triggered, more,
                           [p_intf, more]() { showSpeedPopover( p_intf, more ); } );
+    else if( button->property( "tracks" ).toBool() )
+        QObject::connect( action, &QAction::triggered, more,
+                          [p_intf, more]() { showTracksPopover( p_intf, more ); } );
     else
     {
         action->setCheckable( button->isCheckable() );
