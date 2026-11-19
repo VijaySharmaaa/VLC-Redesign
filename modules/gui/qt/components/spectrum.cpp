@@ -60,6 +60,16 @@ SpectrumFrame ring[RING];
 unsigned ringHead;
 /* Visible widgets; the filter passes blocks through untouched at 0 */
 std::atomic<int> viewers( 0 );
+/* A pause holds back the blocks measured before it by its length: when it
+ * began (0: not paused) and the ring's head then (under ringLock) */
+mtime_t pausedAt;
+unsigned pausedHead;
+
+void clearRing()
+{
+    QMutexLocker locker( &ringLock );
+    memset( ring, 0, sizeof( ring ) );
+}
 }
 
 static block_t *SpectrumFilter( filter_t *p_filter, block_t *p_block )
@@ -90,6 +100,13 @@ static block_t *SpectrumFilter( filter_t *p_filter, block_t *p_block )
     return p_block;
 }
 
+/* a seek or a stop (aout_FiltersFlush): the blocks measured ahead will
+ * not play */
+static void FlushSpectrum( filter_t * )
+{
+    clearRing();
+}
+
 int OpenSpectrumFilter( vlc_object_t *p_this )
 {
     filter_t *p_filter = (filter_t *)p_this;
@@ -99,9 +116,9 @@ int OpenSpectrumFilter( vlc_object_t *p_this )
     aout_FormatPrepare( &p_filter->fmt_in.audio );
     p_filter->fmt_out.audio = p_filter->fmt_in.audio;
     p_filter->pf_audio_filter = SpectrumFilter;
+    p_filter->pf_flush = FlushSpectrum;
 
-    QMutexLocker locker( &ringLock );
-    memset( ring, 0, sizeof( ring ) ); /* drop the previous track */
+    clearRing(); /* drop the previous track */
     return VLC_SUCCESS;
 }
 
@@ -142,6 +159,7 @@ SpectrumWidget::SpectrumWidget( intf_thread_t *_p_i, QWidget *parent )
     connect( THEMIM->getIM(), &InputManager::playingStatusChanged, this,
              [this]( int state ) {
                  playing = ( state == PLAYING_S );
+                 shiftForPause( state );
                  restart();
              } );
     playing = THEMIM->getIM()->playingStatus() == PLAYING_S;
@@ -162,6 +180,34 @@ void SpectrumWidget::setCounted( bool b )
 QSize SpectrumWidget::sizeHint() const
 {
     return QSize( 0, height() );
+}
+
+/* The blocks measured before a pause play after it, later by its length:
+ * so are their frames. Frames measured since the resume are left alone. */
+void SpectrumWidget::shiftForPause( int state )
+{
+    const mtime_t now = mdate();
+    QMutexLocker locker( &ringLock );
+    if( state == PAUSE_S )
+    {
+        if( pausedAt == 0 )
+        {
+            pausedAt = now;
+            pausedHead = ringHead;
+        }
+        return;
+    }
+    if( state == PLAYING_S && pausedAt != 0 )
+    {
+        const unsigned since = ringHead - pausedHead;
+        for( unsigned k = 1; since < RING && k <= RING - since; k++ )
+        {
+            SpectrumFrame &f = ring[( pausedHead - k ) % RING];
+            if( f.date != 0 )
+                f.date += now - pausedAt;
+        }
+    }
+    pausedAt = 0;
 }
 
 void SpectrumWidget::restart()

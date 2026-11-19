@@ -58,6 +58,7 @@ protected:
 private:
     void tick();
     void restart();
+    void shiftForPause( int state );
     bool hidden() const;
     void setCounted( bool ); /* in the filter's count of visible widgets */
 
