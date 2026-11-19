@@ -54,6 +54,7 @@
 #include <QPainter>
 #include <QPalette>
 #include <QPlainTextEdit>
+#include <QPointer>
 #include <QProxyStyle>
 #include <QRadioButton>
 #include <QSaveFile>
@@ -522,7 +523,10 @@ namespace
                 && !w->property(wheelGuardProperty).toBool())
             {
                 w->setProperty(wheelGuardProperty, true);
-                static WheelGuard *guard = new WheelGuard(qApp);
+                /* one per QApplication: the interface can start again in the same process */
+                static QPointer<WheelGuard> guard;
+                if (!guard)
+                    guard = new WheelGuard(qApp);
                 w->installEventFilter(guard);
                 /* wheel focus would hand it the focus first, and the value with it */
                 if (w->focusPolicy() == Qt::WheelFocus)
