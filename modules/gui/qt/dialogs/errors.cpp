@@ -67,6 +67,7 @@ ErrorsDialog::ErrorsDialog( intf_thread_t *_p_intf )
     title = new QLabel;
     title->setFont( t->font( Theme::PanelTitle ) );
     title->setWordWrap( true );
+    title->setTextFormat( Qt::PlainText );  /* any module's text: no markup */
     title->setTextInteractionFlags( Qt::TextSelectableByMouse );
 
     body = new QLabel;
