@@ -149,9 +149,11 @@ ToolbarEditDialog::ToolbarEditDialog( QWidget *_w, intf_thread_t *_p_intf)
     QToolButton *newButton = new QToolButton;
     newButton->setIcon( QIcon( ":/new.svg" ) );
     newButton->setToolTip( qtr("New profile") );
+    newButton->setAccessibleName( qtr("New profile") );
     QToolButton *deleteButton = new QToolButton;
     deleteButton->setIcon( QIcon( ":/toolbar/clear.svg" ) );
     deleteButton->setToolTip( qtr( "Delete the current profile" ) );
+    deleteButton->setAccessibleName( qtr( "Delete the current profile" ) );
 
     profileBoxLayout->addWidget( new QLabel( qtr( "Select profile:" ) ), 0, 0 );
     profileBoxLayout->addWidget( profileCombo, 0, 1 );
