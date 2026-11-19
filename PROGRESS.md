@@ -527,3 +527,26 @@ A full audit of `redesign/spectrum-smooth` (code read by area, plus a compile of
 - A toolbar profile the user named "Default" is replaced by the built-in Default.
 - Unconfirmed: Ctrl+K pressed in video fullscreen may open the panel once fullscreen ends.
 - `harness.py baseline` waits for a window resize that the redesign no longer does (library pages keep their size), and `shot.ps1` can't capture overlay windows.
+
+### Second pass (2026-11-19): edge cases, open items, reviews
+- **Edge-case audit** of every changed area against `redesign/docs/EDGE_CASES.md`: two failures fixed (the Effects sheet closing a filtered playlist left the filter active; a user toolbar profile named "Default" was deleted). Seven new rows added to `EDGE_CASES.md`.
+- **Open items fixed:** rotated MP4/MOV thumbnails (the turn is read from the file's `tkhd` matrix with a bounded parser, since VLC 3 logs no orientation); the aspect correction no longer depends on log timing; the other playlist view keeps its selection and expanded folders after a filter or sort; the `.7z`/installer packages ship a `plugins.dat` built through wine (zips leave it out: unzipped DOS times never match); `harness.py baseline` waits for playback; `shot.ps1 -Overlays` captures overlay windows only when no other app covers them.
+- **Second review:** six more fixed (recent media off: the frame cache is wiped at every start again; a stale built-in "Default" saved by earlier builds is dropped; one box budget for the MP4 parse; the buffering badge never shows user info even for MRLs that don't parse; A→B key read under the config lock; zips without `plugins.dat`).
+- **Crash at start (found by the live run, fixed before merge):** the now-playing seek bar was disabled in its constructor before its seek timer existed, and the new `changeEvent` stopped that timer. Every package rebuild now gets a start/play/quit smoke run before any other test.
+- **Live run findings fixed:** "Show more options" ignored a screen reader's toggle (connected to `clicked`); the speed popover lost its tick for 1.5×/1.75× (the input quantises the rate to 1000/rate); popover rows now expose their checked state; the Open media size drifted and couldn't shrink after a restore (saved as shown now, minimum computed without the options); Ctrl+K brings a detached playlist forward; the toolbar editor's profile buttons have names.
+
+| Live check (final package) | Result |
+|---|---|
+| Rotated MP4 card | **pass**: portrait frame (276×480) |
+| Effects with a filtered playlist, Next | **pass**: next item in order |
+| User "Default" toolbar profile; stale built-in Default | **pass** / **pass** |
+| Pending seek across a track change | **pass**: new item starts at 0 |
+| Drawers and badge vs another app in front | **pass**: stay below it |
+| Speed popover 2.00×, 1.50×, 1.75×, 0.75× (tick and checked state) | **pass** |
+| Open media size: tick, restart, untick, resize, old ini | **pass** (by mouse and by screen-reader toggle) |
+| Ctrl+K with a detached playlist | **pass** |
+| Buffering badge: `u:p@`, spaces, IPv6 | **pass** |
+| Recent media off: cache wiped at start | **pass** |
+| Baseline (7 states) and sweep (fullscreen, minimal view, mini player, Effects, Preferences, playlist, quit) | **pass**: exit code 0 |
+
+Still open: popover rows can't be reached with the arrow keys (focus stays on the list); the `.7z` `plugins.dat` misses `libaribcam_plugin.dll` (it doesn't load under wine, so that one plugin is probed at start); auto-hide taskbar, two monitors, OneDrive and Narrator checks remain manual steps.
