@@ -484,8 +484,9 @@ namespace
             if (t && (m == PM_IndicatorWidth || m == PM_IndicatorHeight) && isToggle(w))
                 return t->metric(m == PM_IndicatorWidth ? Theme::ToggleW : Theme::ToggleH)
                      + 4 * Size::FocusRing;
-            /* the forms' label-to-field room (layouts that set no spacing) */
-            if (t && m == PM_LayoutHorizontalSpacing)
+            /* the preference forms' label-to-field room (their grids set no
+             * spacing); other dialogs keep the style's own */
+            if (t && m == PM_LayoutHorizontalSpacing && w && w->window()->inherits("PrefsDialog"))
                 return qMax(QProxyStyle::pixelMetric(m, opt, w), t->px(Size::LabelFieldGap));
             return QProxyStyle::pixelMetric(m, opt, w);
         }

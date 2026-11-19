@@ -131,7 +131,7 @@ namespace RedesignTokens
          * margin and 1 px indent Qt's tooltip label adds itself */
         static const int TooltipPadX = 6, TooltipPadY = 2;
         /* not in tokens.json: the least room between a label and the field
-         * beside it, in every form (Qt's own layout spacing is about 6) */
+         * beside it, in the preference forms (Qt's own spacing is about 6) */
         static const int LabelFieldGap = 14;
         static const int ButtonPadX = 16;
         static const int SidebarItemH = 36, SidebarOpenBtnH = 38, SidebarRailBelow = 1200;
