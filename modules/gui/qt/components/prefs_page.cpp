@@ -612,9 +612,29 @@ PrefsPage::PrefsPage( intf_thread_t *_p_intf, QWidget *_tabAnchor )
     {
         configTime = QFileInfo( configFile ).lastModified();
         watcher = new QFileSystemWatcher( this );
-        watcher->addPath( QFileInfo( configFile ).absolutePath() );
         connect( watcher, &QFileSystemWatcher::directoryChanged, this, &PrefsPage::configSaved );
+        watchConfig();
     }
+}
+
+/* vlcrc's folder; until the first save creates it (a new profile), its
+ * parent, so the folder's creation is seen */
+void PrefsPage::watchConfig()
+{
+    if( !watcher )
+        return;
+    const QString dir = QFileInfo( configFile ).absolutePath();
+    const QStringList watched = watcher->directories();
+    if( watched.contains( dir ) )
+        return;
+    if( QFileInfo( dir ).isDir() )
+    {
+        if( !watched.isEmpty() )
+            watcher->removePaths( watched );
+        watcher->addPath( dir );
+    }
+    else if( watched.isEmpty() && QFileInfo( QFileInfo( dir ).absolutePath() ).isDir() )
+        watcher->addPath( QFileInfo( dir ).absolutePath() );
 }
 
 void PrefsPage::showEvent( QShowEvent *e )
@@ -712,7 +732,8 @@ void PrefsPage::save()
             panels[i]->apply();
     PrefsDialog::saveConfig( p_intf );
     configTime = QFileInfo( configFile ).lastModified();  /* not a change from elsewhere */
-    rebuild();
+    watchConfig();
+    /* no rebuild(): Save closes the page, which drops the panels (cancel) */
 }
 
 void PrefsPage::cancel()
@@ -723,7 +744,11 @@ void PrefsPage::cancel()
 void PrefsPage::reset()
 {
     if( PrefsDialog::resetConfig( window(), p_intf ) )
+    {
+        configTime = QFileInfo( configFile ).lastModified();  /* not a change from elsewhere */
+        watchConfig();
         rebuild();
+    }
 }
 
 /* the complete tree stays a dialog; what it saves shows here afterwards
@@ -731,12 +756,7 @@ void PrefsPage::reset()
 void PrefsPage::showAllSettings()
 {
     PrefsDialog *dialog = new PrefsDialog( window(), p_intf, true );
-    /* the folder may only exist now, after the dialog's first save */
-    connect( dialog, &QDialog::finished, this, [this]() {
-        if( watcher && watcher->directories().isEmpty() )
-            watcher->addPath( QFileInfo( configFile ).absolutePath() );
-        configSaved();
-    } );
+    connect( dialog, &QDialog::finished, this, &PrefsPage::configSaved );
     dialog->toggleVisible();
 }
 
@@ -748,6 +768,7 @@ void PrefsPage::showAllSettings()
  * option if users hit it */
 void PrefsPage::configSaved()
 {
+    watchConfig();  /* the folder may exist only now */
     const QDateTime saved = QFileInfo( configFile ).lastModified();
     if( !saved.isValid() || saved == configTime )
         return;

@@ -71,6 +71,7 @@ private slots:
 
 private:
     void sizeFields( QWidget * );
+    void watchConfig();
     intf_thread_t *p_intf;
     QWidget *tabAnchor;     /* NULL once the page's own buttons follow it */
     QLabel *title;
@@ -81,7 +82,7 @@ private:
     int section;
     bool narrow;
     QString configFile;     /* vlcrc */
-    QFileSystemWatcher *watcher; /* on vlcrc's folder, NULL without one */
+    QFileSystemWatcher *watcher; /* on vlcrc's folder (watchConfig), NULL without one */
     QDateTime configTime;   /* its time when the panels last matched it */
 };
 
