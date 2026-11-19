@@ -107,6 +107,12 @@ void OverlayWindow::raiseDrawers()
 {
     if( !parentWidget() )
         return;
+#ifdef _WIN32
+    /* the overlay goes under the lowest drawer below it: only VLC's own
+     * windows change places, never above another application's (HWND_TOP
+     * would, with VLC in the background), and nothing is activated */
+    QList<HWND> drawers;
+#endif
     foreach( QWidget *w, parentWidget()->findChildren<QWidget *>( QString(),
                                                                  Qt::FindDirectChildrenOnly ) )
     {
@@ -114,13 +120,23 @@ void OverlayWindow::raiseDrawers()
          || !( w->inherits( "PlaylistPanel" ) || w->inherits( "ExtendedDialog" ) ) )
             continue;
 #ifdef _WIN32
-        /* not raise(): it would take the keys from the main window */
-        SetWindowPos( reinterpret_cast<HWND>( w->winId() ), HWND_TOP, 0, 0, 0, 0,
-                      SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE );
+        drawers << reinterpret_cast<HWND>( w->winId() );
 #else
         w->raise();
 #endif
     }
+#ifdef _WIN32
+    if( drawers.isEmpty() )
+        return;
+    const HWND self = reinterpret_cast<HWND>( winId() );
+    HWND lowest = NULL;
+    for( HWND h = GetWindow( self, GW_HWNDNEXT ); h != NULL; h = GetWindow( h, GW_HWNDNEXT ) )
+        if( drawers.contains( h ) )
+            lowest = h;
+    if( lowest )
+        SetWindowPos( self, lowest, 0, 0, 0, 0,
+                      SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER );
+#endif
 }
 
 QEasingCurve OverlayWindow::enterCurve()

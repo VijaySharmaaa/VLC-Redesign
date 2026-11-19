@@ -85,6 +85,7 @@ protected:
     void mouseMoveEvent( QMouseEvent * ) Q_DECL_OVERRIDE;
     void mouseReleaseEvent( QMouseEvent * ) Q_DECL_OVERRIDE;
     void wheelEvent( QWheelEvent * ) Q_DECL_OVERRIDE;
+    void changeEvent( QEvent * ) Q_DECL_OVERRIDE;
 private:
     int valueAt( int x ) const;
     void seek();

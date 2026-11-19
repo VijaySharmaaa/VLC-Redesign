@@ -320,6 +320,19 @@ void ThinSeekBar::mouseReleaseEvent( QMouseEvent *e )
     e->accept();
 }
 
+/* every input change disables the bar first (delInput: inputCanSeek
+ * false), and a disabled bar gets no release: drop the drag there, so no
+ * seek meant for the old item lands on the next one */
+void ThinSeekBar::changeEvent( QEvent *e )
+{
+    if( e->type() == QEvent::EnabledChange && !isEnabled() )
+    {
+        seekLimit->stop();
+        setSliderDown( false );
+    }
+    QSlider::changeEvent( e );
+}
+
 /* the wheel does over the bar what it does over the rest of the player
  * (MainInterface::wheelEvent: the volume); QSlider would move the thumb
  * with no seek */
