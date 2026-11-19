@@ -663,6 +663,9 @@ QWidget *AbstractController::createWidget( buttonType_e button, int options )
         /* our own state changes are silent: toggled() is then the user's,
          * a click or a screen reader's toggle (which emits no clicked()) */
         auto sync = [intf, tracksButton]() {
+            /* open: the accent stays while a track is picked in it */
+            if( tracksButton->property( "open" ).toBool() )
+                return;
             input_thread_t *p_input = MainInputManager::getInstance( intf )->getInput();
             const QSignalBlocker silent( tracksButton );
             tracksButton->setChecked( p_input && var_GetInteger( p_input, "spu-es" ) >= 0 );
