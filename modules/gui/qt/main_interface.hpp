@@ -240,6 +240,7 @@ protected:
     bool                 b_autoresize;          ///< persistent resizable window
     bool                 b_videoFullScreen;     ///< --fullscreen
     bool                 b_miniAfterFullScreen; ///< the mini player, once full screen is left
+    QSize                pendingVideoSize; ///< asked for behind the mini player
     bool                 b_hideAfterCreation;
     bool                 b_minimalView;         ///< Minimal video
     int                  i_minimalSidebarW;     ///< the sidebar width minimal view took

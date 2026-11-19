@@ -988,7 +988,7 @@ QSize MainInterface::stackAreaSize() const
     int w = stackCentralW->width();
     foreach( QWidget *panel, stackCentralW->parentWidget()->findChildren<QWidget *>(
                                  QString(), Qt::FindDirectChildrenOnly ) )
-        if( panel != sidebar && panel != stackCentralW && panel->isVisible() )
+        if( panel != sidebar && panel != stackCentralW && panel->isVisibleTo( this ) )
             w += panel->width();
     return QSize( w, stackCentralW->height() );
 }
@@ -1241,15 +1241,16 @@ void MainInterface::setVideoSize( unsigned int w, unsigned int h )
                              BreakpointWatcher::fromWidth( screen.width() ) );
                 h = screen.height();
                 h -= titleBar->barHeight();
+                /* isVisibleTo: behind the mini player the window is hidden */
                 if( !b_minimalView )
                 {
-                    if( controls->isVisible() )
+                    if( controls->isVisibleTo( this ) )
                         h -= controls->height();
 #ifndef QT_NO_STATUSBAR
-                    if( statusBar()->isVisible() )
+                    if( statusBar()->isVisibleTo( this ) )
                         h -= statusBar()->height();
 #endif
-                    if( inputC->isVisible() )
+                    if( inputC->isVisibleTo( this ) )
                         h -= inputC->height();
                 }
                 if( !titleBar->hasCaptionButtons() )
@@ -1273,6 +1274,13 @@ void MainInterface::setVideoSize( unsigned int w, unsigned int h )
 
 void MainInterface::videoSizeChanged( int w, int h )
 {
+    /* behind the mini player the window is hidden and its layout does not
+     * run (stale stack height): resized once it is shown again */
+    if( isMiniPlayerVisible() )
+    {
+        pendingVideoSize = QSize( w, h );
+        return;
+    }
     /* the video at its size, the docked side panels beside it (resizeStack
      * keeps the window in the work area) */
     if( !playlistWidget || playlistWidget->artContainer->currentWidget() != videoWidget )
@@ -2469,6 +2477,14 @@ bool MainInterface::eventFilter( QObject *obj, QEvent *event )
     {
         miniPlayer->hide();
         emit miniPlayerToggled( false );
+    }
+    /* laid out by now: the video size asked for behind the mini player */
+    if( obj == this && event->type() == QEvent::Show && pendingVideoSize.isValid()
+     && !isMiniPlayerVisible() )
+    {
+        const QSize video = pendingVideoSize;
+        pendingVideoSize = QSize();
+        videoSizeChanged( video.width(), video.height() );
     }
     if ( event->type() == MainInterface::ToolbarsNeedRebuild ) {
         event->accept();
