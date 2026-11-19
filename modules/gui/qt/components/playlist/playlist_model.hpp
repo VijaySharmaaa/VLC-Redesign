@@ -179,6 +179,9 @@ public:
     static QString mainSearch() { return mainSearchText; }
     /* this model shows the main playlist with that filter already */
     bool mainFiltered( const QString &text ) const;
+    /* unmarks the main playlist when no view shows its filter any more:
+     * the player skips the marked items */
+    void clearMainSearch();
 
 private:
     static QString mainSearchText;

@@ -27,6 +27,8 @@
 #include "dialogs/playlist.hpp"
 
 #include "components/playlist/playlist.hpp"
+#include "components/playlist/playlist_model.hpp"   /* PLModel */
+#include "util/searchlineedit.hpp"
 
 #include "util/qt_dirs.hpp"
 #include "dialogs_provider.hpp"
@@ -79,6 +81,13 @@ void PlaylistDialog::showEvent( QShowEvent * event )
 void PlaylistDialog::hideEvent( QHideEvent * event )
 {
     QWidget::hideEvent( event );
+    /* closed, not minimised: a search left behind would make the player
+     * skip the hidden items with nothing on screen */
+    if( playlistWidget && !event->spontaneous() )
+    {
+        playlistWidget->searchEdit->clear();
+        PLModel::getPLModel( p_intf )->clearMainSearch();   /* searched, then browsed away */
+    }
     THEDP->setPanelShown( PLAYLIST_ACTION, false );
     emit visibilityChanged( false );
 }

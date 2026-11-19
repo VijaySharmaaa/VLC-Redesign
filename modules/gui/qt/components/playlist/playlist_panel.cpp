@@ -27,6 +27,7 @@
 #include "components/playlist/sorting.h"            /* COLUMN_* */
 #include "components/library/library_widgets.hpp"     /* setupSearchField */
 #include "input_manager.hpp"
+#include "components/playlist/playlist.hpp"         /* PlaylistWidget::enqueueDrop */
 #include "dialogs_provider.hpp"
 #include "menus.hpp"                    /* MENU_KEY_* */
 #include "util/customwidgets.hpp"                   /* timeString */
@@ -38,11 +39,13 @@
 
 #include <QApplication>
 #include <QBoxLayout>
+#include <QDropEvent>
 #include <QKeyEvent>
 #include <QKeySequence>
 #include <QLabel>
 #include <QLineEdit>
 #include <QMenu>
+#include <QMimeData>
 #include <QPainter>
 #include <QStyledItemDelegate>
 #include <QToolButton>
@@ -228,7 +231,7 @@ PlaylistPanel::PlaylistPanel( intf_thread_t *_p_intf, QBoxLayout *_dock, QWidget
 
     /* Filter, as the library's search field. It marks the playlist's items
      * (PLModel::filter), so the playlist window shows the same search. */
-    QLineEdit *filter = new QLineEdit( content );
+    filter = new QLineEdit( content );
     filter->setAccessibleName( qtr( "Filter playlist" ) );
     filter->setPlaceholderText( qtr( "Filter playlist" ) );
     filter->setToolTip( qtr( "Filter playlist" ) );
@@ -244,7 +247,7 @@ PlaylistPanel::PlaylistPanel( intf_thread_t *_p_intf, QBoxLayout *_dock, QWidget
     PLModel *shared = PLModel::getPLModel( p_intf );
     connect( model, &PLModel::mainEdited, shared, &PLModel::followMain );
     connect( shared, &PLModel::mainEdited, model, &PLModel::followMain );
-    connect( shared, &PLModel::searchChanged, filter, [filter]( const QString &text ) {
+    connect( shared, &PLModel::searchChanged, filter, [this]( const QString &text ) {
         if( filter->text() != text )
             filter->setText( text );
     } );
@@ -298,6 +301,9 @@ PlaylistPanel::PlaylistPanel( intf_thread_t *_p_intf, QBoxLayout *_dock, QWidget
     connect( model, &QAbstractItemModel::dataChanged, this, [this]() { countTimer.start(); } );
 
     connect( t, &Theme::changed, this, [this]() { update(); view->viewport()->update(); } );
+
+    /* the list takes its own reordering drags, other drops come here */
+    setAcceptDrops( true );
 }
 
 void PlaylistPanel::updateCount()
@@ -326,6 +332,7 @@ void PlaylistPanel::setOpen( bool open )
     {
         slide->stop();
         hide();   /* exit is instant */
+        filter->clear();
         return;
     }
     updateCount();
@@ -339,6 +346,16 @@ void PlaylistPanel::setOpen( bool open )
         activateWindow();
         view->setFocus();
     }
+}
+
+void PlaylistPanel::focusFilter()
+{
+    if( drawer )
+    {
+        raise();
+        activateWindow();
+    }
+    filter->setFocus( Qt::ShortcutFocusReason );
 }
 
 void PlaylistPanel::setBreakpoint( BreakpointWatcher::Size bp )
@@ -371,6 +388,17 @@ bool PlaylistPanel::eventFilter( QObject *obj, QEvent *e )
         }
     }
     return QWidget::eventFilter( obj, e );
+}
+
+void PlaylistPanel::dragEnterEvent( QDragEnterEvent *e )
+{
+    if( e->mimeData()->hasUrls() )
+        e->acceptProposedAction();
+}
+
+void PlaylistPanel::dropEvent( QDropEvent *e )
+{
+    PlaylistWidget::enqueueDrop( p_intf, e );
 }
 
 void PlaylistPanel::popup( const QPoint &pos )

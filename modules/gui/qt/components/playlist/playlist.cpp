@@ -193,6 +193,12 @@ void PlaylistWidget::dropEvent( QDropEvent *event )
         p_intf->p_sys->p_mi->dropEventPlay( event, false,
                 (selector->getCurrentItemCategory() == IS_PL) );
 }
+
+void PlaylistWidget::enqueueDrop( intf_thread_t *p_intf, QDropEvent *event )
+{
+    if( p_intf->p_sys->p_mi )
+        p_intf->p_sys->p_mi->dropEventPlay( event, false, true );
+}
 void PlaylistWidget::dragEnterEvent( QDragEnterEvent *event )
 {
     event->acceptProposedAction();

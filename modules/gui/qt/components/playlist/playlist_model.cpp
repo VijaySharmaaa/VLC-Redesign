@@ -666,6 +666,9 @@ void PLModel::processItemAppend( int i_pl_itemid, int i_pl_itemidparent )
         emit currentIndexChanged( index( newItem, 0 ) );
 
     if( latestSearch.isEmpty() ) return;
+    /* the main playlist keeps only its own filter: not one made in a node
+     * the playlist window browsed into */
+    if( isMain() && latestSearch != mainSearchText ) return;
     /* not filter(): the other models get their own append, and the search
      * did not change. shortcut: each model re-runs the search per appended
      * item; filter only the new item when long filtered loads are slow */
@@ -675,6 +678,7 @@ void PLModel::processItemAppend( int i_pl_itemid, int i_pl_itemidparent )
 void PLModel::rebuild( playlist_item_t *p_root )
 {
     beginResetModel();
+    bool searched = false;
 
     {
         vlc_playlist_locker pl_lock ( THEPL );
@@ -684,7 +688,10 @@ void PLModel::rebuild( playlist_item_t *p_root )
         {
             /* the main playlist's items keep the filter */
             if( p_root == p_playlist->p_playing )
+            {
+                searched = latestSearch != mainSearchText;
                 latestSearch = mainSearchText;
+            }
             if ( rootItem ) delete rootItem;
             rootItem = new PLItem( p_root );
         }
@@ -696,6 +703,8 @@ void PLModel::rebuild( playlist_item_t *p_root )
     /* And signal the view */
     endResetModel();
     if( p_root ) emit rootIndexChanged();
+    /* the search field shows the filter the items have */
+    if( searched ) emit searchChanged( mainSearchText );
 }
 
 void PLModel::takeItem( PLItem *item )
@@ -889,17 +898,20 @@ void PLModel::sortInternal( QModelIndex rootIndex, int mode, int type )
             endInsertRows( );
         }
     }
-    if( isMain() )
+    /* a node's order is not in the docked playlist's rows */
+    if( isMain() && item == rootItem )
         emit mainEdited();
 }
 
 void PLModel::filter( const QString& search_text, const QModelIndex & idx, bool b_recursive )
 {
-    const bool main = applyFilter( search_text, idx, b_recursive );
-    if( isMain() ) /* also a node's filter, in the playlist window */
+    /* a node's filter (the playlist window browsed into it) leaves the
+     * other views alone: their rows stay the same */
+    if( applyFilter( search_text, idx, b_recursive ) )
+    {
         emit mainEdited();
-    if( main )
         emit searchChanged( search_text );
+    }
 }
 
 /* returns whether it filtered the main playlist */
@@ -952,6 +964,8 @@ void PLModel::followMain()
     const bool searched = latestSearch != mainSearchText;
     latestSearch = mainSearchText;
     rebuild();
+    /* the playlist window's view goes back into the node it showed */
+    emit rootIndexChanged();
     if( searched )
         emit searchChanged( mainSearchText );
 }
@@ -959,6 +973,20 @@ void PLModel::followMain()
 bool PLModel::mainFiltered( const QString &text ) const
 {
     return text == mainSearchText && text == latestSearch && isMain();
+}
+
+void PLModel::clearMainSearch()
+{
+    if( mainSearchText.isEmpty() )
+        return;
+    {
+        vlc_playlist_locker pl_lock( THEPL );
+        playlist_LiveSearchUpdate( p_playlist, p_playlist->p_playing, "", true );
+    }
+    mainSearchText.clear();
+    followMain();
+    emit mainEdited();
+    emit searchChanged( mainSearchText );
 }
 
 void PLModel::removeAll()

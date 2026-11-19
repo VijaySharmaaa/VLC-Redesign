@@ -57,6 +57,9 @@ public:
     void forceHide();
     void forceShow();
     void setSearchFieldFocus();
+    /* queues the dropped files: the docked playlist's drops too, through
+     * this friend of MainInterface */
+    static void enqueueDrop( intf_thread_t *, QDropEvent * );
     QStackedWidget *artContainer;
     StandardPLPanel      *mainView;
 
