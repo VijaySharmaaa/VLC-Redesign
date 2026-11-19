@@ -59,6 +59,9 @@
 
 #include <assert.h>
 
+/* the built-in Default profile in the profile combo (never saved) */
+static const int BuiltInRole = Qt::UserRole + 1;
+
 ToolbarEditDialog::ToolbarEditDialog( QWidget *_w, intf_thread_t *_p_intf)
                   : QVLCDialog( _w,  _p_intf )
 {
@@ -162,10 +165,10 @@ ToolbarEditDialog::ToolbarEditDialog( QWidget *_w, intf_thread_t *_p_intf)
     for( int i = 0; i < i_size; i++ )
     {
         getSettings()->setArrayIndex(i);
-        const QString name = getSettings()->value( "ProfileName" ).toString();
-        /* the Default deck comes from this build, not from a saved copy */
-        if( name != qtr( "Default" ) )
-            profileCombo->addItem( name, getSettings()->value( "Value" ).toString() );
+        /* every saved one, also one the user named Default: the built-in
+         * Default is never saved (marked below) */
+        profileCombo->addItem( getSettings()->value( "ProfileName" ).toString(),
+                               getSettings()->value( "Value" ).toString() );
     }
     getSettings()->endArray();
 
@@ -182,8 +185,12 @@ ToolbarEditDialog::ToolbarEditDialog( QWidget *_w, intf_thread_t *_p_intf)
         profileCombo->addItem( PROFILE_NAME_4, QString( VALUE_4 ) );
         profileCombo->addItem( PROFILE_NAME_5, QString( VALUE_5 ) );
     }
-    /* not saved (the destructor skips it): follows VALUE_DEFAULT */
-    profileCombo->insertItem( 0, qtr( "Default" ), QString( VALUE_DEFAULT ) );
+    /* not saved (the destructor skips it by its mark): follows
+     * VALUE_DEFAULT; named apart from a user's profile called Default */
+    profileCombo->insertItem( 0, profileCombo->findText( qtr( "Default" ) ) < 0
+                                 ? qtr( "Default" ) : qtr( "Default (VLC)" ),
+                              QString( VALUE_DEFAULT ) );
+    profileCombo->setItemData( 0, true, BuiltInRole );
     profileCombo->setCurrentIndex( -1 );
 
     /* Build and prepare our preview */
@@ -218,7 +225,7 @@ ToolbarEditDialog::~ToolbarEditDialog()
     getSettings()->beginWriteArray( "ToolbarProfiles" );
     for( int i = 0, saved = 0; i < profileCombo->count(); i++ )
     {
-        if( profileCombo->itemText( i ) == qtr( "Default" ) )
+        if( profileCombo->itemData( i, BuiltInRole ).toBool() )
             continue;
         getSettings()->setArrayIndex( saved++ );
         getSettings()->setValue( "ProfileName", profileCombo->itemText( i ) );
