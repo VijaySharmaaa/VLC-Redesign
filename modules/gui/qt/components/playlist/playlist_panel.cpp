@@ -297,6 +297,8 @@ PlaylistPanel::PlaylistPanel( intf_thread_t *_p_intf, QBoxLayout *_dock, QWidget
     connect( model, &QAbstractItemModel::rowsInserted, this, [this]() { countTimer.start(); } );
     connect( model, &QAbstractItemModel::rowsRemoved, this, [this]() { countTimer.start(); } );
     connect( model, &QAbstractItemModel::modelReset, this, [this]() { countTimer.start(); } );
+    /* PLModel::followMain(): the other view filtered or sorted */
+    connect( model, &QAbstractItemModel::layoutChanged, this, [this]() { countTimer.start(); } );
     /* durations arrive with preparsing */
     connect( model, &QAbstractItemModel::dataChanged, this, [this]() { countTimer.start(); } );
 
