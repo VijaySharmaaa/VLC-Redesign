@@ -558,15 +558,23 @@ void Thumbnailer::start( const Request &r )
 }
 
 /* The scene filter writes a .swp file and renames it: once the picture is
- * there it is whole, and the rest of the playback is not waited for */
+ * there it is whole, and the rest of the playback is not waited for. The
+ * pixel aspect line is printed before, but it can still be in the pipe:
+ * the picture is taken once that line is read (or the process ended,
+ * finish() then reads the rest), so the aspect never depends on which
+ * came first; at the timeout a written picture is kept as it is */
 void Thumbnailer::check()
 {
     QList<QProcess *> done, late;
     foreach( const Job &j, jobs )
-        if( QFileInfo( j.tmpFile ).size() > 0 )
+    {
+        const bool written = QFileInfo( j.tmpFile ).size() > 0;
+        const bool timedOut = j.clock.elapsed() > Library::ThumbTimeoutMs;
+        if( written && ( j.sarDen || timedOut ) )
             done << j.process;
-        else if( j.clock.elapsed() > Library::ThumbTimeoutMs )
+        else if( timedOut )
             late << j.process;
+    }
     foreach( QProcess *p, done )
         finish( p, true );
     foreach( QProcess *p, late )

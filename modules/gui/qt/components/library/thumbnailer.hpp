@@ -95,7 +95,7 @@ private:
         QString tmpFile;
         QProcess *process;
         QElapsedTimer clock;
-        unsigned sarNum, sarDen;             /* 0 until its log tells */
+        unsigned sarNum, sarDen;             /* den 0 until its log tells */
     };
     Thumbnailer( intf_thread_t *, QObject *parent );
     /* asked: the epoch of the frame() that started the probe */
