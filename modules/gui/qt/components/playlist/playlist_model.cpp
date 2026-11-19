@@ -975,6 +975,20 @@ bool PLModel::mainFiltered( const QString &text ) const
     return text == mainSearchText && text == latestSearch && isMain();
 }
 
+void PLModel::clearMainSearch()
+{
+    if( mainSearchText.isEmpty() )
+        return;
+    {
+        vlc_playlist_locker pl_lock( THEPL );
+        playlist_LiveSearchUpdate( p_playlist, p_playlist->p_playing, "", true );
+    }
+    mainSearchText.clear();
+    followMain();
+    emit mainEdited();
+    emit searchChanged( mainSearchText );
+}
+
 void PLModel::removeAll()
 {
     if( rowCount() < 1 ) return;

@@ -2405,6 +2405,15 @@ void MainInterface::handleKeyPress( QKeyEvent *e )
         e->accept();
     }
     else if( ( e->modifiers() & Qt::ControlModifier ) && ( e->key() == Qt::Key_K ) &&
+        b_plDocked )
+    {
+        /* the docked panel's filter: the playlistWidget page is not shown */
+        if( !( playlistPanel && playlistPanel->isVisible() ) )
+            togglePlaylist();
+        playlistPanel->focusFilter();
+        e->accept();
+    }
+    else if( ( e->modifiers() & Qt::ControlModifier ) && ( e->key() == Qt::Key_K ) &&
         playlistWidget )
     {
         playlistWidget->setSearchFieldFocus();

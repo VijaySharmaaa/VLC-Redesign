@@ -30,6 +30,7 @@
 #include <QTimer>
 
 class QLabel;
+class QLineEdit;
 class QModelIndex;
 class PLModel;
 class PlListView;
@@ -44,7 +45,11 @@ class PlaylistPanel : public SidePanel
 public:
     PlaylistPanel( intf_thread_t *, QBoxLayout *dock, QWidget *over );
 
+    /* closing clears the filter: its marks would make the player skip the
+     * hidden items with nothing on screen */
     void setOpen( bool );
+    /* Ctrl+K, as the playlist window's search */
+    void focusFilter();
 
 public slots:
     void setBreakpoint( BreakpointWatcher::Size );
@@ -64,6 +69,7 @@ private:
     PLModel *model;
     PlListView *view;
     QLabel *count;
+    QLineEdit *filter;
     QTimer countTimer;
 };
 

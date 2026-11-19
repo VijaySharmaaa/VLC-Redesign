@@ -228,7 +228,7 @@ PlaylistPanel::PlaylistPanel( intf_thread_t *_p_intf, QBoxLayout *_dock, QWidget
 
     /* Filter, as the library's search field. It marks the playlist's items
      * (PLModel::filter), so the playlist window shows the same search. */
-    QLineEdit *filter = new QLineEdit( content );
+    filter = new QLineEdit( content );
     filter->setAccessibleName( qtr( "Filter playlist" ) );
     filter->setPlaceholderText( qtr( "Filter playlist" ) );
     filter->setToolTip( qtr( "Filter playlist" ) );
@@ -244,7 +244,7 @@ PlaylistPanel::PlaylistPanel( intf_thread_t *_p_intf, QBoxLayout *_dock, QWidget
     PLModel *shared = PLModel::getPLModel( p_intf );
     connect( model, &PLModel::mainEdited, shared, &PLModel::followMain );
     connect( shared, &PLModel::mainEdited, model, &PLModel::followMain );
-    connect( shared, &PLModel::searchChanged, filter, [filter]( const QString &text ) {
+    connect( shared, &PLModel::searchChanged, filter, [this]( const QString &text ) {
         if( filter->text() != text )
             filter->setText( text );
     } );
@@ -326,6 +326,7 @@ void PlaylistPanel::setOpen( bool open )
     {
         slide->stop();
         hide();   /* exit is instant */
+        filter->clear();
         return;
     }
     updateCount();
@@ -339,6 +340,16 @@ void PlaylistPanel::setOpen( bool open )
         activateWindow();
         view->setFocus();
     }
+}
+
+void PlaylistPanel::focusFilter()
+{
+    if( drawer )
+    {
+        raise();
+        activateWindow();
+    }
+    filter->setFocus( Qt::ShortcutFocusReason );
 }
 
 void PlaylistPanel::setBreakpoint( BreakpointWatcher::Size bp )
