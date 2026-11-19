@@ -33,6 +33,7 @@
 #include <vlc_interface.h>              /* EXTENSIONS_VIDEO */
 
 #include <climits>                       /* INT_MAX */
+#include <cstdio>                        /* sscanf */
 #ifdef _WIN32
 # include <windows.h>                    /* GetFileAttributesW */
 /* Windows 10 1709 names, missing from older SDKs */
@@ -52,7 +53,9 @@
 #include <QFileInfo>
 #include <QMutex>
 #include <QPointer>
+#include <QImage>
 #include <QProcess>
+#include <QSaveFile>
 #include <QStandardPaths>
 #include <QThread>
 #include <QTimer>
@@ -495,6 +498,7 @@ void Thumbnailer::start( const Request &r )
 {
     Job j;
     j.r = r;
+    j.sarNum = j.sarDen = 0;
     /* one name per grab: a killed one's file goes only once it is let go */
     const QString prefix = QFileInfo( r.file ).completeBaseName()
                          + QString( ".%1.%2.part" ).arg( QCoreApplication::applicationPid() )
@@ -507,9 +511,11 @@ void Thumbnailer::start( const Request &r )
      * library) and not the crash report question; local files only; no
      * Lua scripts (playlist probes) and no preparsing of the item */
     args << "--intf=dummy" << "--dummy-quiet" << "--ignore-config" << "--no-one-instance"
-         << "--no-media-library" << "--no-crashdump" << "--quiet" << "--no-stats"
+         << "--no-media-library" << "--no-crashdump" << "--no-stats"
          << "--no-metadata-network-access" << "--no-lua" << "--no-auto-preparse"
          << "--vout=dummy" << "--no-audio"
+         /* debug messages: the pixel aspect ratio is in one (readLog) */
+         << "--verbose=2" << "--no-color"
          << "--no-spu" << "--no-osd" << "--no-video-title-show" << "--no-sub-autodetect-file"
          /* the scene filter takes system memory pictures; one decoding
           * thread, as several probes run at once */
@@ -533,7 +539,8 @@ void Thumbnailer::start( const Request &r )
 
     QProcess *process = new QProcess( this );
     j.process = process;
-    process->setProcessChannelMode( QProcess::ForwardedChannels );
+    process->setProcessChannelMode( QProcess::MergedChannels );
+    connect( process, &QProcess::readyRead, this, [this, process]() { readLog( process ); } );
     connect( process, static_cast<void (QProcess::*)( int, QProcess::ExitStatus )>( &QProcess::finished ),
              this, [this, process]( int, QProcess::ExitStatus status ) {
         finish( process, status == QProcess::NormalExit );
@@ -573,13 +580,16 @@ void Thumbnailer::finish( QProcess *process, bool ok )
         i++;
     if( i == jobs.count() )
         return;   /* already finished */
+    if( ok )
+        readLog( process );   /* the lines not handled yet */
     Job j = jobs.takeAt( i );
     if( jobs.isEmpty() )
         poll->stop();
     /* the picture is whole once renamed by the scene filter, even while
      * the process still runs */
     if( ok && QFileInfo( j.tmpFile ).size() > 0
-     && ( QFile::rename( j.tmpFile, j.r.file ) || QFileInfo( j.r.file ).size() > 0 ) )
+     && ( saveSquare( j.tmpFile, j.r.file, j.sarNum, j.sarDen )
+       || QFile::rename( j.tmpFile, j.r.file ) || QFileInfo( j.r.file ).size() > 0 ) )
     {
         pendingFrames.remove( j.r.key );
         const Frame f = { j.r.file, epoch };
@@ -599,6 +609,49 @@ void Thumbnailer::finish( QProcess *process, bool ok )
     }
     stopProcess( j.process, j.tmpFile );   /* also after a timeout */
     startNext();
+}
+
+/* The vout's debug line "original format sz 720x576, ..., sar 64:45, ..."
+ * (video_format_Print): the scene filter writes the coded pixels, so an
+ * anamorphic video's frame is squeezed until saveSquare corrects it.
+ * shortcut: not the orientation (not in the line; a phone video shot
+ * upright stays on its side); read the input's video track if needed */
+void Thumbnailer::readLog( QProcess *process )
+{
+    while( process->canReadLine() )
+    {
+        const QByteArray line = process->readLine();
+        const int at = line.indexOf( "original format sz " );
+        const int sar = at < 0 ? -1 : line.indexOf( " sar ", at );
+        unsigned num, den;
+        if( sar < 0 || sscanf( line.constData() + sar, " sar %u:%u", &num, &den ) != 2 )
+            continue;
+        for( int i = 0; i < jobs.count(); i++ )
+            if( jobs.at( i ).process == process )
+            {
+                jobs[i].sarNum = num;
+                jobs[i].sarDen = den;
+            }
+    }
+}
+
+/* The frame scaled to square pixels, into the cache; false when it is
+ * square already (or unknown) or cannot be written */
+bool Thumbnailer::saveSquare( const QString &from, const QString &to, unsigned num, unsigned den )
+{
+    if( !num || !den || num == den )
+        return false;
+    const QImage image( from );
+    if( image.isNull() )
+        return false;
+    /* shortcut: decoded and encoded on the GUI thread (a 480 px PNG, only
+     * for anamorphic videos); move it to filePool if it ever stutters */
+    const int height = qMax( 1, qRound( qreal( image.height() ) * den / num ) );
+    QSaveFile out( to );
+    return out.open( QIODevice::WriteOnly )
+        && image.scaled( image.width(), height, Qt::IgnoreAspectRatio, Qt::SmoothTransformation )
+                .save( &out, "PNG" )
+        && out.commit();
 }
 
 /* Killed without waiting on the GUI thread (an antivirus can hold a dying

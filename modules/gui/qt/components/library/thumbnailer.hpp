@@ -95,6 +95,7 @@ private:
         QString tmpFile;
         QProcess *process;
         QElapsedTimer clock;
+        unsigned sarNum, sarDen;             /* 0 until its log tells */
     };
     Thumbnailer( intf_thread_t *, QObject *parent );
     /* asked: the epoch of the frame() that started the probe */
@@ -104,6 +105,8 @@ private:
     void check();
     void finish( QProcess *, bool ok );
     static void stopProcess( QProcess *, const QString &tmpFile );
+    void readLog( QProcess * );
+    static bool saveSquare( const QString &from, const QString &to, unsigned num, unsigned den );
 
     intf_thread_t *p_intf;
     int epoch;                               /* cancel()s so far */
