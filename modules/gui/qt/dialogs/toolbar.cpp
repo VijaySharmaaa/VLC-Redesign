@@ -180,6 +180,9 @@ ToolbarEditDialog::ToolbarEditDialog( QWidget *_w, intf_thread_t *_p_intf)
         profileCombo->addItem( PROFILE_NAME_4, QString( VALUE_4 ) );
         profileCombo->addItem( PROFILE_NAME_5, QString( VALUE_5 ) );
     }
+    /* profiles saved before the redesign lack its deck */
+    if( profileCombo->findData( QString( VALUE_DEFAULT ) ) < 0 )
+        profileCombo->insertItem( 0, qtr( "Default" ), QString( VALUE_DEFAULT ) );
     profileCombo->setCurrentIndex( -1 );
 
     /* Build and prepare our preview */
@@ -265,7 +268,7 @@ void ToolbarEditDialog::close()
     QString c2 = getSettings()->value( "MainWindow/MainToolbar2" ).toString();
     QString cA = getSettings()->value( "MainWindow/AdvToolbar" ).toString();
     QString c = getSettings()->value( "MainWindow/InputToolbar" ).toString();
-    QString cFSC = getSettings()->value( "MainWindow/FSCToolbar" ).toString();
+    QString cFSC = getSettings()->value( "MainWindow/FSCtoolbar" ).toString();
 
     if ( isChecked == positionCheckbox->isChecked()
          && c1 == controller1->getValue()

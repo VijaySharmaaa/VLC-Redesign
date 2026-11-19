@@ -792,7 +792,13 @@ SpeedLabel::SpeedLabel( intf_thread_t *_p_intf, QWidget *parent )
     setAccessibleName( qtr( "Playback speed" ) );
     connect( THEMIM->getIM(), &InputManager::rateChanged, this, &SpeedLabel::setRate );
     connect( this, &QToolButton::clicked, this, [this]() { showSpeedPopover( p_intf, this ); } );
-    setRate( var_InheritFloat( THEPL, "rate" ) );
+    setRate( currentRate( p_intf ) );
+}
+
+float currentRate( intf_thread_t *p_intf )
+{
+    input_thread_t *p_input = THEMIM->getInput();
+    return p_input ? var_GetFloat( p_input, "rate" ) : var_InheritFloat( THEPL, "rate" );
 }
 
 void SpeedLabel::setRate( float rate )
@@ -865,7 +871,7 @@ SpeedControlWidget::SpeedControlWidget( intf_thread_t *_p_i, QWidget *_parent )
     connect( THEMIM, &MainInputManager::inputChanged, this, &SpeedControlWidget::activateOnState );
     connect( THEMIM->getIM(), &InputManager::rateChanged, this, &SpeedControlWidget::updateControls );
     activateOnState();
-    updateControls( var_InheritFloat( THEPL, "rate" ) );
+    updateControls( currentRate( p_intf ) );
 }
 
 void SpeedControlWidget::activateOnState()
