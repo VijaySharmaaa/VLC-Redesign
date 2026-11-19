@@ -468,3 +468,62 @@ Evidence: `D:\Projects\VLC\spike-results\p6-perf-final\` (not committed). CPU is
 | Resize settle (median / worst) | 7 / 11 ms | — |
 
 The spectrum costs about 1.5 % of a core more than stock's cone while visible. Minimised audio is one noisy sample; re-run interleaved before treating it as a regression.
+
+## Bug audit and fixes (2026-11-19, branch `redesign/bugfix`)
+
+A full audit of `redesign/spectrum-smooth` (code read by area, plus a compile of the Qt plugin with `-O2 -Wshadow -Wnull-dereference -Wlogical-op -Wduplicated-cond -Wmaybe-uninitialized -Wformat=2`) found 63 issues; a review of the fixes found 13 more. All are fixed except where noted. The audit table with every root cause is `redesign/.local/bug-audit-2026-11-19.md`; live evidence is `redesign/.local/bugfix-evidence/` (not committed). Evidence folders `spike-results\` and `showcase\` cited in earlier sections were deleted on 2026-11-19 to free disk space.
+
+**Compiler:** the merged branch builds with no new warning at the default flags or the strict set above on any changed line.
+
+### Root causes of the main fixes
+| Area | Bug | Root cause | Fix |
+|---|---|---|---|
+| Playlist | Filter, close panel: Next skipped items | The filter runs `playlist_LiveSearchUpdate`, which disables non-matches in the core, and closing kept it | A user close clears it; a hide for fullscreen, Effects, Preferences or a dock switch keeps it |
+| Playlist | Ctrl+K did nothing docked | It focused the old hidden playlist widget's search | Opens the panel and focuses its filter (not in fullscreen, minimal view, Effects, Preferences) |
+| Playlist | Files dropped on the panel played | The panel accepted no drops; the window's drop plays | Panel drops enqueue, like stock (owner decision) |
+| Overlays | Buffering overlay showed `user:password` | It painted the raw URI | Shows `scheme://host[:port]/path` built as the core builds item names |
+| Overlays | "Buffering 0%" for `vlc://pause`; drawers covered at XS | Buffering didn't need a track; only the header re-raised drawers | Shown while opening or with a track; every overlay re-raises the drawers when shown |
+| Network | Ungrouped SAP stream tile never played; blank page on no results | Tiles always opened as folders; no no-results state on tiles | Streams play; "No results" with Clear search |
+| Preferences | Two Preferences dialogs from the mini player overwrote each other | A new dialog per Ctrl+P while the main window is hidden | One dialog, raised |
+| Hotkeys | A→B on hard-coded Shift+L | A `QShortcut` on a fixed key | `key-atob` option (Shift+L by default) listed and editable in Hotkeys (owner decision) |
+| Window | Deck/playlist over fullscreen video after a scale change | Toolbar rebuild called `setMinimalView` in fullscreen | Keeps the fullscreen view |
+| Window | Auto-hide taskbar never appeared over maximised VLC | The maximised client rect covered the monitor | 2 px left free on auto-hide edges of the window's new monitor |
+| Window | Play bar cropped after the mini player | Size maths used `isVisible()` of a hidden window | `isVisibleTo()`, size applied on restore |
+| Now playing | Radio showed the station, not the song | Title read from the item, not `input-title-format` | Same name as stock |
+| Now playing | Huge art froze the UI; seek drag flooded seeks | Three full-size decodes on the GUI thread; no seek limit | One scaled decode shared; one seek per 150 ms |
+| Deck | Volume clipped with a stock layout + Advanced Controls | Fitting treated the deck as one row | Measured and dropped per row, each row's own spacing |
+| Thumbnails | Slow loading; minimise restarted them; quit could hang | `cancel()` left queued jobs; hide cancelled on minimise; killed probes waited 30 s | Queue cleared; spontaneous hides ignored; bounded quit; one decoder thread per probe; cache in local AppData (portable folder in portable mode) |
+| Theme | Focus ring missing after keyboard focus | Only Tab and arrows counted as keyboard input | Shortcut keys, Home/End/PageUp/PageDown and the window a key opened count |
+| Stock bugs | Saved playlist size never restored; toolbar editor rewrote settings on close | `playlistSize` read without its group; `FSCToolbar` vs `FSCtoolbar` | Keys fixed |
+
+### Live verification (test package built from the branch)
+| Check | Result |
+|---|---|
+| Filter "gamma", close panel, Next | **pass**: plays beta (stock order); field empty on reopen |
+| Filter kept through Effects open/close | **pass** |
+| Ctrl+K docked / in fullscreen | **pass** / **pass** (no panel beside the video) |
+| `http://alice:Secret123@…` buffering overlay | **pass**: `http://10.255.255.1/movie.mp4`, no credentials in any accessible name |
+| `vlc://pause:20` | **pass**: no buffering overlay |
+| Network search with no match | **pass**: "No results", field named "Search network" |
+| Ctrl+P twice from the mini player | **pass**: one Preferences window |
+| Hotkeys lists A→B (Shift+L); Shift+L toggles A→B | **pass** |
+| Stock layout + Advanced Controls, narrow window | **pass**: volume visible, More present, no stray separator |
+| Mini player, new video, restore | **pass**: deck not cropped |
+| Ctrl+Shift+O focus ring / mouse-opened | **pass**: ring / no ring |
+| Portable thumbnails cache location | **pass**: `portable\thumbnails`, nothing in local or roaming AppData |
+| Pause badge, Effects, Preferences, playlist, Esc, quit | **pass**: exit code 0 |
+
+### Manual test steps
+1. Auto-hide taskbar: turn it on, maximise VLC, move the pointer to the taskbar edge: it slides in. Repeat after Win+Shift+Arrow to a second monitor.
+2. Two monitors with different scales, `qt-fullscreen-screennumber` on the other one: fullscreen video shows no deck or playlist.
+3. Internet radio (ICY): the bar shows the current song.
+4. Anamorphic DVD rip in Videos: 16:9 card.
+5. OneDrive online-only video in Videos: not downloaded, placeholder card.
+
+### Deferred
+- Rotated phone videos keep sideways thumbnails (orientation isn't in the probe's log); a frame written before the aspect line is read stays squeezed.
+- Release zips have no `plugins.dat` (the cross build skips `vlc-cache-gen`; needs `extras/package/win32/package.mak`). The fast rebuild loop now refreshes it.
+- After a filter/sort, the other playlist view keeps its folder but loses selection and expansion.
+- A toolbar profile the user named "Default" is replaced by the built-in Default.
+- Unconfirmed: Ctrl+K pressed in video fullscreen may open the panel once fullscreen ends.
+- `harness.py baseline` waits for a window resize that the redesign no longer does (library pages keep their size), and `shot.ps1` can't capture overlay windows.
