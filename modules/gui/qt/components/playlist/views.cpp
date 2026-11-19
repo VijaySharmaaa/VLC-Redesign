@@ -104,8 +104,9 @@ void PlIconViewItemDelegate::paint( QPainter * painter, const QStyleOptionViewIt
 
     // Draw the drop shadow
     painter->save();
-    painter->setOpacity( 0.7 );
-    painter->setBrush( Theme::instance()->color( Theme::PausedBadgeBg ) ); /* black shadow, both themes */
+    QColor shadow( Qt::black );   /* both themes, as the drawer's */
+    shadow.setAlpha( RedesignTokens::Playlist::DrawerShadowAlpha );
+    painter->setBrush( shadow );
     painter->setPen( Qt::NoPen );
     painter->drawRoundedRect( artRect.adjusted( 0, 0, 2, 2 ), ART_RADIUS, ART_RADIUS );
     painter->restore();
