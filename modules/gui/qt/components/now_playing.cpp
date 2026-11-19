@@ -44,10 +44,12 @@
 #include <QGridLayout>
 #include <QHBoxLayout>
 #include <QIconEngine>
+#include <QImageReader>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QListView>
 #include <QPainter>
+#include <QtMath>
 #include <QPropertyAnimation>
 #include <QSettings>
 #include <QStyle>
@@ -164,13 +166,12 @@ void ArtView::childEvent( QChildEvent *e )
     QWidget::childEvent( e );
 }
 
-/* every info update calls this: decode the file only when it changes */
-void ArtView::setArt( const QString &url )
+/* every info update calls this: crop again only when the art changes */
+void ArtView::setArt( const QPixmap &pixmap )
 {
-    if( url == artUrl )
+    if( pixmap.cacheKey() == art.cacheKey() )
         return;
-    artUrl = url;
-    art = url.isEmpty() ? QPixmap() : QPixmap( url );
+    art = pixmap;
     scaled = QPixmap();
     QWidget::update();
 }
@@ -341,7 +342,7 @@ NowPlayingInfo::NowPlayingInfo( intf_thread_t *_p_i, QObject *parent )
              [this]( const QString &url ) {
                  if( url.isEmpty() && !THEMIM->getIM()->hasInput() )
                      return;
-                 art = url;
+                 setArt( url );
                  emit changed();
              } );
     /* the name stock shows: input-title-format, with a stream's now playing */
@@ -357,10 +358,32 @@ NowPlayingInfo::NowPlayingInfo( intf_thread_t *_p_i, QObject *parent )
         if( has && THEMIM->getInput() )
         {
             title = THEMIM->getIM()->getName();
-            art = InputManager::decodeArtURL( input_GetItem( THEMIM->getInput() ) );
+            setArt( InputManager::decodeArtURL( input_GetItem( THEMIM->getInput() ) ) );
             readItem( input_GetItem( THEMIM->getInput() ) );
         }
     } );
+}
+
+/* Decoded once for all the views, no larger than the biggest of them
+ * needs: a 6000 px cover would take 144 MB and freeze the interface */
+void NowPlayingInfo::setArt( const QString &url )
+{
+    if( url == artUrl )
+        return;
+    artUrl = url;
+    art = QPixmap();
+    if( url.isEmpty() )
+        return;
+    /* shortcut: sized for the scale at decode, a later scale change
+     * crops from it until the next item; decode again on Theme::changed
+     * if that blur shows */
+    const int cap = qCeil( Theme::instance()->px( qMax( NowPlaying::ArtL, NowPlaying::MiniW ) )
+                           * qApp->devicePixelRatio() );
+    QImageReader reader( url );
+    const QSize full = reader.size();
+    if( full.isValid() && qMin( full.width(), full.height() ) > cap )
+        reader.setScaledSize( full.scaled( cap, cap, Qt::KeepAspectRatioByExpanding ) );
+    art = QPixmap::fromImage( reader.read() );
 }
 
 void NowPlayingInfo::readItem( input_item_t *p_item )

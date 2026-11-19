@@ -58,12 +58,11 @@ public:
     /* stripe: the placeholder's stripe period, radius: corners (token px),
      * onVideo: stands for the video, so its placeholder stays dark */
     ArtView( int stripe, int radius, QWidget *parent, bool onVideo = false );
-    void setArt( const QString &url );  /* empty: placeholder */
+    void setArt( const QPixmap & );  /* null: placeholder */
 protected:
     void paintEvent( QPaintEvent * ) Q_DECL_OVERRIDE;
     void childEvent( QChildEvent * ) Q_DECL_OVERRIDE;
 private:
-    QString artUrl;
     QPixmap art, scaled;    /* scaled: art cropped to the last paint's size */
     int stripe, radius;
     bool onVideo;
@@ -99,14 +98,17 @@ class NowPlayingInfo : public QObject
     Q_OBJECT
 public:
     NowPlayingInfo( intf_thread_t *, QObject *parent );
-    QString title, artist, album, year, format, art;
+    QString title, artist, album, year, format;
+    QPixmap art;    /* decoded once, shared by the views; null: none */
     /* "artist · album", or the format when there is no tag */
     QString metaLine() const;
 signals:
     void changed();
 private:
     void readItem( input_item_t * );
+    void setArt( const QString &url );
     intf_thread_t *p_intf;
+    QString artUrl;
 };
 
 /* Transport buttons shared by the bar and the mini player */
