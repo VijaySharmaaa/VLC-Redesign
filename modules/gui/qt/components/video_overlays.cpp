@@ -314,8 +314,10 @@ static QString displayUrl( const QString &mrl )
     return mrl.left( from ) + mrl.mid( host, pathEnd - host );
 }
 
-/* Only an input with a track fills a cache: one without (vlc://pause, a
- * directory or playlist being expanded) keeps "cache" at 0 all along */
+/* Only an input with a track fills a cache once it plays: one without
+ * (vlc://pause, a directory or playlist being expanded: PLAYING_S once its
+ * demux opened) keeps "cache" at 0 all along. While it opens (OPENING_S, a
+ * stream still connecting) it has no track yet and still shows. */
 static bool hasTrack( input_thread_t *input )
 {
     static const char *const vars[] = { "video-es", "audio-es", "spu-es" };
@@ -333,8 +335,8 @@ bool BufferingOverlay::buffering() const
 {
     const int status = THEMIM->getIM()->playingStatus();
     input_thread_t *input = THEMIM->getInput();
-    return onPlayer && ( status == OPENING_S || status == PLAYING_S ) && level() < 1.f
-        && input && hasTrack( input );
+    return onPlayer && input && level() < 1.f
+        && ( status == OPENING_S || ( status == PLAYING_S && hasTrack( input ) ) );
 }
 
 void BufferingOverlay::refresh()
