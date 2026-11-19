@@ -45,11 +45,12 @@ class PlaylistPanel : public SidePanel
 public:
     PlaylistPanel( intf_thread_t *, QBoxLayout *dock, QWidget *over );
 
-    /* closing clears the filter: its marks would make the player skip the
-     * hidden items with nothing on screen */
     void setOpen( bool );
     /* Ctrl+K, as the playlist window's search */
     void focusFilter();
+    /* on a close by the user: the filter's marks would make the player
+     * skip the hidden items with nothing on screen */
+    void clearFilter();
 
 public slots:
     void setBreakpoint( BreakpointWatcher::Size );

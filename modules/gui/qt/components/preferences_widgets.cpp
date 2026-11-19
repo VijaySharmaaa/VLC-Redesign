@@ -1220,58 +1220,61 @@ void KeySelectorControl::finish()
 {
     /* Fill the table */
 
-    /* The core's hotkeys, then this interface's own (qt.cpp: key-atob) */
+    /*
+       Each tree item has:
+        - QString text in column 0
+        - QString name in data of column 0
+        - KeyValue in String in column 1
+     */
+    auto addKey = [this]( const module_config_t *p_config_item ) {
+        QTreeWidgetItem *treeItem = new HotkeyItem();
+        treeItem->setText( ACTION_COL, qtr( p_config_item->psz_text ) );
+        treeItem->setData( ACTION_COL, Qt::UserRole,
+                           QVariant( qfu( p_config_item->psz_name ) ) );
+
+        QString keys = qfu(p_config_item->value.psz ? _(p_config_item->value.psz) : "");
+        treeItem->setText( HOTKEY_COL, keys );
+        treeItem->setToolTip( HOTKEY_COL, qtr("Double click to change.\nDelete key to remove.") );
+        treeItem->setToolTip( GLOBAL_HOTKEY_COL, qtr("Double click to change.\nDelete key to remove.") );
+        treeItem->setData( HOTKEY_COL, Qt::UserRole, QVariant( qfu( p_config_item->value.psz ) ) );
+        table->addTopLevelItem( treeItem );
+    };
+
+    /* Access to the module_config_t */
+    unsigned confsize;
     module_t *p_main = module_get_main();
     assert( p_main );
-    module_t *const modules[] = { p_main, module_find( "qt" ) };
+    module_config_t *p_config = module_config_get( p_main, &confsize );
 
     QMultiMap<QString, QString> global_keys;
-    for( module_t *p_module : modules )
+    for (size_t i = 0; i < confsize; i++)
     {
-        if( !p_module )
-            continue;
-        /* Access to the module_config_t */
-        unsigned confsize;
-        module_config_t *p_config = module_config_get( p_module, &confsize );
-        for (size_t i = 0; i < confsize; i++)
+        module_config_t *p_config_item = p_config + i;
+
+        /* If we are a (non-global) key option not empty */
+        if( CONFIG_ITEM(p_config_item->i_type) && p_config_item->psz_name != NULL
+         && !strncmp( p_config_item->psz_name , "key-", 4 )
+         && !EMPTY_STR( p_config_item->psz_text ) )
         {
-            module_config_t *p_config_item = p_config + i;
-
-            /* If we are a (non-global) key option not empty */
-            if( CONFIG_ITEM(p_config_item->i_type) && p_config_item->psz_name != NULL
-             && !strncmp( p_config_item->psz_name , "key-", 4 )
-             && !EMPTY_STR( p_config_item->psz_text ) )
-            {
-                /*
-                   Each tree item has:
-                    - QString text in column 0
-                    - QString name in data of column 0
-                    - KeyValue in String in column 1
-                 */
-                QTreeWidgetItem *treeItem = new HotkeyItem();
-                treeItem->setText( ACTION_COL, qtr( p_config_item->psz_text ) );
-                treeItem->setData( ACTION_COL, Qt::UserRole,
-                                   QVariant( qfu( p_config_item->psz_name ) ) );
-
-                QString keys = qfu(p_config_item->value.psz ? _(p_config_item->value.psz) : "");
-                treeItem->setText( HOTKEY_COL, keys );
-                treeItem->setToolTip( HOTKEY_COL, qtr("Double click to change.\nDelete key to remove.") );
-                treeItem->setToolTip( GLOBAL_HOTKEY_COL, qtr("Double click to change.\nDelete key to remove.") );
-                treeItem->setData( HOTKEY_COL, Qt::UserRole, QVariant( qfu( p_config_item->value.psz ) ) );
-                table->addTopLevelItem( treeItem );
-                continue;
-            }
-
-            if( CONFIG_ITEM(p_config_item->i_type) && p_config_item->psz_name != NULL
-             && !strncmp( p_config_item->psz_name , "global-key", 10 )
-             && !EMPTY_STR( p_config_item->psz_text )
-             && !EMPTY_STR( p_config_item->value.psz ) )
-            {
-                global_keys.insert( qtr( p_config_item->psz_text ), qfu( p_config_item->value.psz ) );
-            }
+            addKey( p_config_item );
+            continue;
         }
-        module_config_free( p_config );
+
+        if( CONFIG_ITEM(p_config_item->i_type) && p_config_item->psz_name != NULL
+         && !strncmp( p_config_item->psz_name , "global-key", 10 )
+         && !EMPTY_STR( p_config_item->psz_text )
+         && !EMPTY_STR( p_config_item->value.psz ) )
+        {
+            global_keys.insert( qtr( p_config_item->psz_text ), qfu( p_config_item->value.psz ) );
+        }
     }
+    module_config_free( p_config );
+
+    /* this interface's own (qt.cpp): private, so module_config_get() skips
+     * it and the Qt module's advanced page shows no second table */
+    const module_config_t *p_atob = config_FindConfig( "key-atob" /* MENU_KEY_ATOB */ );
+    if( p_atob )
+        addKey( p_atob );
 
     auto i = global_keys.constBegin();
     while (i != global_keys.constEnd())

@@ -332,7 +332,6 @@ void PlaylistPanel::setOpen( bool open )
     {
         slide->stop();
         hide();   /* exit is instant */
-        filter->clear();
         return;
     }
     updateCount();
@@ -356,6 +355,11 @@ void PlaylistPanel::focusFilter()
         activateWindow();
     }
     filter->setFocus( Qt::ShortcutFocusReason );
+}
+
+void PlaylistPanel::clearFilter()
+{
+    filter->clear();
 }
 
 void PlaylistPanel::setBreakpoint( BreakpointWatcher::Size bp )

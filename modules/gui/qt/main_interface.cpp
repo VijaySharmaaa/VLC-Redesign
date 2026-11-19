@@ -1531,6 +1531,8 @@ void MainInterface::togglePlaylist()
         /* from what is on screen: full screen hides the panel */
         playlistVisible = !( playlistPanel && playlistPanel->isVisible() );
         showPlaylistPanel( playlistVisible );
+        if( !playlistVisible )   /* closed by the user, not stepped aside */
+            playlistPanel->clearFilter();
     }
     else
     {
@@ -1589,8 +1591,9 @@ void MainInterface::dockPlaylist( bool p_docked )
     else /* Previously undocked */
     {
         playlistVisible = dialog->isVisible();
-        dialog->hide();
+        /* exported first: the hide then is no close, the search stays */
         playlistWidget = dialog->exportPlaylistWidget();
+        dialog->hide();
         stackCentralW->addWidget( playlistWidget );
 
         /* If playlist is invisible don't show it */
@@ -2387,8 +2390,8 @@ static bool isAtoBKey( intf_thread_t *p_intf, uint_fast32_t key )
     char *psz = var_InheritString( p_intf, MENU_KEY_ATOB );
     bool match = false;
     char *save;
-    for( char *k = psz ? strtok_r( psz, "	", &save ) : NULL; k && !match;
-         k = strtok_r( NULL, "	", &save ) )
+    for( char *k = psz ? strtok_r( psz, "\t", &save ) : NULL; k && !match;
+         k = strtok_r( NULL, "\t", &save ) )
         match = vlc_str2keycode( k ) == key;
     free( psz );
     return match;
@@ -2431,10 +2434,16 @@ void MainInterface::handleKeyPress( QKeyEvent *e )
     else if( ( e->modifiers() & Qt::ControlModifier ) && ( e->key() == Qt::Key_K ) &&
         b_plDocked )
     {
-        /* the docked panel's filter: the playlistWidget page is not shown */
-        if( !( playlistPanel && playlistPanel->isVisible() ) )
+        /* the docked panel's filter: the playlistWidget page is not shown;
+         * not opened where the panel steps aside (full screen, minimal
+         * view, the Effects sheet, Preferences) */
+        if( !( playlistPanel && playlistPanel->isVisible() )
+         && !b_videoFullScreen && !b_minimalView
+         && !THEDP->isPanelShown( EXTENDED_ACTION )
+         && stackCentralW->currentWidget() != sidebar->page( Sidebar::Preferences ) )
             togglePlaylist();
-        playlistPanel->focusFilter();
+        if( playlistPanel && playlistPanel->isVisible() )
+            playlistPanel->focusFilter();
         e->accept();
     }
     else if( ( e->modifiers() & Qt::ControlModifier ) && ( e->key() == Qt::Key_K ) &&
