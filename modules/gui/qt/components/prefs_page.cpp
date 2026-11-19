@@ -310,6 +310,11 @@ static QFrame *buildRow( const Row &r, const QString &orphan, bool first, QList<
             l->setFont( Theme::instance()->font( Theme::Meta ) );
             return l;
         };
+        /* the labels are not the spin box's: a screen reader gets the
+         * unit from its description (below) */
+        const QString pre = prefix.trimmed(), post = suffix.trimmed();
+        spin->setProperty( "prefsUnit", pre.isEmpty() || post.isEmpty()
+                           ? pre + post : qtr( "%1 ... %2" ).arg( pre, post ) );
         if( !suffix.trimmed().isEmpty() )
             controls.insert( i + 1, unit( suffix ) );
         if( !prefix.trimmed().isEmpty() )
@@ -365,8 +370,10 @@ static QFrame *buildRow( const Row &r, const QString &orphan, bool first, QList<
                 w->setAccessibleName( qtr( p_config->psz_text ) );
             else if( w->accessibleName().isEmpty() && !( b && !b->text().isEmpty() ) )
                 w->setAccessibleName( plainName );
+            const QString unit = w->property( "prefsUnit" ).toString();
             if( w->accessibleDescription().isEmpty() )
-                w->setAccessibleDescription( desc );
+                w->setAccessibleDescription( unit.isEmpty() || desc.isEmpty()
+                                             ? unit + desc : qtr( "%1. %2" ).arg( unit, desc ) );
         }
         addFocus( w, order );
     }
