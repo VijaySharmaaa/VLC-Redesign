@@ -193,6 +193,8 @@ static void ShowDialog   ( intf_thread_t *, int, int, intf_dialog_args_t * );
 #define QT_PAUSE_MINIMIZED_LONGTEXT N_( \
     "With this option enabled, the playback will be automatically paused when minimizing the window." )
 
+#define ATOB_KEY_TEXT N_( "Loop from point A to point B continuously." )
+
 #define ICONCHANGE_TEXT N_( "Allow automatic icon changes")
 #define ICONCHANGE_LONGTEXT N_( \
     "This option allows the interface to change its icon on various occasions.")
@@ -329,6 +331,13 @@ vlc_module_begin ()
     add_bool( "qt-icon-change", true, ICONCHANGE_TEXT, ICONCHANGE_LONGTEXT, true )
 
     add_integer_with_range( "qt-max-volume", 200, 60, 300, VOLUME_MAX_TEXT, VOLUME_MAX_TEXT, true)
+
+    /* The A->B loop's hotkey: the core has no action for it. Private: the
+     * Hotkeys table lists it (KeySelectorControl), an advanced panel of
+     * its own would be a second table. No global key: no one listens. */
+    add_string_inner( CONFIG_ITEM_KEY, "key-atob" /* MENU_KEY_ATOB */, ATOB_KEY_TEXT, ATOB_KEY_TEXT, false,
+                      "Shift+l" )
+        change_private()
 
     add_integer_with_range( "qt-fs-sensitivity", 3, 0, 4000, FULLSCREEN_CONTROL_PIXELS,
             FULLSCREEN_CONTROL_PIXELS, true)

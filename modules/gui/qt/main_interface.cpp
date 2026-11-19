@@ -72,7 +72,6 @@
 #include <QLabel>
 #include <QStackedWidget>
 #include <QScreen>
-#include <QShortcut>
 #include <QAbstractButton>
 #include <QApplication>
 #include <QDialog>
@@ -399,11 +398,8 @@ MainInterface::MainInterface( intf_thread_t *_p_intf, bool customFrame ) : QVLCM
     connect( this, &MainInterface::askBoss, this, &MainInterface::setBoss );
     connect( this, &MainInterface::askRaise, this, &MainInterface::setRaise );
 
-    /* A->B loop: one shortcut for the window, not one per deck button (the
-     * deck, the immersive bar and the FSC each have one, often hidden) */
-    QShortcut *atob = new QShortcut( QKeySequence( qtr( MENU_KEY_ATOB ) ), this );
+    /* the A->B loop's hotkey is handleKeyPress()'s (key-atob) */
     qApp->installEventFilter( new ButtonKeys( this ) );
-    connect( atob, &QShortcut::activated, THEMIM->getIM(), &InputManager::setAtoB );
 
 
     connect( THEDP, &DialogsProvider::releaseMouseEvents, this, &MainInterface::voutReleaseMouseEvents ) ;
@@ -2383,6 +2379,21 @@ void MainInterface::keyReleaseEvent( QKeyEvent *e )
     b_altAlone = false;
 }
 
+/* The A->B loop's hotkey (qt.cpp): the core has no such action, this
+ * window answers it; read at each key, so a saved change applies at once.
+ * One or more keys, split by tabs as the core's are. */
+static bool isAtoBKey( intf_thread_t *p_intf, uint_fast32_t key )
+{
+    char *psz = var_InheritString( p_intf, MENU_KEY_ATOB );
+    bool match = false;
+    char *save;
+    for( char *k = psz ? strtok_r( psz, "	", &save ) : NULL; k && !match;
+         k = strtok_r( NULL, "	", &save ) )
+        match = vlc_str2keycode( k ) == key;
+    free( psz );
+    return match;
+}
+
 void MainInterface::handleKeyPress( QKeyEvent *e )
 {
     /* Esc closes the top-most surface first: the Effects sheet, the
@@ -2425,7 +2436,12 @@ void MainInterface::handleKeyPress( QKeyEvent *e )
     }
 
     int i_vlck = qtEventToVLCKey( e );
-    if( i_vlck > 0 )
+    if( i_vlck > 0 && isAtoBKey( p_intf, i_vlck ) )
+    {
+        THEMIM->getIM()->setAtoB();
+        e->accept();
+    }
+    else if( i_vlck > 0 )
     {
         var_SetInteger( p_intf->obj.libvlc, "key-pressed", i_vlck );
         e->accept();
