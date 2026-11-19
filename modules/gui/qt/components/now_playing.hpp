@@ -28,6 +28,7 @@
 #include <QPixmap>
 
 class QLabel;
+class QTimer;
 class QPainter;
 class QRectF;
 class QListView;
@@ -86,6 +87,7 @@ private:
     int valueAt( int x ) const;
     void seek();
     intf_thread_t *p_intf;
+    QTimer *seekLimit;  /* while dragging: the next seek is due */
     QString timeText;   /* "0:10 of 1:00": the accessible value */
     friend class ThinSeekAccessible;
 };

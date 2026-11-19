@@ -54,6 +54,7 @@
 #include <QSettings>
 #include <QStyle>
 #include <QStyledItemDelegate>
+#include <QTimer>
 #include <QToolButton>
 #include <QVBoxLayout>
 
@@ -253,12 +254,22 @@ ThinSeekBar::ThinSeekBar( intf_thread_t *_p_i, QWidget *parent )
                      setValue( pos < 0.f ? 0 : qRound( pos * maximum() ) );
              } );
     connect( THEMIM->getIM(), &InputManager::inputCanSeek, this, &QWidget::setEnabled );
-    /* keys and wheel: sliderPosition holds the new value already */
+    /* keys: sliderPosition holds the new value already */
     connect( this, &QAbstractSlider::actionTriggered, this, [this]( int action ) {
         if( action != SliderMove )
             seek();
     } );
-    connect( this, &QAbstractSlider::sliderMoved, this, &ThinSeekBar::seek );
+    /* dragging: one seek per SEEK_LIMIT_MS, the last one on release, as
+     * the stock SeekSlider does */
+    enum { SEEK_LIMIT_MS = 150 };
+    seekLimit = new QTimer( this );
+    seekLimit->setSingleShot( true );
+    seekLimit->setInterval( SEEK_LIMIT_MS );
+    connect( seekLimit, &QTimer::timeout, this, &ThinSeekBar::seek );
+    connect( this, &QAbstractSlider::sliderMoved, this, [this]() {
+        if( !seekLimit->isActive() )
+            seekLimit->start();
+    } );
 }
 
 QSize ThinSeekBar::sizeHint() const
@@ -288,7 +299,7 @@ void ThinSeekBar::mousePressEvent( QMouseEvent *e )
     if( e->button() != Qt::LeftButton )
         return QSlider::mousePressEvent( e );
     setSliderDown( true );
-    setSliderPosition( valueAt( e->pos().x() ) );   /* emits sliderMoved: seeks */
+    setSliderPosition( valueAt( e->pos().x() ) );   /* emits sliderMoved */
     e->accept();
 }
 
@@ -301,6 +312,10 @@ void ThinSeekBar::mouseMoveEvent( QMouseEvent *e )
 
 void ThinSeekBar::mouseReleaseEvent( QMouseEvent *e )
 {
+    const bool pending = seekLimit->isActive();
+    seekLimit->stop();
+    if( pending )
+        seek();
     setSliderDown( false );
     e->accept();
 }
