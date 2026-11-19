@@ -122,19 +122,23 @@ class Vlc:
         win32gui.EnumWindows(cb, None)
         return out
 
-    def keys(self, k):
-        # Never type into another app: keys go to whatever window is in front.
+    def front(self):
+        fg = win32gui.GetForegroundWindow()
+        return fg and win32process.GetWindowThreadProcessId(fg)[1] == self.proc.pid
+
+    def to_front(self, why):
         # Focus returns asynchronously after a dialog closes, so ask until VLC has it.
-        def front():
-            fg = win32gui.GetForegroundWindow()
-            return fg and win32process.GetWindowThreadProcessId(fg)[1] == self.proc.pid
         def ours():
             self.main.set_focus()
-            return front()
-        self.wait_for(ours, 'VLC to become the foreground window before sending ' + k, timeout=5)
+            return self.front()
+        self.wait_for(ours, 'VLC to become the foreground window before ' + why, timeout=5)
+
+    def keys(self, k):
+        # Never type into another app: keys go to whatever window is in front.
+        self.to_front('sending ' + k)
         # The user may click another app at any moment: check again right before every key.
         for action in keyboard.parse_keys(k, with_spaces=True):
-            if not front():
+            if not self.front():
                 # Don't leave a modifier held down in the user's app.
                 for vk in (win32con.VK_SHIFT, win32con.VK_CONTROL, win32con.VK_MENU):
                     keyboard.VirtualKeyAction(vk, down=False).run()
@@ -162,10 +166,6 @@ class Vlc:
         win32gui.PostMessage(hwnd, win32con.WM_CLOSE, 0, 0)
         self.wait_for(lambda: hwnd not in self.windows(), 'window to close')
 
-    def main_size(self):
-        r = self.main.rectangle()
-        return r.width(), r.height()
-
     def press_in_window(self, keys, what):
         """Press keys that change the main window itself (a panel, sheet or
         page in the redesign) and wait until its pixels change."""
@@ -177,12 +177,26 @@ class Vlc:
     def toggle_playlist(self):
         self.press_in_window('^l', 'playlist to toggle')   # Ctrl+L is hard-coded in 3.0.x
 
-    def shot(self, out, title=''):
+    def playing_time(self):
+        """Seconds played (rc get_time); 0 before playback starts. Skips the
+        asynchronous 'status change' lines rc may print in between."""
+        lines = [l.strip('> ') for l in self.rc('get_time', wait=0.2).splitlines()]
+        return max([int(l) for l in lines if l.isdigit()] or [0])
+
+    def shot(self, out, title='', overlays=False):
+        """overlays=True also draws this VLC's own windows above the target
+        (overlay badges, toasts, drawers): see shot.ps1 -Overlays."""
         cmd = ['powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
                os.path.join(HERE, 'shot.ps1'), '-Out', out, '-ProcessId', str(self.proc.pid)]
         if title:
             cmd += ['-Title', title]
-        print(subprocess.run(cmd, check=True, capture_output=True, text=True).stdout.strip())
+        if overlays:
+            self.to_front('a screen capture')     # shot.ps1 refuses if another app covers VLC
+            cmd += ['-Overlays']
+        r = subprocess.run(cmd, capture_output=True, text=True)
+        if r.returncode:                  # e.g. -Overlays refusing: another app covers VLC
+            raise RuntimeError('shot.ps1 failed: ' + r.stderr.strip())
+        print(r.stdout.strip())
 
     def quit(self):
         try:
@@ -204,12 +218,13 @@ def baseline(args):
     v = Vlc(args.vlc)
     try:
         v.shot(p('01-main-idle.png'))
-        idle = v.main_size()
         v.rc('add ' + media('test-720p.mp4'), wait=2)
-        v.wait_for(lambda: v.main_size() != idle, 'the video to resize the window')
+        # Stock VLC resizes the window to the video, the redesign keeps its size:
+        # wait for playback to advance instead, which both do.
+        v.wait_for(lambda: v.playing_time() >= 1, 'the video to play', timeout=15)
         v.rc('seek 10', wait=1)
         v.rc('pause', wait=1)
-        v.shot(p('02-main-video-paused.png'))
+        v.shot(p('02-main-video-paused.png'), overlays=True)
         v.toggle_playlist()
         v.shot(p('03-playlist.png'))
         v.toggle_playlist()
