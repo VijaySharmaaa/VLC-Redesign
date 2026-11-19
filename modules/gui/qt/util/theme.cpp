@@ -53,6 +53,7 @@
 #include <QMenuBar>
 #include <QPainter>
 #include <QPalette>
+#include <QPixmapCache>
 #include <QPlainTextEdit>
 #include <QPointer>
 #include <QProxyStyle>
@@ -1106,7 +1107,8 @@ void Theme::paintFocusRing(QPainter *p, const QRectF &r, qreal radius)
  * there, then onto the widget. Those grayscale glyphs come from GDI, which
  * obeys the font's gasp table: at UI sizes Segoe UI gets no smoothing, only
  * pixel-snapped stems. So the text is drawn at 4x the device's pixel ratio,
- * where it is smoothed, and averaged down. */
+ * where it is smoothed, and averaged down; the result is cached, as lists
+ * (the EPG grid, the plugins) repaint the same labels often. */
 void Theme::drawGrayText(QPainter *p, const QRect &r, int flags, const QString &text, const QColor &c)
 {
     static const int SuperSample = 4;
@@ -1114,6 +1116,15 @@ void Theme::drawGrayText(QPainter *p, const QRect &r, int flags, const QString &
     const QSize size = (QSizeF(r.size()) * dpr).toSize();
     if (size.isEmpty())
         return;
+    const QString key = QString("grayText|%1|%2|%3x%4|%5|%6|%7|%8")
+        .arg(p->font().key()).arg(c.rgba()).arg(r.width()).arg(r.height())
+        .arg(dpr).arg(flags).arg(int(p->renderHints())).arg(text);
+    QPixmap cached;
+    if (QPixmapCache::find(key, &cached))
+    {
+        p->drawPixmap(r.topLeft(), cached);
+        return;
+    }
     QImage big(size * SuperSample, QImage::Format_RGBA8888_Premultiplied);
     big.setDevicePixelRatio(dpr * SuperSample);
     big.fill(Qt::transparent);
@@ -1125,7 +1136,10 @@ void Theme::drawGrayText(QPainter *p, const QRect &r, int flags, const QString &
     ip.end();
     QImage img = big.scaled(size, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
     img.setDevicePixelRatio(dpr);
-    p->drawImage(r.topLeft(), img);
+    cached = QPixmap::fromImage(img);
+    cached.setDevicePixelRatio(dpr);
+    QPixmapCache::insert(key, cached);
+    p->drawPixmap(r.topLeft(), cached);
 }
 
 void Theme::setDestructive(QAction *action)
